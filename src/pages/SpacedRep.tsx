@@ -99,8 +99,9 @@ const SpacedRep = () => {
       }
     }
 
-    // Calculate next review date based on level
-    let nextReview: Date | null = null;
+    // Calculate next review date based on completion status
+    let nextReview = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Default to tomorrow
+
     if (completed) {
       const daysToAdd = {
         1: 2,  // Level 1: review in 2 days
@@ -123,7 +124,7 @@ const SpacedRep = () => {
             completed,
             level: nextLevel,
             last_attempted: now.toISOString(),
-            next_review: nextReview?.toISOString() || null,
+            next_review: nextReview.toISOString(),
           })
           .eq("id", currentProblem.attempt.id)
           .eq("user_id", user.id);
@@ -139,7 +140,7 @@ const SpacedRep = () => {
             completed,
             level: nextLevel,
             last_attempted: now.toISOString(),
-            next_review: nextReview?.toISOString() || null,
+            next_review: nextReview.toISOString(),
           });
 
         if (error) throw error;
