@@ -1,335 +1,195 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Check, Clock, RotateCcw, Search } from 'lucide-react';
+import { ChevronRight, Check, Clock, RotateCcw, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { format, isPast } from 'date-fns';
 
 // Components
 import ProblemCard from '../components/ProblemCard';
 import { ProgressRing } from '../components/ProgressRing';
 
-// Utils
-import { getNeetcodeProblems } from '../utils/neetcodeData';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-
-// Types
-import { Problem } from '../types';
-
-// Algorithm categories
-const categories = [
-  'Arrays & Hashing',
-  'Two Pointers',
-  'Sliding Window',
-  'Stack',
-  'Binary Search',
-  'Linked List',
-  'Trees',
-  'Tries',
-  'Heap / Priority Queue',
-  'Backtracking',
-  'Graphs',
-  'Advanced Graphs',
-  'Dynamic Programming',
-  '1D Dynamic Programming',
-  '2D Dynamic Programming',
-  'Greedy',
-  'Intervals',
-  'Math & Geometry',
-  'Bit Manipulation'
-];
+// Supabase
+import { supabase, Problem, ProblemCategory } from '../lib/supabase';
 
 const SpacedRep = () => {
-  const [problems, setProblems] = useLocalStorage<Problem[]>('neetcode-progress', []);
-  const [filteredProblems, setFilteredProblems] = useState<Problem[]>([]);
-  const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showProblemDetails, setShowProblemDetails] = useState(false);
+  const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
+  const [reviewQueue, setReviewQueue] = useState<Problem[]>([]);
+  const [categories, setCategories] = useState<ProblemCategory[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  const itemsPerPage = 8;
-  
-  // Fetch Neetcode problems on first load
   useEffect(() => {
-    const fetchProblems = async () => {
-      if (problems.length === 0) {
-        const neetcodeProblems = getNeetcodeProblems();
-        setProblems(neetcodeProblems);
-        setFilteredProblems(neetcodeProblems);
-      } else {
-        setFilteredProblems(problems);
-      }
-    };
-    
-    fetchProblems();
-  }, [problems, setProblems]);
+    fetchData();
+  }, []);
   
-  // Filter problems based on search query and category
-  useEffect(() => {
-    let filtered = [...problems];
-    
-    if (searchQuery) {
-      filtered = filtered.filter(problem => 
-        problem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        problem.difficulty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        problem.category.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(problem => problem.category === selectedCategory);
-    }
-    
-    setFilteredProblems(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [searchQuery, selectedCategory, problems]);
-  
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredProblems.length / itemsPerPage);
-  const currentProblems = filteredProblems.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  
-  // Calculate statistics
-  const totalCompleted = problems.filter(p => p.completed).length;
-  const completionPercentage = Math.round((totalCompleted / problems.length) * 100) || 0;
-  
-  const handleProblemClick = (problem: Problem) => {
-    setSelectedProblem(problem);
-    setShowProblemDetails(true);
-  };
-  
-  const handleStatusChange = (problemId: number, completed: boolean) => {
-    const updatedProblems = problems.map(p => 
-      p.id === problemId 
-        ? { 
-            ...p, 
-            completed, 
-            lastAttempted: Date.now(),
-            dueDate: completed ? Date.now() + (3 * 24 * 60 * 60 * 1000) : p.dueDate // 3 days later if completed
-          } 
-        : p
-    );
-    
-    setProblems(updatedProblems);
-    
-    if (selectedProblem && selectedProblem.id === problemId) {
-      setSelectedProblem({
-        ...selectedProblem,
-        completed,
-        lastAttempted: Date.now(),
-        dueDate: completed ? Date.now() + (3 * 24 * 60 * 60 * 1000) : selectedProblem.dueDate
-      });
-    }
-  };
-  
-  const resetProblemProgress = () => {
-    if (selectedProblem) {
-      const updatedProblems = problems.map(p => 
-        p.id === selectedProblem.id 
-          ? { 
-              ...p, 
-              completed: false,
-              lastAttempted: null,
-              dueDate: null,
-              notes: ''
-            } 
-          : p
-      );
+  const fetchData = async () => {
+    try {
+      setLoading(true);
       
-      setProblems(updatedProblems);
-      setSelectedProblem({
-        ...selectedProblem,
-        completed: false,
-        lastAttempted: null,
-        dueDate: null,
-        notes: ''
-      });
+      // Fetch categories
+      const { data: categoriesData } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (categoriesData) {
+        setCategories(categoriesData);
+      }
+      
+      // Fetch problems due for review
+      const now = new Date().toISOString();
+      const { data: problemsData } = await supabase
+        .from('problems')
+        .select('*')
+        .lte('next_review', now)
+        .order('next_review');
+      
+      if (problemsData) {
+        setReviewQueue(problemsData);
+        if (problemsData.length > 0 && !currentProblem) {
+          setCurrentProblem(problemsData[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
     }
   };
   
-  const updateNotes = (problemId: number, notes: string) => {
-    const updatedProblems = problems.map(p => 
-      p.id === problemId ? { ...p, notes } : p
-    );
+  const handleComplete = async (completed: boolean) => {
+    if (!currentProblem) return;
     
-    setProblems(updatedProblems);
+    const now = new Date();
+    let nextLevel = completed ? currentProblem.level + 1 : 0;
+    let nextReview: Date | null = null;
     
-    if (selectedProblem && selectedProblem.id === problemId) {
-      setSelectedProblem({
-        ...selectedProblem,
-        notes
-      });
+    // Calculate next review date based on level
+    if (completed) {
+      const daysToAdd = {
+        0: 1,   // Review tomorrow
+        1: 2,   // Review in 2 days
+        2: 4,   // Review in 4 days
+        3: 7,   // Review in 7 days
+        4: 16,  // Review in 16 days
+        5: 30,  // Review in 30 days
+        6: 60   // Review in 60 days
+      }[nextLevel] || null;
+      
+      if (daysToAdd) {
+        nextReview = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+      }
+    }
+    
+    try {
+      await supabase
+        .from('problems')
+        .update({
+          completed,
+          level: nextLevel,
+          last_attempted: now.toISOString(),
+          next_review: nextReview?.toISOString() || null
+        })
+        .eq('id', currentProblem.id);
+      
+      // Move to next problem in queue
+      const nextProblem = reviewQueue.find(p => p.id !== currentProblem?.id);
+      setCurrentProblem(nextProblem || null);
+      setReviewQueue(reviewQueue.filter(p => p.id !== currentProblem?.id));
+      
+      // Refresh data
+      fetchData();
+    } catch (error) {
+      console.error('Error updating problem:', error);
     }
   };
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">Neetcode 150</h1>
           <p className="text-neutral-600 mt-1">Master coding interview problems with spaced repetition</p>
         </div>
         
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
+          <div className="text-sm text-neutral-600">
+            Problems to review today: <span className="font-medium">{reviewQueue.length}</span>
+          </div>
+          
           <ProgressRing 
-            progress={completionPercentage} 
+            progress={Math.round((150 - reviewQueue.length) / 150 * 100)} 
             size={48} 
             strokeWidth={4} 
             color="#3B82F6" 
           />
-          <div>
-            <p className="text-sm font-medium text-neutral-900">Progress</p>
-            <p className="text-lg font-semibold text-primary-600">{totalCompleted} / {problems.length}</p>
-          </div>
         </div>
       </div>
       
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
-            <input
-              type="text"
-              placeholder="Search by title, difficulty, or category..."
-              className="input pl-10"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-        
-        <select
-          value={selectedCategory}
-          onChange={e => setSelectedCategory(e.target.value)}
-          className="select"
-        >
-          <option value="all">All Categories</option>
-          {categories.map(category => (
-            <option key={category} value={category}>{category}</option>
-          ))}
-        </select>
-      </div>
-      
-      {/* Problem Grid and Details */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Current Problem */}
         <div className="lg:col-span-2">
-          {currentProblems.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {currentProblems.map(problem => (
-                <ProblemCard
-                  key={problem.id}
-                  problem={problem}
-                  onClick={() => handleProblemClick(problem)}
-                  onStatusChange={handleStatusChange}
-                  isSelected={selectedProblem?.id === problem.id}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="card bg-white text-center py-12">
-              <p className="text-neutral-600">No problems match your search criteria</p>
-              <button 
-                className="btn btn-primary mt-4"
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedCategory('all');
-                }}
-              >
-                Clear filters
-              </button>
-            </div>
-          )}
-          
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center mt-6 items-center space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-md hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              
-              <span className="text-sm">
-                Page {currentPage} of {totalPages}
-              </span>
-              
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-md hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          )}
-        </div>
-        
-        {/* Problem Details Panel */}
-        <div className={`lg:block ${showProblemDetails ? 'block' : 'hidden'}`}>
-          {selectedProblem ? (
+          {currentProblem ? (
             <motion.div 
-              className="card bg-white sticky top-6"
+              className="card bg-white"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h2 className="text-xl font-medium">{selectedProblem.title}</h2>
+                  <h2 className="text-xl font-medium">{currentProblem.title}</h2>
                   <div className="flex items-center mt-1">
                     <span 
                       className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                        selectedProblem.difficulty === 'Easy' 
+                        currentProblem.difficulty === 'Easy' 
                           ? 'bg-success-500' 
-                          : selectedProblem.difficulty === 'Medium' 
+                          : currentProblem.difficulty === 'Medium' 
                             ? 'bg-warning-500' 
                             : 'bg-error-500'
                       }`} 
                     />
-                    <span className="text-sm text-neutral-600">{selectedProblem.difficulty}</span>
+                    <span className="text-sm text-neutral-600">{currentProblem.difficulty}</span>
                     <span className="text-sm text-neutral-400 mx-2">•</span>
-                    <span className="text-sm text-neutral-600">{selectedProblem.category}</span>
+                    <span className="text-sm text-neutral-600">
+                      Level {currentProblem.level}
+                    </span>
                   </div>
                 </div>
                 
                 <div className="flex space-x-2">
                   <button 
-                    onClick={() => handleStatusChange(selectedProblem.id, !selectedProblem.completed)}
-                    className={`btn ${selectedProblem.completed ? 'btn-secondary' : 'btn-primary'} !p-2`}
-                    aria-label={selectedProblem.completed ? "Mark as incomplete" : "Mark as complete"}
+                    onClick={() => handleComplete(true)}
+                    className="btn btn-primary !p-2"
+                    aria-label="Mark as complete"
                   >
-                    <Check size={16} />
+                    <Check className="h-4 w-4" />
                   </button>
                   
                   <button
-                    onClick={resetProblemProgress}
+                    onClick={() => handleComplete(false)}
                     className="btn btn-outline !p-2"
-                    aria-label="Reset progress"
+                    aria-label="Mark as incomplete"
                   >
-                    <RotateCcw size={16} />
+                    <RotateCcw className="h-4 w-4" />
                   </button>
                 </div>
               </div>
               
-              {selectedProblem.lastAttempted && (
-                <div className="flex items-center mb-4 text-sm text-neutral-500">
-                  <Clock size={14} className="mr-1" />
-                  Last attempted: {new Date(selectedProblem.lastAttempted).toLocaleDateString()}
-                </div>
-              )}
-              
               <div className="mb-4">
                 <h3 className="text-sm font-medium text-neutral-700 mb-1">Problem Description</h3>
                 <p className="text-neutral-600 text-sm">
-                  {selectedProblem.description || 'Visit the problem link to see the full description.'}
+                  {currentProblem.description || 'Visit the problem link to see the full description.'}
                 </p>
                 
-                {selectedProblem.url && (
+                {currentProblem.url && (
                   <a 
-                    href={selectedProblem.url} 
+                    href={currentProblem.url} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="inline-block mt-3 text-primary-600 hover:text-primary-700 text-sm font-medium"
@@ -344,16 +204,24 @@ const SpacedRep = () => {
                 <textarea 
                   className="input !h-32 resize-none"
                   placeholder="Add your notes, solutions, or reminders here..."
-                  value={selectedProblem.notes || ''}
-                  onChange={e => updateNotes(selectedProblem.id, e.target.value)}
+                  value={currentProblem.notes || ''}
+                  onChange={async (e) => {
+                    try {
+                      await supabase
+                        .from('problems')
+                        .update({ notes: e.target.value })
+                        .eq('id', currentProblem.id);
+                    } catch (error) {
+                      console.error('Error updating notes:', error);
+                    }
+                  }}
                 />
               </div>
               
-              {/* Tags/Concepts */}
               <div>
                 <h3 className="text-sm font-medium text-neutral-700 mb-2">Related Concepts</h3>
                 <div className="flex flex-wrap gap-1">
-                  {selectedProblem.tags?.map((tag, index) => (
+                  {currentProblem.tags?.map((tag, index) => (
                     <span 
                       key={index} 
                       className="badge bg-primary-50 text-primary-700"
@@ -366,9 +234,50 @@ const SpacedRep = () => {
             </motion.div>
           ) : (
             <div className="card bg-white text-center py-12">
-              <p className="text-neutral-600">Select a problem to view details</p>
+              <p className="text-neutral-600">No problems to review right now!</p>
+              <p className="text-sm text-neutral-500 mt-2">
+                Come back later when you have problems due for review.
+              </p>
             </div>
           )}
+        </div>
+        
+        {/* Review Queue */}
+        <div className="lg:col-span-1">
+          <div className="card bg-white">
+            <h2 className="text-lg font-medium mb-4">Review Queue</h2>
+            
+            {reviewQueue.length > 0 ? (
+              <div className="space-y-3">
+                {reviewQueue.map(problem => (
+                  <motion.div
+                    key={problem.id}
+                    className={`p-3 rounded-md border transition-colors cursor-pointer ${
+                      currentProblem?.id === problem.id
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-neutral-200 hover:border-primary-300'
+                    }`}
+                    onClick={() => setCurrentProblem(problem)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium">{problem.title}</h3>
+                        <div className="flex items-center mt-1 text-sm text-neutral-500">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Due: {format(new Date(problem.next_review!), 'MMM d')}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-neutral-400" />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-neutral-500 py-8">
+                No problems in queue
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
