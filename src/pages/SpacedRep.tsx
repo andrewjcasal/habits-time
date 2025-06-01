@@ -86,11 +86,14 @@ const SpacedRep = () => {
     if (!currentProblem || !user) return;
 
     const now = new Date();
-    // If completed, increment level. If not completed, reset to level 0
-    let nextLevel = completed ? (currentProblem.attempt?.level ?? -1) + 1 : 0;
-    let nextReview: Date | null = null;
+    
+    // For new attempts, start at level 0 when completing
+    // For existing attempts, increment the current level
+    const currentLevel = currentProblem.attempt?.level ?? -1;
+    const nextLevel = completed ? currentLevel + 1 : 0;
 
     // Calculate next review date based on level
+    let nextReview: Date | null = null;
     if (completed) {
       const daysToAdd = {
         0: 1,  // First completion: review tomorrow
