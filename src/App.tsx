@@ -72,7 +72,7 @@ function App() {
           element={
             user 
               ? <NotFound /> 
-              : <Navigate to="/" replace />
+              : <Navigate to="/\" replace />
           } 
         />
       </Routes>
