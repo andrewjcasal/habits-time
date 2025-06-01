@@ -3,7 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Ensure we have the required environment variables
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('Supabase credentials not found. Please connect to Supabase using the button in the top right.');
+}
+
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder-url.supabase.co',
+  supabaseKey || 'placeholder-key'
+);
 
 // Types for our tables
 export type ProblemCategory = {
