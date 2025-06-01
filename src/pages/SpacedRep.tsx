@@ -7,11 +7,11 @@ import { format, isPast } from 'date-fns';
 import { ProgressRing } from '../components/ProgressRing';
 
 // Supabase
-import { supabase, Problem, ProblemCategory } from '../lib/supabase';
+import { supabase, Problem, ProblemCategory, Attempt, ProblemWithAttempt } from '../lib/supabase';
 
 const SpacedRep = () => {
-  const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
-  const [reviewQueue, setReviewQueue] = useState<Problem[]>([]);
+  const [currentProblem, setCurrentProblem] = useState<ProblemWithAttempt | null>(null);
+  const [reviewQueue, setReviewQueue] = useState<ProblemWithAttempt[]>([]);
   const [categories, setCategories] = useState<ProblemCategory[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -33,19 +33,43 @@ const SpacedRep = () => {
         setCategories(categoriesData);
       }
 
-      // Fetch problems due for review
+      // Fetch attempts due for review
       const now = new Date().toISOString();
-      const { data: problemsData } = await supabase
-        .from("bolt_problems")
+      const { data: attemptsData, error: attemptsError } = await supabase
+        .from("bolt_attempts")
         .select("*")
         .lte("next_review", now)
         .order("next_review");
 
-      if (problemsData) {
-        setReviewQueue(problemsData);
-        if (problemsData.length > 0 && !currentProblem) {
-          setCurrentProblem(problemsData[0]);
+      if (attemptsError) throw attemptsError;
+
+      if (attemptsData && attemptsData.length > 0) {
+        // Get unique problem IDs from attempts
+        const problemIds = [...new Set(attemptsData.map(a => a.problem_id))];
+
+        // Fetch corresponding problems
+        const { data: problemsData, error: problemsError } = await supabase
+          .from("bolt_problems")
+          .select("*")
+          .in("id", problemIds);
+
+        if (problemsError) throw problemsError;
+
+        if (problemsData) {
+          // Combine problems with their attempts
+          const problemsWithAttempts = problemsData.map(problem => ({
+            ...problem,
+            attempt: attemptsData.find(a => a.problem_id === problem.id)
+          }));
+
+          setReviewQueue(problemsWithAttempts);
+          if (problemsWithAttempts.length > 0 && !currentProblem) {
+            setCurrentProblem(problemsWithAttempts[0]);
+          }
         }
+      } else {
+        setReviewQueue([]);
+        setCurrentProblem(null);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -55,10 +79,10 @@ const SpacedRep = () => {
   };
 
   const handleComplete = async (completed: boolean) => {
-    if (!currentProblem) return;
+    if (!currentProblem?.attempt) return;
 
     const now = new Date();
-    let nextLevel = completed ? currentProblem.level + 1 : 0;
+    let nextLevel = completed ? (currentProblem.attempt.level + 1) : 0;
     let nextReview: Date | null = null;
 
     // Calculate next review date based on level
@@ -81,14 +105,14 @@ const SpacedRep = () => {
 
     try {
       await supabase
-        .from("bolt_problems")
+        .from("bolt_attempts")
         .update({
           completed,
           level: nextLevel,
           last_attempted: now.toISOString(),
           next_review: nextReview?.toISOString() || null,
         })
-        .eq("id", currentProblem.id);
+        .eq("id", currentProblem.attempt.id);
 
       // Move to next problem in queue
       const nextProblem = reviewQueue.find((p) => p.id !== currentProblem?.id);
@@ -98,7 +122,7 @@ const SpacedRep = () => {
       // Refresh data
       fetchData();
     } catch (error) {
-      console.error("Error updating problem:", error);
+      console.error("Error updating attempt:", error);
     }
   };
   
@@ -157,7 +181,7 @@ const SpacedRep = () => {
                     <span className="text-sm text-neutral-600">{currentProblem.difficulty}</span>
                     <span className="text-sm text-neutral-400 mx-2">•</span>
                     <span className="text-sm text-neutral-600">
-                      Level {currentProblem.level}
+                      Level {currentProblem.attempt?.level ?? 0}
                     </span>
                   </div>
                 </div>
@@ -204,13 +228,14 @@ const SpacedRep = () => {
                 <textarea 
                   className="input !h-32 resize-none"
                   placeholder="Add your notes, solutions, or reminders here..."
-                  value={currentProblem.notes || ''}
+                  value={currentProblem.attempt?.notes || ''}
                   onChange={async (e) => {
+                    if (!currentProblem.attempt?.id) return;
                     try {
                       await supabase
-                        .from("bolt_problems")
+                        .from("bolt_attempts")
                         .update({ notes: e.target.value })
-                        .eq("id", currentProblem.id);
+                        .eq("id", currentProblem.attempt.id);
                     } catch (error) {
                       console.error('Error updating notes:', error);
                     }
@@ -264,7 +289,7 @@ const SpacedRep = () => {
                         <h3 className="font-medium">{problem.title}</h3>
                         <div className="flex items-center mt-1 text-sm text-neutral-500">
                           <Clock className="h-3 w-3 mr-1" />
-                          Due: {format(new Date(problem.next_review!), 'MMM d')}
+                          Due: {format(new Date(problem.attempt?.next_review!), 'MMM d')}
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 text-neutral-400" />

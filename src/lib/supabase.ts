@@ -28,11 +28,23 @@ export type Problem = {
   category_id: number;
   url: string | null;
   description: string | null;
+  tags: string[];
+  created_at: string;
+};
+
+export type Attempt = {
+  id: string;
+  problem_id: number;
+  user_id: string;
   completed: boolean;
   last_attempted: string | null;
   next_review: string | null;
   level: number;
   notes: string | null;
-  tags: string[];
   created_at: string;
+  updated_at: string;
+};
+
+export type ProblemWithAttempt = Problem & {
+  attempt?: Attempt;
 };
