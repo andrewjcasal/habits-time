@@ -87,33 +87,37 @@ const SpacedRep = () => {
 
     const now = new Date();
     
-    // For new attempts, start at level 0 when completing
-    // For existing attempts, increment the current level
-    const currentLevel = currentProblem.attempt?.level ?? -1;
-    const nextLevel = completed ? currentLevel + 1 : 0;
+    // Calculate the next level based on completion status and existing attempt
+    let nextLevel = 0;
+    if (completed) {
+      if (!currentProblem.attempt) {
+        // New attempt, start at level 1
+        nextLevel = 1;
+      } else {
+        // Existing attempt, increment level if it was previously completed
+        nextLevel = currentProblem.attempt.completed ? currentProblem.attempt.level + 1 : 1;
+      }
+    }
 
     // Calculate next review date based on level
     let nextReview: Date | null = null;
     if (completed) {
       const daysToAdd = {
-        0: 1,  // First completion: review tomorrow
         1: 2,  // Level 1: review in 2 days
         2: 4,  // Level 2: review in 4 days
         3: 7,  // Level 3: review in 7 days
         4: 16, // Level 4: review in 16 days
         5: 30, // Level 5: review in 30 days
         6: 60, // Level 6: review in 60 days
-      }[nextLevel] || null;
+      }[nextLevel] || 1; // Default to 1 day if level not found
 
-      if (daysToAdd) {
-        nextReview = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-      }
+      nextReview = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
     }
 
     try {
       if (currentProblem.attempt) {
         // Update existing attempt
-        await supabase
+        const { error } = await supabase
           .from("bolt_attempts")
           .update({
             completed,
@@ -123,9 +127,11 @@ const SpacedRep = () => {
           })
           .eq("id", currentProblem.attempt.id)
           .eq("user_id", user.id);
+
+        if (error) throw error;
       } else {
         // Create new attempt
-        await supabase
+        const { error } = await supabase
           .from("bolt_attempts")
           .insert({
             problem_id: currentProblem.id,
@@ -135,6 +141,8 @@ const SpacedRep = () => {
             last_attempted: now.toISOString(),
             next_review: nextReview?.toISOString() || null,
           });
+
+        if (error) throw error;
       }
 
       // Move to next problem in queue
