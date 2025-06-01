@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { format, isPast } from 'date-fns';
 
 // Components
-import ProblemCard from '../components/ProblemCard';
 import { ProgressRing } from '../components/ProgressRing';
 
 // Supabase
@@ -23,25 +22,25 @@ const SpacedRep = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch categories
       const { data: categoriesData } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-      
+        .from("bolt_categories")
+        .select("*")
+        .order("name");
+
       if (categoriesData) {
         setCategories(categoriesData);
       }
-      
+
       // Fetch problems due for review
       const now = new Date().toISOString();
       const { data: problemsData } = await supabase
-        .from('problems')
-        .select('*')
-        .lte('next_review', now)
-        .order('next_review');
-      
+        .from("bolt_problems")
+        .select("*")
+        .lte("next_review", now)
+        .order("next_review");
+
       if (problemsData) {
         setReviewQueue(problemsData);
         if (problemsData.length > 0 && !currentProblem) {
@@ -49,56 +48,57 @@ const SpacedRep = () => {
         }
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
   };
-  
+
   const handleComplete = async (completed: boolean) => {
     if (!currentProblem) return;
-    
+
     const now = new Date();
     let nextLevel = completed ? currentProblem.level + 1 : 0;
     let nextReview: Date | null = null;
-    
+
     // Calculate next review date based on level
     if (completed) {
-      const daysToAdd = {
-        0: 1,   // Review tomorrow
-        1: 2,   // Review in 2 days
-        2: 4,   // Review in 4 days
-        3: 7,   // Review in 7 days
-        4: 16,  // Review in 16 days
-        5: 30,  // Review in 30 days
-        6: 60   // Review in 60 days
-      }[nextLevel] || null;
-      
+      const daysToAdd =
+        {
+          0: 1, // Review tomorrow
+          1: 2, // Review in 2 days
+          2: 4, // Review in 4 days
+          3: 7, // Review in 7 days
+          4: 16, // Review in 16 days
+          5: 30, // Review in 30 days
+          6: 60, // Review in 60 days
+        }[nextLevel] || null;
+
       if (daysToAdd) {
         nextReview = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
       }
     }
-    
+
     try {
       await supabase
-        .from('problems')
+        .from("bolt_problems")
         .update({
           completed,
           level: nextLevel,
           last_attempted: now.toISOString(),
-          next_review: nextReview?.toISOString() || null
+          next_review: nextReview?.toISOString() || null,
         })
-        .eq('id', currentProblem.id);
-      
+        .eq("id", currentProblem.id);
+
       // Move to next problem in queue
-      const nextProblem = reviewQueue.find(p => p.id !== currentProblem?.id);
+      const nextProblem = reviewQueue.find((p) => p.id !== currentProblem?.id);
       setCurrentProblem(nextProblem || null);
-      setReviewQueue(reviewQueue.filter(p => p.id !== currentProblem?.id));
-      
+      setReviewQueue(reviewQueue.filter((p) => p.id !== currentProblem?.id));
+
       // Refresh data
       fetchData();
     } catch (error) {
-      console.error('Error updating problem:', error);
+      console.error("Error updating problem:", error);
     }
   };
   
@@ -208,9 +208,9 @@ const SpacedRep = () => {
                   onChange={async (e) => {
                     try {
                       await supabase
-                        .from('problems')
+                        .from("bolt_problems")
                         .update({ notes: e.target.value })
-                        .eq('id', currentProblem.id);
+                        .eq("id", currentProblem.id);
                     } catch (error) {
                       console.error('Error updating notes:', error);
                     }
