@@ -33,43 +33,40 @@ const SpacedRep = () => {
         setCategories(categoriesData);
       }
 
-      // Fetch attempts due for review
-      const now = new Date().toISOString();
-      const { data: attemptsData, error: attemptsError } = await supabase
+      // First, fetch all problems
+      const { data: allProblems, error: problemsError } = await supabase
+        .from("bolt_problems")
+        .select("*");
+
+      if (problemsError) throw problemsError;
+
+      // Then fetch all attempts for the current user
+      const { data: attempts, error: attemptsError } = await supabase
         .from("bolt_attempts")
-        .select("*")
-        .lte("next_review", now)
-        .order("next_review");
+        .select("*");
 
       if (attemptsError) throw attemptsError;
 
-      if (attemptsData && attemptsData.length > 0) {
-        // Get unique problem IDs from attempts
-        const problemIds = [...new Set(attemptsData.map(a => a.problem_id))];
-
-        // Fetch corresponding problems
-        const { data: problemsData, error: problemsError } = await supabase
-          .from("bolt_problems")
-          .select("*")
-          .in("id", problemIds);
-
-        if (problemsError) throw problemsError;
-
-        if (problemsData) {
-          // Combine problems with their attempts
-          const problemsWithAttempts = problemsData.map(problem => ({
+      if (allProblems) {
+        const now = new Date().toISOString();
+        const reviewQueue = allProblems.map(problem => {
+          const attempt = attempts?.find(a => a.problem_id === problem.id);
+          return {
             ...problem,
-            attempt: attemptsData.find(a => a.problem_id === problem.id)
-          }));
+            attempt
+          };
+        }).filter(problem => {
+          // Include problem if:
+          // 1. No attempt exists (never attempted) OR
+          // 2. Has attempt and is due for review
+          return !problem.attempt || 
+                 (problem.attempt.next_review && problem.attempt.next_review <= now);
+        });
 
-          setReviewQueue(problemsWithAttempts);
-          if (problemsWithAttempts.length > 0 && !currentProblem) {
-            setCurrentProblem(problemsWithAttempts[0]);
-          }
+        setReviewQueue(reviewQueue);
+        if (reviewQueue.length > 0 && !currentProblem) {
+          setCurrentProblem(reviewQueue[0]);
         }
-      } else {
-        setReviewQueue([]);
-        setCurrentProblem(null);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -79,10 +76,10 @@ const SpacedRep = () => {
   };
 
   const handleComplete = async (completed: boolean) => {
-    if (!currentProblem?.attempt) return;
+    if (!currentProblem) return;
 
     const now = new Date();
-    let nextLevel = completed ? (currentProblem.attempt.level + 1) : 0;
+    let nextLevel = completed ? ((currentProblem.attempt?.level ?? -1) + 1) : 0;
     let nextReview: Date | null = null;
 
     // Calculate next review date based on level
@@ -104,15 +101,29 @@ const SpacedRep = () => {
     }
 
     try {
-      await supabase
-        .from("bolt_attempts")
-        .update({
-          completed,
-          level: nextLevel,
-          last_attempted: now.toISOString(),
-          next_review: nextReview?.toISOString() || null,
-        })
-        .eq("id", currentProblem.attempt.id);
+      if (currentProblem.attempt) {
+        // Update existing attempt
+        await supabase
+          .from("bolt_attempts")
+          .update({
+            completed,
+            level: nextLevel,
+            last_attempted: now.toISOString(),
+            next_review: nextReview?.toISOString() || null,
+          })
+          .eq("id", currentProblem.attempt.id);
+      } else {
+        // Create new attempt
+        await supabase
+          .from("bolt_attempts")
+          .insert({
+            problem_id: currentProblem.id,
+            completed,
+            level: nextLevel,
+            last_attempted: now.toISOString(),
+            next_review: nextReview?.toISOString() || null,
+          });
+      }
 
       // Move to next problem in queue
       const nextProblem = reviewQueue.find((p) => p.id !== currentProblem?.id);
@@ -288,8 +299,14 @@ const SpacedRep = () => {
                       <div>
                         <h3 className="font-medium">{problem.title}</h3>
                         <div className="flex items-center mt-1 text-sm text-neutral-500">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Due: {format(new Date(problem.attempt?.next_review!), 'MMM d')}
+                          {problem.attempt ? (
+                            <>
+                              <Clock className="h-3 w-3 mr-1" />
+                              Due: {format(new Date(problem.attempt.next_review!), 'MMM d')}
+                            </>
+                          ) : (
+                            'Not attempted yet'
+                          )}
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 text-neutral-400" />
