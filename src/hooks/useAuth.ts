@@ -18,14 +18,15 @@ export function useAuth() {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const newUser = session?.user ?? null;
+      setUser(newUser);
       setIsLoading(false);
 
-      // Redirect based on auth state
-      if (session?.user) {
+      // Only redirect on specific auth events, not on token refresh
+      if (event === 'SIGNED_IN' && newUser) {
         navigate('/');
-      } else {
+      } else if (event === 'SIGNED_OUT' && !newUser) {
         navigate('/login');
       }
     });
