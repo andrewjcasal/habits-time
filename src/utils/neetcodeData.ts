@@ -1,0 +1,267 @@
+import { Problem } from '../types';
+
+// Generate sample Neetcode 150 problems
+// In a real app, this would fetch from an API or be a complete dataset
+export const getNeetcodeProblems = (): Problem[] => {
+  const problems: Problem[] = [
+    {
+      id: 1,
+      title: "Two Sum",
+      difficulty: "Easy",
+      category: "Arrays & Hashing",
+      url: "https://leetcode.com/problems/two-sum/",
+      description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Array", "Hash Table"]
+    },
+    {
+      id: 2,
+      title: "Valid Parentheses",
+      difficulty: "Easy",
+      category: "Stack",
+      url: "https://leetcode.com/problems/valid-parentheses/",
+      description: "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["String", "Stack"]
+    },
+    {
+      id: 3,
+      title: "Merge Two Sorted Lists",
+      difficulty: "Easy",
+      category: "Linked List",
+      url: "https://leetcode.com/problems/merge-two-sorted-lists/",
+      description: "Merge two sorted linked lists and return it as a sorted list.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Linked List", "Recursion"]
+    },
+    {
+      id: 4,
+      title: "Best Time to Buy and Sell Stock",
+      difficulty: "Easy",
+      category: "Arrays & Hashing",
+      url: "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/",
+      description: "You are given an array prices where prices[i] is the price of a given stock on the ith day.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Array", "Dynamic Programming"]
+    },
+    {
+      id: 5,
+      title: "Valid Palindrome",
+      difficulty: "Easy",
+      category: "Two Pointers",
+      url: "https://leetcode.com/problems/valid-palindrome/",
+      description: "A phrase is a palindrome if, after converting all uppercase letters into lowercase letters and removing all non-alphanumeric characters, it reads the same forward and backward.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["String", "Two Pointers"]
+    },
+    {
+      id: 6,
+      title: "Invert Binary Tree",
+      difficulty: "Easy",
+      category: "Trees",
+      url: "https://leetcode.com/problems/invert-binary-tree/",
+      description: "Given the root of a binary tree, invert the tree, and return its root.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Tree", "Depth-First Search", "Breadth-First Search", "Binary Tree"]
+    },
+    {
+      id: 7,
+      title: "Valid Anagram",
+      difficulty: "Easy",
+      category: "Arrays & Hashing",
+      url: "https://leetcode.com/problems/valid-anagram/",
+      description: "Given two strings s and t, return true if t is an anagram of s, and false otherwise.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Hash Table", "String", "Sorting"]
+    },
+    {
+      id: 8,
+      title: "Binary Search",
+      difficulty: "Easy",
+      category: "Binary Search",
+      url: "https://leetcode.com/problems/binary-search/",
+      description: "Given an array of integers nums which is sorted in ascending order, and an integer target, write a function to search target in nums.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Array", "Binary Search"]
+    },
+    {
+      id: 9,
+      title: "Flood Fill",
+      difficulty: "Easy",
+      category: "Graphs",
+      url: "https://leetcode.com/problems/flood-fill/",
+      description: "An image is represented by an m x n integer grid image where image[i][j] represents the pixel value of the image.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Array", "Depth-First Search", "Breadth-First Search", "Matrix"]
+    },
+    {
+      id: 10,
+      title: "Lowest Common Ancestor of a Binary Search Tree",
+      difficulty: "Medium",
+      category: "Trees",
+      url: "https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-search-tree/",
+      description: "Given a binary search tree (BST), find the lowest common ancestor (LCA) of two given nodes in the BST.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Tree", "Depth-First Search", "Binary Search Tree", "Binary Tree"]
+    },
+    {
+      id: 11,
+      title: "Balanced Binary Tree",
+      difficulty: "Easy",
+      category: "Trees",
+      url: "https://leetcode.com/problems/balanced-binary-tree/",
+      description: "Given a binary tree, determine if it is height-balanced.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Tree", "Depth-First Search", "Binary Tree"]
+    },
+    {
+      id: 12,
+      title: "Linked List Cycle",
+      difficulty: "Easy",
+      category: "Linked List",
+      url: "https://leetcode.com/problems/linked-list-cycle/",
+      description: "Given head, the head of a linked list, determine if the linked list has a cycle in it.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Hash Table", "Linked List", "Two Pointers"]
+    },
+    {
+      id: 13,
+      title: "Implement Queue using Stacks",
+      difficulty: "Easy",
+      category: "Stack",
+      url: "https://leetcode.com/problems/implement-queue-using-stacks/",
+      description: "Implement a first in first out (FIFO) queue using only two stacks.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Stack", "Design", "Queue"]
+    },
+    {
+      id: 14,
+      title: "First Bad Version",
+      difficulty: "Easy",
+      category: "Binary Search",
+      url: "https://leetcode.com/problems/first-bad-version/",
+      description: "You are a product manager and currently leading a team to develop a new product.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Binary Search", "Interactive"]
+    },
+    {
+      id: 15,
+      title: "Ransom Note",
+      difficulty: "Easy",
+      category: "Arrays & Hashing",
+      url: "https://leetcode.com/problems/ransom-note/",
+      description: "Given two stings ransomNote and magazine, return true if ransomNote can be constructed from magazine and false otherwise.",
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ["Hash Table", "String", "Counting"]
+    }
+  ];
+  
+  // Generate the remaining problems to reach 150
+  // In a real app, all 150 problems would be defined
+  for (let i = 16; i <= 150; i++) {
+    const difficulties = ['Easy', 'Medium', 'Hard'];
+    const categories = [
+      'Arrays & Hashing', 'Two Pointers', 'Sliding Window', 'Stack', 
+      'Binary Search', 'Linked List', 'Trees', 'Tries', 
+      'Heap / Priority Queue', 'Backtracking', 'Graphs', 'Advanced Graphs',
+      'Dynamic Programming', '1D Dynamic Programming', '2D Dynamic Programming',
+      'Greedy', 'Intervals', 'Math & Geometry', 'Bit Manipulation'
+    ];
+    
+    const randomDifficulty = difficulties[Math.floor(Math.random() * difficulties.length)] as 'Easy' | 'Medium' | 'Hard';
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    
+    problems.push({
+      id: i,
+      title: `Problem ${i}`,
+      difficulty: randomDifficulty,
+      category: randomCategory,
+      url: `https://leetcode.com/problems/problem-${i}/`,
+      description: `This is a sample description for Problem ${i}.`,
+      completed: false,
+      lastAttempted: null,
+      dueDate: null,
+      level: 0,
+      nextReview: null,
+      firstAttemptDate: null,
+      tags: ['Sample Tag 1', 'Sample Tag 2']
+    });
+  }
+  
+  return problems;
+};
