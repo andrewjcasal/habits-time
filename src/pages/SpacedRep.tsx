@@ -8,18 +8,24 @@ import { ProgressRing } from '../components/ProgressRing';
 
 // Supabase
 import { supabase, Problem, ProblemCategory, Attempt, ProblemWithAttempt } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 
 const SpacedRep = () => {
+  const { user } = useAuth();
   const [currentProblem, setCurrentProblem] = useState<ProblemWithAttempt | null>(null);
   const [reviewQueue, setReviewQueue] = useState<ProblemWithAttempt[]>([]);
   const [categories, setCategories] = useState<ProblemCategory[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
   
   const fetchData = async () => {
+    if (!user) return;
+
     try {
       setLoading(true);
 
@@ -43,7 +49,8 @@ const SpacedRep = () => {
       // Then fetch all attempts for the current user
       const { data: attempts, error: attemptsError } = await supabase
         .from("bolt_attempts")
-        .select("*");
+        .select("*")
+        .eq('user_id', user.id);
 
       if (attemptsError) throw attemptsError;
 
@@ -76,7 +83,7 @@ const SpacedRep = () => {
   };
 
   const handleComplete = async (completed: boolean) => {
-    if (!currentProblem) return;
+    if (!currentProblem || !user) return;
 
     const now = new Date();
     let nextLevel = completed ? ((currentProblem.attempt?.level ?? -1) + 1) : 0;
@@ -111,13 +118,15 @@ const SpacedRep = () => {
             last_attempted: now.toISOString(),
             next_review: nextReview?.toISOString() || null,
           })
-          .eq("id", currentProblem.attempt.id);
+          .eq("id", currentProblem.attempt.id)
+          .eq("user_id", user.id);
       } else {
         // Create new attempt
         await supabase
           .from("bolt_attempts")
           .insert({
             problem_id: currentProblem.id,
+            user_id: user.id,
             completed,
             level: nextLevel,
             last_attempted: now.toISOString(),
@@ -241,12 +250,13 @@ const SpacedRep = () => {
                   placeholder="Add your notes, solutions, or reminders here..."
                   value={currentProblem.attempt?.notes || ''}
                   onChange={async (e) => {
-                    if (!currentProblem.attempt?.id) return;
+                    if (!currentProblem.attempt?.id || !user) return;
                     try {
                       await supabase
                         .from("bolt_attempts")
                         .update({ notes: e.target.value })
-                        .eq("id", currentProblem.attempt.id);
+                        .eq("id", currentProblem.attempt.id)
+                        .eq("user_id", user.id);
                     } catch (error) {
                       console.error('Error updating notes:', error);
                     }
