@@ -12,23 +12,23 @@ interface StatProps {
 
 export const Stat = ({ title, value, icon: Icon, trend, href }: StatProps) => {
   const StatContent = () => (
-    <div className="card bg-white hover:shadow-md transition-shadow p-5">
+    <div className="card bg-white hover:shadow-md transition-shadow p-4">
       <div className="flex justify-between">
         <div>
           <p className="text-sm font-medium text-neutral-500">{title}</p>
-          <p className="text-2xl font-semibold mt-1">{value}</p>
+          <p className="text-xl font-semibold mt-0.5">{value}</p>
           {trend && (
-            <p className="text-xs text-neutral-500 mt-1">{trend}</p>
+            <p className="text-xs text-neutral-500 mt-0.5">{trend}</p>
           )}
         </div>
         
-        <div className="h-12 w-12 rounded-full bg-primary-50 flex items-center justify-center">
-          <Icon className="h-6 w-6 text-primary-500" />
+        <div className="h-8 w-8 rounded-full bg-primary-50 flex items-center justify-center">
+          <Icon className="h-4 w-4 text-primary-500" />
         </div>
       </div>
       
       {href && (
-        <div className="mt-4 text-primary-600 text-sm font-medium flex items-center">
+        <div className="mt-3 text-primary-600 text-sm font-medium flex items-center">
           View details <ArrowRight className="ml-1 h-3 w-3" />
         </div>
       )}

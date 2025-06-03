@@ -29,16 +29,16 @@ const MainLayout = () => {
   return (
     <div className="flex min-h-screen bg-neutral-50">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col bg-white border-r border-neutral-200">
-        <div className="p-6">
-          <h1 className="text-xl font-semibold text-primary-700 flex items-center">
-            <Users className="w-6 h-6 mr-2 text-primary-600" />
+      <aside className="hidden md:flex w-56 flex-col bg-white border-r border-neutral-200">
+        <div className="p-4">
+          <h1 className="text-lg font-semibold text-primary-700 flex items-center">
+            <Users className="w-4 h-4 mr-2 text-primary-600" />
             FrontPrep
           </h1>
         </div>
         
-        <nav className="flex-1 px-4 pb-4">
-          <ul className="space-y-1">
+        <nav className="flex-1 px-2 pb-4">
+          <ul className="space-y-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -46,14 +46,14 @@ const MainLayout = () => {
                   <NavLink
                     to={item.path}
                     className={({ isActive }) =>
-                      `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      `flex items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-primary-50 text-primary-700'
                           : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                       }`
                     }
                   >
-                    <Icon className="mr-2 h-5 w-5" />
+                    <Icon className="mr-2 h-3.5 w-3.5" />
                     {item.label}
                   </NavLink>
                 </li>
@@ -62,12 +62,12 @@ const MainLayout = () => {
           </ul>
         </nav>
         
-        <div className="mt-auto p-4 border-t border-neutral-200">
+        <div className="mt-auto p-2 border-t border-neutral-200">
           <NavLink
             to="/settings"
-            className="flex items-center rounded-md px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+            className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
           >
-            <Settings className="mr-2 h-5 w-5" />
+            <Settings className="mr-2 h-3.5 w-3.5" />
             Settings
           </NavLink>
         </div>
@@ -75,20 +75,20 @@ const MainLayout = () => {
 
       {/* Mobile Header & Menu */}
       <div className="flex flex-col flex-1">
-        <header className="md:hidden sticky top-0 z-10 bg-white border-b border-neutral-200 px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-primary-700 flex items-center">
-            <Users className="w-5 h-5 mr-2 text-primary-600" />
+        <header className="md:hidden sticky top-0 z-10 bg-white border-b border-neutral-200 px-3 py-2 flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-primary-700 flex items-center">
+            <Users className="w-4 h-4 mr-2 text-primary-600" />
             FrontPrep
           </h1>
-          <button onClick={toggleMobileMenu} className="p-2 rounded-md text-neutral-500 hover:bg-neutral-100">
-            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          <button onClick={toggleMobileMenu} className="p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100">
+            {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </header>
         
         {isMobileMenuOpen && (
-          <div className="md:hidden absolute inset-x-0 top-[57px] z-50 bg-white border-b border-neutral-200 animate-fadeDown">
-            <nav className="px-4 py-3">
-              <ul className="space-y-1">
+          <div className="md:hidden absolute inset-x-0 top-[45px] z-50 bg-white border-b border-neutral-200 animate-fadeDown">
+            <nav className="px-3 py-2">
+              <ul className="space-y-0.5">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -96,7 +96,7 @@ const MainLayout = () => {
                       <NavLink
                         to={item.path}
                         className={({ isActive }) =>
-                          `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                          `flex items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
                             isActive
                               ? 'bg-primary-50 text-primary-700'
                               : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
@@ -104,7 +104,7 @@ const MainLayout = () => {
                         }
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
-                        <Icon className="mr-2 h-5 w-5" />
+                        <Icon className="mr-2 h-3.5 w-3.5" />
                         {item.label}
                       </NavLink>
                     </li>
@@ -113,10 +113,10 @@ const MainLayout = () => {
                 <li>
                   <NavLink
                     to="/settings"
-                    className="flex items-center rounded-md px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                    className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    <Settings className="mr-2 h-5 w-5" />
+                    <Settings className="mr-2 h-3.5 w-3.5" />
                     Settings
                   </NavLink>
                 </li>
@@ -126,7 +126,7 @@ const MainLayout = () => {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4">
           <Outlet />
         </main>
       </div>
