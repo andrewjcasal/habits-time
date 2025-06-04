@@ -3,18 +3,18 @@ import { Bell, BellRing, Calendar, Link as LinkIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface FeedItem {
-  id: number;
+  id: string;
   type: 'connection' | 'job_view' | 'message';
   title: string;
   description?: string;
-  timestamp: number;
+  created_at: string;
   url?: string;
   read: boolean;
 }
 
 interface FeedItemProps {
   item: FeedItem;
-  onMarkRead: (id: number) => void;
+  onMarkRead: (id: string) => void;
 }
 
 export const FeedItem = ({ item, onMarkRead }: FeedItemProps) => {
@@ -44,7 +44,7 @@ export const FeedItem = ({ item, onMarkRead }: FeedItemProps) => {
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-neutral-900">{item.title}</p>
             <span className="text-xs text-neutral-500">
-              {formatDistanceToNow(item.timestamp, { addSuffix: true })}
+              {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
             </span>
           </div>
           

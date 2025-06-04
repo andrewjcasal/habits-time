@@ -45,45 +45,57 @@ const JobTracker = () => {
     position: '',
     status: 'applied'
   });
-  const [feedItems, setFeedItems] = useState([
-    {
-      id: 1,
-      type: 'connection' as const,
-      title: 'John Smith viewed your profile',
-      description: 'Engineering Manager at Google',
-      timestamp: Date.now() - 1000 * 60 * 30, // 30 minutes ago
-      url: 'https://linkedin.com/in/johnsmith',
-      read: false
-    },
-    {
-      id: 2,
-      type: 'job_view' as const,
-      title: 'Your application was viewed',
-      description: 'Sr. Full Stack Engineer at Meta',
-      timestamp: Date.now() - 1000 * 60 * 60 * 2, // 2 hours ago
-      read: false
-    },
-    {
-      id: 3,
-      type: 'message' as const,
-      title: 'New message from Sarah Lee',
-      description: 'Thanks for connecting! I\'d love to chat about opportunities at...',
-      timestamp: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
-      url: 'https://linkedin.com/in/sarahlee',
-      read: true
-    }
-  ]);
+  const [feedItems, setFeedItems] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Load data from Supabase
+  // Load data
   useEffect(() => {
-    fetchApplications();
-    fetchPositions();
+    if (user) {
+      fetchApplications();
+      fetchPositions();
+      fetchFeedItems();
+    }
     
     const savedContacts = localStorage.getItem('job-contacts');
     if (savedContacts) {
       setContacts(JSON.parse(savedContacts));
     }
-  }, []);
+  }, [user]);
+
+  const fetchFeedItems = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('bolt_feed')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching feed:', error);
+      return;
+    }
+
+    setFeedItems(data || []);
+    setUnreadCount(data?.filter(item => !item.read).length || 0);
+  };
+
+  const handleMarkRead = async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('bolt_feed')
+      .update({ read: true })
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error marking feed item as read:', error);
+      return;
+    }
+
+    await fetchFeedItems();
+  };
 
   const fetchPositions = async () => {
     const { data, error } = await supabase
@@ -316,16 +328,6 @@ const JobTracker = () => {
     link.click();
     document.body.removeChild(link);
   };
-
-  const handleMarkRead = (id: number) => {
-    setFeedItems(items =>
-      items.map(item =>
-        item.id === id ? { ...item, read: true } : item
-      )
-    );
-  };
-
-  const unreadCount = feedItems.filter(item => !item.read).length;
   
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
