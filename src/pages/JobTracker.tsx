@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth'; // Add this import
 
 // Components
 import { Tabs } from '../components/Tabs';
@@ -24,6 +25,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { JobApplication, Contact } from '../types';
 
 const JobTracker = () => {
+  const { user } = useAuth(); // Add this hook
   const [activeTab, setActiveTab] = useState('applications');
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -72,7 +74,7 @@ const JobTracker = () => {
   }, [contacts]);
   
   const handleAddApplication = async () => {
-    if (!newApplication.company || !newApplication.position) return;
+    if (!newApplication.company || !newApplication.position || !user) return;
 
     try {
       // First, get or create the company
@@ -100,14 +102,15 @@ const JobTracker = () => {
         companyId = companies[0].id;
       }
       
-      // Create application
+      // Create application with user_id
       const { error: applicationError } = await supabase
         .from('bolt_applications')
         .insert({
           company_id: companyId,
           position: newApplication.position,
           status: 'applied',
-          applied_date: new Date().toISOString()
+          applied_date: new Date().toISOString(),
+          user_id: user.id // Add user_id here
         });
         
       if (applicationError) throw applicationError;
@@ -272,17 +275,17 @@ const JobTracker = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-neutral-200">
-                  <th className="text-left py-2 px-3 text-xs font-medium text-neutral-500">Company</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-neutral-500">Position</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-neutral-500">Applied</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-neutral-500">Status</th>
-                  <th className="text-right py-2 px-3 text-xs font-medium text-neutral-500">Actions</th>
+                  <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Company</th>
+                  <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Position</th>
+                  <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Applied</th>
+                  <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Status</th>
+                  <th className="text-right py-1 px-2 text-xs font-medium text-neutral-500">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {/* Quick Add Form */}
                 <tr className="border-b border-neutral-100">
-                  <td className="py-2 px-3">
+                  <td className="py-1 px-2">
                     <input
                       type="text"
                       placeholder="Company"
@@ -291,7 +294,7 @@ const JobTracker = () => {
                       onChange={e => setNewApplication({ ...newApplication, company: e.target.value })}
                     />
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-1 px-2">
                     <input
                       type="text"
                       placeholder="Position"
@@ -300,15 +303,15 @@ const JobTracker = () => {
                       onChange={e => setNewApplication({ ...newApplication, position: e.target.value })}
                     />
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-1 px-2">
                     <span className="text-sm text-neutral-500">Today</span>
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-1 px-2">
                     <span className="inline-block rounded-full px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800">
                       Applied
                     </span>
                   </td>
-                  <td className="py-2 px-3 text-right">
+                  <td className="py-1 px-2 text-right">
                     <button
                       onClick={handleAddApplication}
                       disabled={!newApplication.company || !newApplication.position}
@@ -322,7 +325,7 @@ const JobTracker = () => {
                 {/* Applications List */}
                 {filteredApplications.map(application => (
                   <tr key={application.id} className="border-b border-neutral-100 hover:bg-neutral-50">
-                    <td className="py-2 px-3">
+                    <td className="py-1 px-2">
                       <div className="font-medium text-sm">{application.company}</div>
                       {application.url && (
                         <a 
@@ -336,15 +339,15 @@ const JobTracker = () => {
                         </a>
                       )}
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-1 px-2">
                       <span className="text-sm">{application.position}</span>
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-1 px-2">
                       <span className="text-sm text-neutral-600">
                         {new Date(application.dateApplied).toLocaleDateString()}
                       </span>
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-1 px-2">
                       <span className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
                         application.status === 'applied' 
                           ? 'bg-primary-100 text-primary-800' 
@@ -359,7 +362,7 @@ const JobTracker = () => {
                         {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
                       </span>
                     </td>
-                    <td className="py-2 px-3 text-right">
+                    <td className="py-1 px-2 text-right">
                       <div className="flex items-center justify-end space-x-1">
                         <button 
                           onClick={() => handleEditClick(application, 'application')}
