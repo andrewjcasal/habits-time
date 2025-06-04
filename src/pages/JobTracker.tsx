@@ -9,7 +9,9 @@ import {
   ExternalLink,
   Calendar,
   Plus,
-  X
+  X,
+  Bell,
+  BellRing
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -18,6 +20,7 @@ import { Tabs } from '../components/Tabs';
 import { JobForm } from '../components/JobForm';
 import { ContactForm } from '../components/ContactForm';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { FeedItem } from '../components/FeedItem';
 import { Autocomplete } from '../components/Autocomplete';
 
 // Types
@@ -42,6 +45,34 @@ const JobTracker = () => {
     position: '',
     status: 'applied'
   });
+  const [feedItems, setFeedItems] = useState([
+    {
+      id: 1,
+      type: 'connection' as const,
+      title: 'John Smith viewed your profile',
+      description: 'Engineering Manager at Google',
+      timestamp: Date.now() - 1000 * 60 * 30, // 30 minutes ago
+      url: 'https://linkedin.com/in/johnsmith',
+      read: false
+    },
+    {
+      id: 2,
+      type: 'job_view' as const,
+      title: 'Your application was viewed',
+      description: 'Sr. Full Stack Engineer at Meta',
+      timestamp: Date.now() - 1000 * 60 * 60 * 2, // 2 hours ago
+      read: false
+    },
+    {
+      id: 3,
+      type: 'message' as const,
+      title: 'New message from Sarah Lee',
+      description: 'Thanks for connecting! I'd love to chat about opportunities at...',
+      timestamp: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
+      url: 'https://linkedin.com/in/sarahlee',
+      read: true
+    }
+  ]);
 
   // Load data from Supabase
   useEffect(() => {
@@ -285,6 +316,16 @@ const JobTracker = () => {
     link.click();
     document.body.removeChild(link);
   };
+
+  const handleMarkRead = (id: number) => {
+    setFeedItems(items =>
+      items.map(item =>
+        item.id === id ? { ...item, read: true } : item
+      )
+    );
+  };
+
+  const unreadCount = feedItems.filter(item => !item.read).length;
   
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
@@ -307,7 +348,8 @@ const JobTracker = () => {
       <Tabs 
         tabs={[
           { id: 'applications', label: 'Applications', count: applications.length },
-          { id: 'contacts', label: 'Contacts', count: contacts.length }
+          { id: 'contacts', label: 'Contacts', count: contacts.length },
+          { id: 'feed', label: 'Feed', count: unreadCount }
         ]}
         activeTab={activeTab}
         onChange={setActiveTab}
@@ -541,6 +583,21 @@ const JobTracker = () => {
                 </motion.div>
               ))}
             </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {/* Feed Tab */}
+      {activeTab === 'feed' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            {feedItems.map(item => (
+              <FeedItem 
+                key={item.id} 
+                item={item} 
+                onMarkRead={handleMarkRead} 
+              />
+            ))}
           </div>
         </div>
       )}
