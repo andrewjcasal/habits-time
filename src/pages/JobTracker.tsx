@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../lib/supabase';
 
 // Components
 import { Tabs } from '../components/Tabs';
@@ -32,19 +33,15 @@ const JobTracker = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{id: number, type: 'application' | 'contact'} | null>(null);
-  const [isAddingApplication, setIsAddingApplication] = useState(false);
   const [newApplication, setNewApplication] = useState({
     company: '',
     position: '',
     status: 'applied'
   });
 
-  // Load data from localStorage
+  // Load data from Supabase
   useEffect(() => {
-    const savedApplications = localStorage.getItem('job-applications');
-    if (savedApplications) {
-      setApplications(JSON.parse(savedApplications));
-    }
+    fetchApplications();
     
     const savedContacts = localStorage.getItem('job-contacts');
     if (savedContacts) {
@@ -52,38 +49,78 @@ const JobTracker = () => {
     }
   }, []);
   
-  // Save data to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('job-applications', JSON.stringify(applications));
-  }, [applications]);
+  const fetchApplications = async () => {
+    const { data, error } = await supabase
+      .from('bolt_applications')
+      .select(`
+        *,
+        company:bolt_companies(*)
+      `)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Error fetching applications:', error);
+      return;
+    }
+    
+    setApplications(data || []);
+  };
   
+  // Save contacts to localStorage when they change
   useEffect(() => {
     localStorage.setItem('job-contacts', JSON.stringify(contacts));
   }, [contacts]);
   
-  const handleAddApplication = (application: Omit<JobApplication, 'id'>) => {
-    const newApplication = {
-      ...application,
-      id: Date.now()
-    };
-    
-    setApplications([newApplication, ...applications]);
-    setShowJobForm(false);
-  };
-
-  const handleQuickAdd = () => {
+  const handleAddApplication = async () => {
     if (!newApplication.company || !newApplication.position) return;
 
-    const application = {
-      ...newApplication,
-      id: Date.now(),
-      dateApplied: Date.now(),
-      status: 'applied'
-    };
-
-    setApplications([application, ...applications]);
-    setNewApplication({ company: '', position: '', status: 'applied' });
-    setIsAddingApplication(false);
+    try {
+      // First, get or create the company
+      let { data: companies, error: companyError } = await supabase
+        .from('bolt_companies')
+        .select('id')
+        .eq('name', newApplication.company)
+        .limit(1);
+        
+      let companyId;
+      
+      if (companyError) throw companyError;
+      
+      if (!companies || companies.length === 0) {
+        // Create new company
+        const { data: newCompany, error: createError } = await supabase
+          .from('bolt_companies')
+          .insert({ name: newApplication.company })
+          .select('id')
+          .single();
+          
+        if (createError) throw createError;
+        companyId = newCompany.id;
+      } else {
+        companyId = companies[0].id;
+      }
+      
+      // Create application
+      const { error: applicationError } = await supabase
+        .from('bolt_applications')
+        .insert({
+          company_id: companyId,
+          position: newApplication.position,
+          status: 'applied',
+          applied_date: new Date().toISOString()
+        });
+        
+      if (applicationError) throw applicationError;
+      
+      // Refresh applications
+      await fetchApplications();
+      
+      // Reset form
+      setNewApplication({ company: '', position: '', status: 'applied' });
+      
+    } catch (error) {
+      console.error('Error adding application:', error);
+    }
   };
   
   const handleUpdateApplication = (updatedApplication: JobApplication) => {
@@ -230,46 +267,6 @@ const JobTracker = () => {
             </p>
           </div>
           
-          {/* Quick Add Form */}
-          {isAddingApplication ? (
-            <div className="flex items-center space-x-2 mb-2">
-              <input
-                type="text"
-                placeholder="Company"
-                className="input !py-1 !text-sm"
-                value={newApplication.company}
-                onChange={e => setNewApplication({ ...newApplication, company: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder="Position"
-                className="input !py-1 !text-sm"
-                value={newApplication.position}
-                onChange={e => setNewApplication({ ...newApplication, position: e.target.value })}
-              />
-              <button
-                onClick={handleQuickAdd}
-                className="btn btn-primary btn-sm"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => setIsAddingApplication(false)}
-                className="btn btn-outline btn-sm !p-1"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsAddingApplication(true)}
-              className="btn btn-outline btn-sm mb-2"
-            >
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Quick Add
-            </button>
-          )}
-          
           {/* Applications List */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <table className="w-full">
@@ -283,6 +280,46 @@ const JobTracker = () => {
                 </tr>
               </thead>
               <tbody>
+                {/* Quick Add Form */}
+                <tr className="border-b border-neutral-100">
+                  <td className="py-2 px-3">
+                    <input
+                      type="text"
+                      placeholder="Company"
+                      className="input !py-1 !text-sm w-full"
+                      value={newApplication.company}
+                      onChange={e => setNewApplication({ ...newApplication, company: e.target.value })}
+                    />
+                  </td>
+                  <td className="py-2 px-3">
+                    <input
+                      type="text"
+                      placeholder="Position"
+                      className="input !py-1 !text-sm w-full"
+                      value={newApplication.position}
+                      onChange={e => setNewApplication({ ...newApplication, position: e.target.value })}
+                    />
+                  </td>
+                  <td className="py-2 px-3">
+                    <span className="text-sm text-neutral-500">Today</span>
+                  </td>
+                  <td className="py-2 px-3">
+                    <span className="inline-block rounded-full px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800">
+                      Applied
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    <button
+                      onClick={handleAddApplication}
+                      disabled={!newApplication.company || !newApplication.position}
+                      className="btn btn-primary btn-sm"
+                    >
+                      Add
+                    </button>
+                  </td>
+                </tr>
+                
+                {/* Applications List */}
                 {filteredApplications.map(application => (
                   <tr key={application.id} className="border-b border-neutral-100 hover:bg-neutral-50">
                     <td className="py-2 px-3">
