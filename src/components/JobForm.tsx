@@ -26,9 +26,9 @@ export const JobForm = ({ isOpen, onClose, onSubmit, initialData }: JobFormProps
   useEffect(() => {
     if (initialData) {
       setFormData({
-        company: initialData.company,
+        company: initialData.company.name,
         position: initialData.position,
-        dateApplied: new Date(initialData.dateApplied).toISOString().split('T')[0],
+        dateApplied: new Date(initialData.applied_date).toISOString().split('T')[0],
         status: initialData.status,
         url: initialData.url || '',
         notes: initialData.notes || ''
@@ -59,7 +59,7 @@ export const JobForm = ({ isOpen, onClose, onSubmit, initialData }: JobFormProps
     
     const submissionData = {
       ...formData,
-      dateApplied: new Date(formData.dateApplied).getTime(),
+      applied_date: formData.dateApplied,
       ...(initialData && { id: initialData.id }) // Preserve ID for updates
     };
     

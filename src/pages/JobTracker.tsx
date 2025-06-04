@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth'; // Add this import
+import { useAuth } from '../hooks/useAuth';
 
 // Components
 import { Tabs } from '../components/Tabs';
@@ -25,7 +25,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { JobApplication, Contact } from '../types';
 
 const JobTracker = () => {
-  const { user } = useAuth(); // Add this hook
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('applications');
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -110,7 +110,7 @@ const JobTracker = () => {
           position: newApplication.position,
           status: 'applied',
           applied_date: new Date().toISOString(),
-          user_id: user.id // Add user_id here
+          user_id: user.id
         });
         
       if (applicationError) throw applicationError;
@@ -126,14 +126,27 @@ const JobTracker = () => {
     }
   };
   
-  const handleUpdateApplication = (updatedApplication: JobApplication) => {
-    const updatedApplications = applications.map(app => 
-      app.id === updatedApplication.id ? updatedApplication : app
-    );
-    
-    setApplications(updatedApplications);
-    setShowJobForm(false);
-    setEditingItem(null);
+  const handleUpdateApplication = async (updatedApplication: JobApplication) => {
+    try {
+      const { error } = await supabase
+        .from('bolt_applications')
+        .update({
+          position: updatedApplication.position,
+          status: updatedApplication.status,
+          applied_date: updatedApplication.applied_date,
+          url: updatedApplication.url,
+          notes: updatedApplication.notes
+        })
+        .eq('id', updatedApplication.id);
+
+      if (error) throw error;
+
+      await fetchApplications();
+      setShowJobForm(false);
+      setEditingItem(null);
+    } catch (error) {
+      console.error('Error updating application:', error);
+    }
   };
   
   const handleAddContact = (contact: Omit<Contact, 'id'>) => {
@@ -170,15 +183,26 @@ const JobTracker = () => {
     setShowConfirmDelete(true);
   };
   
-  const confirmDelete = () => {
-    if (itemToDelete) {
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+
+    try {
       if (itemToDelete.type === 'application') {
-        setApplications(applications.filter(app => app.id !== itemToDelete.id));
+        const { error } = await supabase
+          .from('bolt_applications')
+          .delete()
+          .eq('id', itemToDelete.id);
+
+        if (error) throw error;
+        await fetchApplications();
       } else {
         setContacts(contacts.filter(contact => contact.id !== itemToDelete.id));
       }
+      
       setShowConfirmDelete(false);
       setItemToDelete(null);
+    } catch (error) {
+      console.error('Error deleting item:', error);
     }
   };
   
@@ -197,7 +221,7 @@ const JobTracker = () => {
     if (activeTab === 'applications') {
       csvContent = 'Company,Position,Date Applied,Status,URL,Notes\n';
       dataToExport.forEach((item: any) => {
-        csvContent += `"${item.company}","${item.position}","${new Date(item.dateApplied).toLocaleDateString()}","${item.status}","${item.url || ''}","${item.notes || ''}"\n`;
+        csvContent += `"${item.company.name}","${item.position}","${new Date(item.applied_date).toLocaleDateString()}","${item.status}","${item.url || ''}","${item.notes || ''}"\n`;
       });
     } else {
       csvContent = 'Name,Company,Email,Phone,Notes,Last Contact Date\n';
@@ -326,7 +350,7 @@ const JobTracker = () => {
                 {filteredApplications.map(application => (
                   <tr key={application.id} className="border-b border-neutral-100 hover:bg-neutral-50">
                     <td className="py-1 px-2">
-                      <div className="font-medium text-sm">{application.company}</div>
+                      <div className="font-medium text-sm">{application.company.name}</div>
                       {application.url && (
                         <a 
                           href={application.url}
@@ -344,7 +368,7 @@ const JobTracker = () => {
                     </td>
                     <td className="py-1 px-2">
                       <span className="text-sm text-neutral-600">
-                        {new Date(application.dateApplied).toLocaleDateString()}
+                        {new Date(application.applied_date).toLocaleDateString()}
                       </span>
                     </td>
                     <td className="py-1 px-2">

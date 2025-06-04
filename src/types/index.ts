@@ -16,12 +16,24 @@ export interface Problem {
   firstAttemptDate: number | null;
 }
 
+// Company
+export interface Company {
+  id: string;
+  name: string;
+  size?: string;
+  website?: string;
+  industry?: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Job Application
 export interface JobApplication {
   id: number;
-  company: string;
+  company: Company;
   position: string;
-  dateApplied: number; // timestamp
+  applied_date: string;
   status: 'applied' | 'interviewing' | 'rejected' | 'offered' | 'accepted';
   url?: string;
   notes?: string;
