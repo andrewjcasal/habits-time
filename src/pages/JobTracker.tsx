@@ -67,7 +67,7 @@ const JobTracker = () => {
       id: 3,
       type: 'message' as const,
       title: 'New message from Sarah Lee',
-      description: 'Thanks for connecting! I'd love to chat about opportunities at...',
+      description: 'Thanks for connecting! I\'d love to chat about opportunities at...',
       timestamp: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
       url: 'https://linkedin.com/in/sarahlee',
       read: true
