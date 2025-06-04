@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+// Components
+import { Autocomplete } from './Autocomplete';
+
 // Types
 import { JobApplication } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface JobFormProps {
   isOpen: boolean;
@@ -22,6 +26,27 @@ export const JobForm = ({ isOpen, onClose, onSubmit, initialData }: JobFormProps
     notes: ''
   });
   
+  const [positions, setPositions] = useState<string[]>([]);
+  
+  // Load positions from Supabase
+  useEffect(() => {
+    const fetchPositions = async () => {
+      const { data, error } = await supabase
+        .from('bolt_positions')
+        .select('title')
+        .order('title');
+        
+      if (error) {
+        console.error('Error fetching positions:', error);
+        return;
+      }
+      
+      setPositions(data.map(p => p.title));
+    };
+    
+    fetchPositions();
+  }, []);
+  
   // Load initial data if provided (for editing)
   useEffect(() => {
     if (initialData) {
@@ -38,7 +63,7 @@ export const JobForm = ({ isOpen, onClose, onSubmit, initialData }: JobFormProps
       setFormData({
         company: '',
         position: '',
-        dateApplied: new Date().toISOString().split('T')[0], // Default to today
+        dateApplied: new Date().toISOString().split('T')[0],
         status: 'applied',
         url: '',
         notes: ''
@@ -60,7 +85,7 @@ export const JobForm = ({ isOpen, onClose, onSubmit, initialData }: JobFormProps
     const submissionData = {
       ...formData,
       applied_date: formData.dateApplied,
-      ...(initialData && { id: initialData.id }) // Preserve ID for updates
+      ...(initialData && { id: initialData.id })
     };
     
     onSubmit(submissionData);
@@ -115,15 +140,12 @@ export const JobForm = ({ isOpen, onClose, onSubmit, initialData }: JobFormProps
               <label htmlFor="position" className="block text-sm font-medium text-neutral-700 mb-1">
                 Position
               </label>
-              <input 
-                type="text"
-                id="position"
-                name="position"
+              <Autocomplete 
                 value={formData.position}
-                onChange={handleChange}
-                className="input"
+                onChange={(value) => setFormData({ ...formData, position: value })}
+                onSelect={(value) => setFormData({ ...formData, position: value })}
+                options={positions}
                 placeholder="Job title"
-                required
               />
             </div>
             
