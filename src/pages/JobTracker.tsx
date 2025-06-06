@@ -1,52 +1,78 @@
 import { useState, useEffect } from 'react';
-import { 
-  Trash2, 
-  Edit, 
-  Filter, 
-  Download, 
-  Mail, 
-  Phone, 
+import { Routes, Route, useLocation } from "react-router-dom";
+import InterviewHistory from "./InterviewHistory";
+import {
+  Trash2,
+  Edit,
+  Filter,
+  Download,
+  Mail,
+  Phone,
   ExternalLink,
   Calendar,
   Plus,
   X,
   Bell,
-  BellRing
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+  BellRing,
+  Briefcase,
+  Users as UsersIcon,
+  Rss,
+  History,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Components
-import { Tabs } from '../components/Tabs';
-import { JobForm } from '../components/JobForm';
-import { ContactForm } from '../components/ContactForm';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { FeedItem } from '../components/FeedItem';
-import { Autocomplete } from '../components/Autocomplete';
+import { SecondaryNav } from "../components/SecondaryNav";
+import { JobForm } from "../components/JobForm";
+import { ContactForm } from "../components/ContactForm";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { FeedItem } from "../components/FeedItem";
+import { Autocomplete } from "../components/Autocomplete";
 
 // Types
-import { JobApplication, Contact } from '../types';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth';
+import { JobApplication, Contact } from "../types";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../hooks/useAuth";
+
+// Feed Item type to avoid collision with the component
+interface FeedActivityItem {
+  id: string;
+  type: "connection" | "job_view" | "message";
+  title: string;
+  description?: string;
+  created_at: string;
+  url?: string;
+  read: boolean;
+}
 
 const JobTracker = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('applications');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState("applications");
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [showJobForm, setShowJobForm] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
-  const [editingItem, setEditingItem] = useState<JobApplication | Contact | null>(null);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [editingItem, setEditingItem] = useState<
+    JobApplication | Contact | null
+  >(null);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<{id: number, type: 'application' | 'contact'} | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{
+    id: number;
+    type: "application" | "contact";
+  } | null>(null);
   const [positions, setPositions] = useState<string[]>([]);
   const [newApplication, setNewApplication] = useState({
-    company: '',
-    position: '',
-    status: 'applied'
+    company: "",
+    position: "",
+    status: "applied",
   });
-  const [feedItems, setFeedItems] = useState([]);
+  const [feedItems, setFeedItems] = useState<FeedActivityItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Check if we're on a nested route
+  const isNestedRoute = location.pathname.includes("/interview-history");
 
   // Load data
   useEffect(() => {
@@ -55,8 +81,8 @@ const JobTracker = () => {
       fetchPositions();
       fetchFeedItems();
     }
-    
-    const savedContacts = localStorage.getItem('job-contacts');
+
+    const savedContacts = localStorage.getItem("job-contacts");
     if (savedContacts) {
       setContacts(JSON.parse(savedContacts));
     }
@@ -66,31 +92,31 @@ const JobTracker = () => {
     if (!user) return;
 
     const { data, error } = await supabase
-      .from('bolt_feed')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .from("bolt_feed")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error('Error fetching feed:', error);
+      console.error("Error fetching feed:", error);
       return;
     }
 
     setFeedItems(data || []);
-    setUnreadCount(data?.filter(item => !item.read).length || 0);
+    setUnreadCount(data?.filter((item) => !item.read).length || 0);
   };
 
   const handleMarkRead = async (id: string) => {
     if (!user) return;
 
     const { error } = await supabase
-      .from('bolt_feed')
+      .from("bolt_feed")
       .update({ read: true })
-      .eq('id', id)
-      .eq('user_id', user.id);
+      .eq("id", id)
+      .eq("user_id", user.id);
 
     if (error) {
-      console.error('Error marking feed item as read:', error);
+      console.error("Error marking feed item as read:", error);
       return;
     }
 
@@ -99,67 +125,71 @@ const JobTracker = () => {
 
   const fetchPositions = async () => {
     const { data, error } = await supabase
-      .from('bolt_positions')
-      .select('title')
-      .order('title');
+      .from("bolt_positions")
+      .select("title")
+      .order("title");
 
     if (error) {
-      console.error('Error fetching positions:', error);
+      console.error("Error fetching positions:", error);
       return;
     }
 
-    setPositions(data.map(p => p.title));
+    setPositions(data.map((p) => p.title));
   };
-  
+
   const fetchApplications = async () => {
     const { data, error } = await supabase
-      .from('bolt_applications')
-      .select(`
+      .from("bolt_applications")
+      .select(
+        `
         *,
         company:bolt_companies(*),
         position:bolt_positions(title)
-      `)
-      .order('created_at', { ascending: false });
-      
+      `
+      )
+      .order("created_at", { ascending: false });
+
     if (error) {
-      console.error('Error fetching applications:', error);
+      console.error("Error fetching applications:", error);
       return;
     }
-    
-    setApplications(data.map(app => ({
-      ...app,
-      position: app.position.title
-    })) || []);
+
+    setApplications(
+      data.map((app) => ({
+        ...app,
+        position: app.position.title,
+      })) || []
+    );
   };
-  
+
   // Save contacts to localStorage when they change
   useEffect(() => {
-    localStorage.setItem('job-contacts', JSON.stringify(contacts));
+    localStorage.setItem("job-contacts", JSON.stringify(contacts));
   }, [contacts]);
-  
+
   const handleAddApplication = async () => {
     if (!newApplication.company || !newApplication.position || !user) return;
 
     try {
       // First, get or create the company
       let { data: companies, error: companyError } = await supabase
-        .from('bolt_companies')
-        .select('id')
-        .eq('name', newApplication.company)
+        .from("bolt_companies")
+        .select("id")
+        .eq("name", newApplication.company)
         .limit(1);
-        
+
       let companyId;
-      
+
       if (companyError) throw companyError;
-      
+
       if (!companies || companies.length === 0) {
         // Create new company
         const { data: newCompany, error: createError } = await supabase
-          .from('bolt_companies')
+          .from("bolt_companies")
           .insert({ name: newApplication.company })
-          .select('id')
+          .select("id")
           .single();
-          
+
         if (createError) throw createError;
         companyId = newCompany.id;
       } else {
@@ -168,9 +198,9 @@ const JobTracker = () => {
 
       // Get or create position
       let { data: positionData, error: positionError } = await supabase
-        .from('bolt_positions')
-        .select('id')
-        .eq('title', newApplication.position)
+        .from("bolt_positions")
+        .select("id")
+        .eq("title", newApplication.position)
         .limit(1);
 
       if (positionError) throw positionError;
@@ -178,9 +208,9 @@ const JobTracker = () => {
       let positionId;
       if (!positionData || positionData.length === 0) {
         const { data: newPosition, error: createPositionError } = await supabase
-          .from('bolt_positions')
+          .from("bolt_positions")
           .insert({ title: newApplication.position })
-          .select('id')
+          .select("id")
           .single();
 
         if (createPositionError) throw createPositionError;
@@ -188,43 +218,44 @@ const JobTracker = () => {
       } else {
         positionId = positionData[0].id;
       }
-      
+
       // Create application
       const { error: applicationError } = await supabase
-        .from('bolt_applications')
+        .from("bolt_applications")
         .insert({
           company_id: companyId,
           position_id: positionId,
-          status: 'applied',
+          status: "applied",
           applied_date: new Date().toISOString(),
-          user_id: user.id
+          user_id: user.id,
         });
-        
+
       if (applicationError) throw applicationError;
-      
+
       // Refresh applications
       await fetchApplications();
       await fetchPositions();
-      
+
       // Reset form
-      setNewApplication({ company: '', position: '', status: 'applied' });
-      
+      setNewApplication({ company: "", position: "", status: "applied" });
     } catch (error) {
-      console.error('Error adding application:', error);
+      console.error("Error adding application:", error);
     }
   };
-  
-  const handleUpdateApplication = async (updatedApplication: JobApplication) => {
+
+  const handleUpdateApplication = async (
+    updatedApplication: JobApplication
+  ) => {
     try {
       const { error } = await supabase
-        .from('bolt_applications')
+        .from("bolt_applications")
         .update({
           status: updatedApplication.status,
           applied_date: updatedApplication.applied_date,
           url: updatedApplication.url,
-          notes: updatedApplication.notes
+          notes: updatedApplication.notes,
         })
-        .eq('id', updatedApplication.id);
+        .eq("id", updatedApplication.id);
 
       if (error) throw error;
 
@@ -232,381 +263,516 @@ const JobTracker = () => {
       setShowJobForm(false);
       setEditingItem(null);
     } catch (error) {
-      console.error('Error updating application:', error);
+      console.error("Error updating application:", error);
     }
   };
-  
-  const handleAddContact = (contact: Omit<Contact, 'id'>) => {
+
+  const handleAddContact = (contact: Omit<Contact, "id">) => {
     const newContact = {
       ...contact,
-      id: Date.now()
+      id: Date.now(),
     };
-    
+
     setContacts([newContact, ...contacts]);
     setShowContactForm(false);
   };
-  
+
   const handleUpdateContact = (updatedContact: Contact) => {
-    const updatedContacts = contacts.map(contact => 
+    const updatedContacts = contacts.map((contact) =>
       contact.id === updatedContact.id ? updatedContact : contact
     );
-    
+
     setContacts(updatedContacts);
     setShowContactForm(false);
     setEditingItem(null);
   };
-  
-  const handleEditClick = (item: JobApplication | Contact, type: 'application' | 'contact') => {
+
+  const handleEditClick = (
+    item: JobApplication | Contact,
+    type: "application" | "contact"
+  ) => {
     setEditingItem(item);
-    if (type === 'application') {
+    if (type === "application") {
       setShowJobForm(true);
     } else {
       setShowContactForm(true);
     }
   };
-  
-  const handleDeleteClick = (id: number, type: 'application' | 'contact') => {
+
+  const handleDeleteClick = (id: number, type: "application" | "contact") => {
     setItemToDelete({ id, type });
     setShowConfirmDelete(true);
   };
-  
+
   const confirmDelete = async () => {
     if (!itemToDelete) return;
 
     try {
-      if (itemToDelete.type === 'application') {
+      if (itemToDelete.type === "application") {
         const { error } = await supabase
-          .from('bolt_applications')
+          .from("bolt_applications")
           .delete()
-          .eq('id', itemToDelete.id);
+          .eq("id", itemToDelete.id);
 
         if (error) throw error;
         await fetchApplications();
       } else {
-        setContacts(contacts.filter(contact => contact.id !== itemToDelete.id));
+        setContacts(
+          contacts.filter((contact) => contact.id !== itemToDelete.id)
+        );
       }
-      
+
       setShowConfirmDelete(false);
       setItemToDelete(null);
     } catch (error) {
-      console.error('Error deleting item:', error);
+      console.error("Error deleting item:", error);
     }
   };
-  
+
   // Filter applications based on status
-  const filteredApplications = statusFilter === 'all' 
-    ? applications 
-    : applications.filter(app => app.status === statusFilter);
-    
+  const filteredApplications =
+    statusFilter === "all"
+      ? applications
+      : applications.filter((app) => app.status === statusFilter);
+
   // Export data as CSV
   const exportData = () => {
-    const dataToExport = activeTab === 'applications' ? applications : contacts;
-    
+    const dataToExport = activeTab === "applications" ? applications : contacts;
+
     // Create CSV content
-    let csvContent = '';
-    
-    if (activeTab === 'applications') {
-      csvContent = 'Company,Position,Date Applied,Status,URL,Notes\n';
+    let csvContent = "";
+
+    if (activeTab === "applications") {
+      csvContent = "Company,Position,Date Applied,Status,URL,Notes\n";
       dataToExport.forEach((item: any) => {
-        csvContent += `"${item.company.name}","${item.position}","${new Date(item.applied_date).toLocaleDateString()}","${item.status}","${item.url || ''}","${item.notes || ''}"\n`;
+        csvContent += `"${item.company.name}","${item.position}","${new Date(
+          item.applied_date
+        ).toLocaleDateString()}","${item.status}","${item.url || ""}","${
+          item.notes || ""
+        }"\n`;
       });
     } else {
-      csvContent = 'Name,Company,Email,Phone,Notes,Last Contact Date\n';
+      csvContent = "Name,Company,Email,Phone,Notes,Last Contact Date\n";
       dataToExport.forEach((item: any) => {
-        csvContent += `"${item.name}","${item.company || ''}","${item.email || ''}","${item.phone || ''}","${item.notes || ''}","${item.lastContactDate ? new Date(item.lastContactDate).toLocaleDateString() : ''}"\n`;
+        csvContent += `"${item.name}","${item.company || ""}","${
+          item.email || ""
+        }","${item.phone || ""}","${item.notes || ""}","${
+          item.lastContactDate
+            ? new Date(item.lastContactDate).toLocaleDateString()
+            : ""
+        }"\n`;
       });
     }
-    
+
     // Create download link
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`);
-    link.style.visibility = 'hidden';
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
-  
+
   return (
-    <div className="space-y-4 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Job Tracker</h1>
-          <p className="text-sm text-neutral-600">Track your applications and networking contacts</p>
-        </div>
-        
-        <button 
-          className="btn btn-outline btn-sm"
-          onClick={exportData}
-        >
-          <Download className="mr-1.5 h-3.5 w-3.5" />
-          Export
-        </button>
-      </div>
-      
-      {/* Tabs */}
-      <Tabs 
-        tabs={[
-          { id: 'applications', label: 'Applications', count: applications.length },
-          { id: 'contacts', label: 'Contacts', count: contacts.length },
-          { id: 'feed', label: 'Feed', count: unreadCount }
+    <div className="flex h-full max-w-7xl mx-auto">
+      {/* Secondary Navigation */}
+      <SecondaryNav
+        items={[
+          {
+            id: "applications",
+            label: "Applications",
+            count: applications.length,
+            icon: <Briefcase className="h-3 w-3" />,
+            href: isNestedRoute ? "/job-tracker" : undefined,
+          },
+          {
+            id: "contacts",
+            label: "Contacts",
+            count: contacts.length,
+            icon: <UsersIcon className="h-3 w-3" />,
+            href: isNestedRoute ? "/job-tracker" : undefined,
+          },
+          {
+            id: "feed",
+            label: "Feed",
+            count: unreadCount,
+            icon: <Rss className="h-3 w-3" />,
+            href: isNestedRoute ? "/job-tracker" : undefined,
+          },
+          {
+            id: "history",
+            label: "History",
+            count: 3,
+            icon: <History className="h-3 w-3" />,
+            href: "/job-tracker/interview-history",
+          },
         ]}
-        activeTab={activeTab}
+        activeItem={isNestedRoute ? "history" : activeTab}
         onChange={setActiveTab}
       />
-      
-      {/* Applications Tab */}
-      {activeTab === 'applications' && (
-        <>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <Filter className="h-3.5 w-3.5 text-neutral-500" />
-              <select
-                className="select !py-1 !text-sm !w-auto"
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-              >
-                <option value="all">All Statuses</option>
-                <option value="applied">Applied</option>
-                <option value="interviewing">Interviewing</option>
-                <option value="rejected">Rejected</option>
-                <option value="offered">Offered</option>
-                <option value="accepted">Accepted</option>
-              </select>
-            </div>
-            
-            <p className="text-xs text-neutral-500">
-              Showing {filteredApplications.length} of {applications.length} applications
-            </p>
-          </div>
-          
-          {/* Applications List */}
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-neutral-200">
-                  <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Company</th>
-                  <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Position</th>
-                  <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Applied</th>
-                  <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Status</th>
-                  <th className="text-right py-1 px-2 text-xs font-medium text-neutral-500">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Quick Add Form */}
-                <tr className="border-b border-neutral-100">
-                  <td className="py-1 px-2">
-                    <input
-                      type="text"
-                      placeholder="Company"
-                      className="input !py-1 !text-sm w-full"
-                      value={newApplication.company}
-                      onChange={e => setNewApplication({ ...newApplication, company: e.target.value })}
-                    />
-                  </td>
-                  <td className="py-1 px-2">
-                    <Autocomplete
-                      value={newApplication.position}
-                      onChange={value => setNewApplication({ ...newApplication, position: value })}
-                      onSelect={value => setNewApplication({ ...newApplication, position: value })}
-                      options={positions}
-                      placeholder="Position"
-                      className="!py-1 !text-sm w-full"
-                    />
-                  </td>
-                  <td className="py-1 px-2">
-                    <span className="text-sm text-neutral-500">Today</span>
-                  </td>
-                  <td className="py-1 px-2">
-                    <span className="inline-block rounded-full px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800">
-                      Applied
-                    </span>
-                  </td>
-                  <td className="py-1 px-2 text-right">
-                    <button
-                      onClick={handleAddApplication}
-                      disabled={!newApplication.company || !newApplication.position}
-                      className="btn btn-primary btn-sm"
-                    >
-                      Add
-                    </button>
-                  </td>
-                </tr>
-                
-                {/* Applications List */}
-                {filteredApplications.map(application => (
-                  <tr key={application.id} className="border-b border-neutral-100 hover:bg-neutral-50">
-                    <td className="py-1 px-2">
-                      <div className="font-medium text-sm">{application.company.name}</div>
-                      {application.url && (
-                        <a 
-                          href={application.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary-600 hover:text-primary-800 flex items-center mt-0.5"
+
+      {/* Main Content Area */}
+      <div className="flex-1 p-6 space-y-4">
+        <Routes>
+          <Route path="interview-history" element={<InterviewHistory />} />
+          <Route
+            path="*"
+            element={
+              // Render main job tracker content
+              <>
+                {/* Header */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h1 className="text-xl font-semibold text-neutral-900">
+                      {activeTab === "applications"
+                        ? "Job Applications"
+                        : activeTab === "contacts"
+                        ? "Contacts"
+                        : "Activity Feed"}
+                    </h1>
+                    <p className="text-sm text-neutral-600">
+                      {activeTab === "applications"
+                        ? "Track your job applications"
+                        : activeTab === "contacts"
+                        ? "Manage your networking contacts"
+                        : "Stay updated with your activity"}
+                    </p>
+                  </div>
+
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={exportData}
+                  >
+                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                    Export
+                  </button>
+                </div>
+
+                {/* Applications Tab */}
+                {activeTab === "applications" && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2">
+                        <Filter className="h-3.5 w-3.5 text-neutral-500" />
+                        <select
+                          className="select !py-1 !text-sm !w-auto"
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
                         >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          View Job
-                        </a>
-                      )}
-                    </td>
-                    <td className="py-1 px-2">
-                      <span className="text-sm">{application.position}</span>
-                    </td>
-                    <td className="py-1 px-2">
-                      <span className="text-sm text-neutral-600">
-                        {new Date(application.applied_date).toLocaleDateString()}
-                      </span>
-                    </td>
-                    <td className="py-1 px-2">
-                      <span className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
-                        application.status === 'applied' 
-                          ? 'bg-primary-100 text-primary-800' 
-                          : application.status === 'interviewing' 
-                            ? 'bg-secondary-100 text-secondary-800' 
-                            : application.status === 'rejected' 
-                              ? 'bg-error-100 text-error-800' 
-                              : application.status === 'offered' 
-                                ? 'bg-warning-100 text-warning-800' 
-                                : 'bg-success-100 text-success-800'
-                      }`}>
-                        {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="py-1 px-2 text-right">
-                      <div className="flex items-center justify-end space-x-1">
-                        <button 
-                          onClick={() => handleEditClick(application, 'application')}
-                          className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteClick(application.id, 'application')}
-                          className="p-1 text-neutral-500 hover:text-error-600 hover:bg-neutral-100 rounded"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                          <option value="all">All Statuses</option>
+                          <option value="applied">Applied</option>
+                          <option value="interviewing">Interviewing</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="offered">Offered</option>
+                          <option value="accepted">Accepted</option>
+                        </select>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-      
-      {/* Contacts Tab */}
-      {activeTab === 'contacts' && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-neutral-600">
-              {contacts.length} total contacts
-            </div>
-            <button 
-              className="btn btn-primary btn-sm"
-              onClick={() => setShowContactForm(true)}
-            >
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Add Contact
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <AnimatePresence>
-              {contacts.map(contact => (
-                <motion.div
-                  key={contact.id}
-                  className="card bg-white !p-3"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <div className="flex justify-between">
-                    <div>
-                      <h3 className="font-medium text-sm">{contact.name}</h3>
-                      {contact.company && (
-                        <p className="text-sm text-neutral-600">{contact.company}</p>
-                      )}
-                      
-                      <div className="mt-2 space-y-1">
-                        {contact.email && (
-                          <div className="flex items-center text-xs text-neutral-600">
-                            <Mail className="h-3 w-3 mr-1" />
-                            <a 
-                              href={`mailto:${contact.email}`}
-                              className="hover:text-primary-600"
-                            >
-                              {contact.email}
-                            </a>
-                          </div>
-                        )}
-                        
-                        {contact.phone && (
-                          <div className="flex items-center text-xs text-neutral-600">
-                            <Phone className="h-3 w-3 mr-1" />
-                            <a 
-                              href={`tel:${contact.phone}`}
-                              className="hover:text-primary-600"
-                            >
-                              {contact.phone}
-                            </a>
-                          </div>
-                        )}
-                        
-                        {contact.lastContactDate && (
-                          <div className="flex items-center text-xs text-neutral-500">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            Last Contact: {new Date(contact.lastContactDate).toLocaleDateString()}
-                          </div>
-                        )}
-                      </div>
+
+                      <p className="text-xs text-neutral-500">
+                        Showing {filteredApplications.length} of{" "}
+                        {applications.length} applications
+                      </p>
                     </div>
-                    
-                    <div className="flex items-start space-x-1">
-                      <button 
-                        onClick={() => handleEditClick(contact, 'contact')}
-                        className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
+
+                    {/* Applications List */}
+                    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-neutral-200">
+                            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
+                              Company
+                            </th>
+                            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
+                              Position
+                            </th>
+                            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
+                              Applied
+                            </th>
+                            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
+                              Status
+                            </th>
+                            <th className="text-right py-1 px-2 text-xs font-medium text-neutral-500">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Quick Add Form */}
+                          <tr className="border-b border-neutral-100">
+                            <td className="py-1 px-2">
+                              <input
+                                type="text"
+                                placeholder="Company"
+                                className="input !py-1 !text-sm w-full"
+                                value={newApplication.company}
+                                onChange={(e) =>
+                                  setNewApplication({
+                                    ...newApplication,
+                                    company: e.target.value,
+                                  })
+                                }
+                              />
+                            </td>
+                            <td className="py-1 px-2">
+                              <Autocomplete
+                                value={newApplication.position}
+                                onChange={(value) =>
+                                  setNewApplication({
+                                    ...newApplication,
+                                    position: value,
+                                  })
+                                }
+                                onSelect={(value) =>
+                                  setNewApplication({
+                                    ...newApplication,
+                                    position: value,
+                                  })
+                                }
+                                options={positions}
+                                placeholder="Position"
+                                className="!py-1 !text-sm w-full"
+                              />
+                            </td>
+                            <td className="py-1 px-2">
+                              <span className="text-sm text-neutral-500">
+                                Today
+                              </span>
+                            </td>
+                            <td className="py-1 px-2">
+                              <span className="inline-block rounded-full px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800">
+                                Applied
+                              </span>
+                            </td>
+                            <td className="py-1 px-2 text-right">
+                              <button
+                                onClick={handleAddApplication}
+                                disabled={
+                                  !newApplication.company ||
+                                  !newApplication.position
+                                }
+                                className="btn btn-primary btn-sm"
+                              >
+                                Add
+                              </button>
+                            </td>
+                          </tr>
+
+                          {/* Applications List */}
+                          {filteredApplications.map((application) => (
+                            <tr
+                              key={application.id}
+                              className="border-b border-neutral-100 hover:bg-neutral-50"
+                            >
+                              <td className="py-1 px-2">
+                                <div className="font-medium text-sm">
+                                  {application.company.name}
+                                </div>
+                                {application.url && (
+                                  <a
+                                    href={application.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-primary-600 hover:text-primary-800 flex items-center mt-0.5"
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    View Job
+                                  </a>
+                                )}
+                              </td>
+                              <td className="py-1 px-2">
+                                <span className="text-sm">
+                                  {application.position}
+                                </span>
+                              </td>
+                              <td className="py-1 px-2">
+                                <span className="text-sm text-neutral-600">
+                                  {new Date(
+                                    application.applied_date
+                                  ).toLocaleDateString()}
+                                </span>
+                              </td>
+                              <td className="py-1 px-2">
+                                <span
+                                  className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
+                                    application.status === "applied"
+                                      ? "bg-primary-100 text-primary-800"
+                                      : application.status === "interviewing"
+                                      ? "bg-secondary-100 text-secondary-800"
+                                      : application.status === "rejected"
+                                      ? "bg-error-100 text-error-800"
+                                      : application.status === "offered"
+                                      ? "bg-warning-100 text-warning-800"
+                                      : "bg-success-100 text-success-800"
+                                  }`}
+                                >
+                                  {application.status.charAt(0).toUpperCase() +
+                                    application.status.slice(1)}
+                                </span>
+                              </td>
+                              <td className="py-1 px-2 text-right">
+                                <div className="flex items-center justify-end space-x-1">
+                                  <button
+                                    onClick={() =>
+                                      handleEditClick(
+                                        application,
+                                        "application"
+                                      )
+                                    }
+                                    className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteClick(
+                                        application.id,
+                                        "application"
+                                      )
+                                    }
+                                    className="p-1 text-neutral-500 hover:text-error-600 hover:bg-neutral-100 rounded"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+
+                {/* Contacts Tab */}
+                {activeTab === "contacts" && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-neutral-600">
+                        {contacts.length} total contacts
+                      </div>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setShowContactForm(true)}
                       >
-                        <Edit className="h-3.5 w-3.5" />
+                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                        Add Contact
                       </button>
-                      
-                      <button 
-                        onClick={() => handleDeleteClick(contact.id, 'contact')}
-                        className="p-1 text-neutral-500 hover:text-error-600 hover:bg-neutral-100 rounded"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <AnimatePresence>
+                        {contacts.map((contact) => (
+                          <motion.div
+                            key={contact.id}
+                            className="card bg-white !p-3"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                          >
+                            <div className="flex justify-between">
+                              <div>
+                                <h3 className="font-medium text-sm">
+                                  {contact.name}
+                                </h3>
+                                {contact.company && (
+                                  <p className="text-sm text-neutral-600">
+                                    {contact.company}
+                                  </p>
+                                )}
+
+                                <div className="mt-2 space-y-1">
+                                  {contact.email && (
+                                    <div className="flex items-center text-xs text-neutral-600">
+                                      <Mail className="h-3 w-3 mr-1" />
+                                      <a
+                                        href={`mailto:${contact.email}`}
+                                        className="hover:text-primary-600"
+                                      >
+                                        {contact.email}
+                                      </a>
+                                    </div>
+                                  )}
+
+                                  {contact.phone && (
+                                    <div className="flex items-center text-xs text-neutral-600">
+                                      <Phone className="h-3 w-3 mr-1" />
+                                      <a
+                                        href={`tel:${contact.phone}`}
+                                        className="hover:text-primary-600"
+                                      >
+                                        {contact.phone}
+                                      </a>
+                                    </div>
+                                  )}
+
+                                  {contact.lastContactDate && (
+                                    <div className="flex items-center text-xs text-neutral-500">
+                                      <Calendar className="h-3 w-3 mr-1" />
+                                      Last Contact:{" "}
+                                      {new Date(
+                                        contact.lastContactDate
+                                      ).toLocaleDateString()}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-start space-x-1">
+                                <button
+                                  onClick={() =>
+                                    handleEditClick(contact, "contact")
+                                  }
+                                  className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+
+                                <button
+                                  onClick={() =>
+                                    handleDeleteClick(contact.id, "contact")
+                                  }
+                                  className="p-1 text-neutral-500 hover:text-error-600 hover:bg-neutral-100 rounded"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
                     </div>
                   </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        </div>
-      )}
+                )}
 
-      {/* Feed Tab */}
-      {activeTab === 'feed' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            {feedItems.map(item => (
-              <FeedItem 
-                key={item.id} 
-                item={item} 
-                onMarkRead={handleMarkRead} 
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      
+                {/* Feed Tab */}
+                {activeTab === "feed" && (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                      {feedItems.map((item) => (
+                        <FeedItem
+                          key={item.id}
+                          item={item}
+                          onMarkRead={handleMarkRead}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            }
+          />
+        </Routes>
+      </div>
+
       {/* Forms */}
-      <JobForm 
-        isOpen={showJobForm} 
+      <JobForm
+        isOpen={showJobForm}
         onClose={() => {
           setShowJobForm(false);
           setEditingItem(null);
@@ -614,7 +780,7 @@ const JobTracker = () => {
         onSubmit={editingItem ? handleUpdateApplication : handleAddApplication}
         initialData={editingItem as JobApplication}
       />
-      
+
       <ContactForm
         isOpen={showContactForm}
         onClose={() => {
@@ -624,7 +790,7 @@ const JobTracker = () => {
         onSubmit={editingItem ? handleUpdateContact : handleAddContact}
         initialData={editingItem as Contact}
       />
-      
+
       <ConfirmDialog
         isOpen={showConfirmDelete}
         onClose={() => {

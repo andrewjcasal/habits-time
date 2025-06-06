@@ -24,11 +24,10 @@ export function useAuth() {
       setIsLoading(false);
 
       // Only redirect on specific auth events, not on token refresh
-      if (event === 'SIGNED_IN' && newUser) {
-        navigate('/');
-      } else if (event === 'SIGNED_OUT' && !newUser) {
+      if (event === 'SIGNED_OUT' && !newUser) {
         navigate('/login');
       }
+      // Don't redirect on SIGNED_IN as it can interfere with navigation
     });
 
     return () => subscription.unsubscribe();
