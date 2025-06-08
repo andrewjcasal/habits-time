@@ -26,6 +26,11 @@ export interface Company {
   description?: string;
   created_at?: string;
   updated_at?: string;
+  applications: {
+    position: {
+      title: string;
+    };
+  }[];
 }
 
 // Job Application
@@ -41,13 +46,31 @@ export interface JobApplication {
 
 // Contact
 export interface Contact {
-  id: number;
+  id: string;
+  user_id?: string;
   name: string;
   company?: string;
+  role?: string;
   email?: string;
   phone?: string;
   notes?: string;
-  lastContactDate?: number; // timestamp
+  last_contact_date?: string; // ISO string
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Networking Action
+export interface NetworkingAction {
+  id: number;
+  user_id: string;
+  contact_id?: string;
+  contact_name: string;
+  company: string;
+  role: string;
+  action_taken: string;
+  follow_up_date?: string;
+  note?: string;
+  created_at: string;
 }
 
 // Interview types
@@ -88,3 +111,9 @@ export const SPACED_REP_LEVELS: SpacedRepLevel[] = [
   { days: 30, totalDays: 60, nextLevel: 120 },// Level 5 -> 6: Review in 30 days
   { days: 60, totalDays: 120, nextLevel: -1 } // Level 6: Review in 60 days, then done
 ];
+
+export interface TodoType {
+  id: number;
+  name: string;
+  script: string;
+}

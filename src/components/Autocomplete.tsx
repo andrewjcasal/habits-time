@@ -63,7 +63,7 @@ export const Autocomplete = ({
         }}
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
-        className={`input ${className}`}
+        className={`${className}`}
       />
 
       <AnimatePresence>
@@ -79,10 +79,10 @@ export const Autocomplete = ({
               {filteredOptions.map((option, index) => (
                 <li
                   key={index}
-                  className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between ${
+                  className={`px-1 py-0.5 text-sm cursor-pointer flex items-center justify-between ${
                     option === value
-                      ? 'bg-primary-50 text-primary-900'
-                      : 'hover:bg-neutral-50'
+                      ? "bg-primary-50 text-primary-900"
+                      : "hover:bg-neutral-50"
                   }`}
                   onClick={() => handleSelect(option)}
                 >

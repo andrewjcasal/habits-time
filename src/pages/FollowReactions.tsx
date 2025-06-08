@@ -179,22 +179,18 @@ const FollowReactions = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-2 max-w-7xl mx-auto p-1">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">
             Follow Reactions
           </h1>
-          <p className="text-neutral-600 mt-1">
-            Track posts that people you follow on LinkedIn have reacted to
-          </p>
         </div>
 
         <button
           onClick={() => setShowAddForm(true)}
-          className="btn btn-primary"
+          className="btn btn-primary text-sm px-1 py-0.5"
         >
-          <Plus className="mr-2 h-4 w-4" />
           Add Post
         </button>
       </div>
@@ -206,11 +202,11 @@ const FollowReactions = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="card bg-white border-l-4 border-l-primary-500"
+            className="card bg-white p-1"
           >
-            <h3 className="text-lg font-medium mb-4">Add New Post Reaction</h3>
+            <h3 className="text-lg font-medium mb-1">Add New Post Reaction</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Post Author
@@ -224,7 +220,7 @@ const FollowReactions = () => {
                       author: e.target.value,
                     })
                   }
-                  className="input w-full"
+                  className="w-full"
                   placeholder="Who wrote the post?"
                 />
               </div>
@@ -242,7 +238,7 @@ const FollowReactions = () => {
                       reacted_by: e.target.value,
                     })
                   }
-                  className="input w-full"
+                  className="w-full"
                   placeholder="Who reacted to the post?"
                 />
               </div>
@@ -259,24 +255,24 @@ const FollowReactions = () => {
                       notes: e.target.value,
                     })
                   }
-                  className="input w-full"
+                  className="w-full"
                   rows={3}
                   placeholder="Any notes about this post or reaction..."
                 />
               </div>
             </div>
 
-            <div className="flex justify-end space-x-2 mt-4">
+            <div className="flex justify-end space-x-1 mt-1">
               <button
                 onClick={() => setShowAddForm(false)}
-                className="btn btn-outline"
+                className="btn btn-outline text-sm px-1 py-0.5"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddPost}
                 disabled={!newPost.author || !newPost.reacted_by}
-                className="btn btn-primary"
+                className="btn btn-primary text-sm px-1 py-0.5"
               >
                 Add Post
               </button>
@@ -294,13 +290,12 @@ const FollowReactions = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="card bg-white hover:shadow-md transition-shadow"
+              className="card p-1 bg-white hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
+                  <div className="flex items-center space-x-1 mb-0.5">
                     <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-neutral-500" />
                       {editingId === post.id &&
                       editingField === "reacted_by" ? (
                         <div className="flex items-center space-x-2">
@@ -326,7 +321,7 @@ const FollowReactions = () => {
                         </div>
                       ) : (
                         <span
-                          className="font-medium text-neutral-900 cursor-pointer hover:text-primary-600"
+                          className="font-medium text-neutral-900 cursor-pointer hover:text-primary-600 text-sm"
                           onClick={() =>
                             handleStartEdit(
                               post.id,
@@ -340,7 +335,7 @@ const FollowReactions = () => {
                       )}
                     </div>
 
-                    <span className="text-neutral-500">reacted to</span>
+                    <span className="text-neutral-500 text-sm">reacted to</span>
 
                     {editingId === post.id && editingField === "author" ? (
                       <div className="flex items-center space-x-2">
@@ -366,7 +361,7 @@ const FollowReactions = () => {
                       </div>
                     ) : (
                       <span
-                        className="font-medium text-neutral-700 cursor-pointer hover:text-primary-600"
+                        className="font-medium text-neutral-700 cursor-pointer hover:text-primary-600 text-sm"
                         onClick={() =>
                           handleStartEdit(post.id, "author", post.author)
                         }
@@ -377,7 +372,7 @@ const FollowReactions = () => {
                   </div>
 
                   {post.notes && (
-                    <div className="mb-3">
+                    <div className="mb-0.5">
                       {editingId === post.id && editingField === "notes" ? (
                         <div className="flex items-start space-x-2">
                           <textarea
@@ -404,7 +399,7 @@ const FollowReactions = () => {
                         </div>
                       ) : (
                         <div
-                          className="text-sm text-neutral-600 bg-neutral-50 p-2 rounded cursor-pointer hover:bg-neutral-100"
+                          className="text-sm text-neutral-600"
                           onClick={() =>
                             handleStartEdit(post.id, "notes", post.notes)
                           }
@@ -427,7 +422,7 @@ const FollowReactions = () => {
                   onClick={() => handleDeletePost(post.id)}
                   className="text-neutral-400 hover:text-red-500 ml-4"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-2 w-2" />
                 </button>
               </div>
             </motion.div>

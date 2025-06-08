@@ -56,7 +56,7 @@
   }
   
   .card {
-    @apply rounded-lg bg-white p-4 shadow-md;
+    @apply rounded-lg bg-white shadow-md;
   }
   
   .input {

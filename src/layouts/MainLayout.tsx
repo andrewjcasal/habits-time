@@ -79,7 +79,7 @@ const MainLayout = () => {
       </aside>
 
       {/* Mobile Vertical Sidebar */}
-      <aside className="md:hidden w-18 flex flex-col bg-white border-r border-neutral-200 relative z-10">
+      <aside className="z-100 md:hidden w-18 flex flex-col bg-white border-r border-neutral-200 relative z-10">
         {/* App Icon */}
         <div className="p-1 border-b border-neutral-100">
           <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">

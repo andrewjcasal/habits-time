@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from "react-router-dom";
 import InterviewHistory from "./InterviewHistory";
+import Actions from "./Actions";
+import Todos from "./Todos";
 import {
   Trash2,
   Edit,
@@ -18,6 +20,8 @@ import {
   Users as UsersIcon,
   Rss,
   History,
+  Zap,
+  CheckSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -28,9 +32,10 @@ import { ContactForm } from "../components/ContactForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { FeedItem } from "../components/FeedItem";
 import { Autocomplete } from "../components/Autocomplete";
+import { ContactsTab } from "../components/ContactsTab";
 
 // Types
-import { JobApplication, Contact } from "../types";
+import { JobApplication, Contact, NetworkingAction } from "../types";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 
@@ -59,9 +64,10 @@ const JobTracker = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{
-    id: number;
+    id: string;
     type: "application" | "contact";
   } | null>(null);
+  const [contactActions, setContactActions] = useState<NetworkingAction[]>([]);
   const [positions, setPositions] = useState<string[]>([]);
   const [newApplication, setNewApplication] = useState({
     company: "",
@@ -70,9 +76,13 @@ const JobTracker = () => {
   });
   const [feedItems, setFeedItems] = useState<FeedActivityItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [secondaryNavVisible, setSecondaryNavVisible] = useState(false);
 
   // Check if we're on a nested route
-  const isNestedRoute = location.pathname.includes("/interview-history");
+  const isNestedRoute =
+    location.pathname.includes("/interview-history") ||
+    location.pathname.includes("/actions") ||
+    location.pathname.includes("/todos");
 
   // Load data
   useEffect(() => {
@@ -80,11 +90,7 @@ const JobTracker = () => {
       fetchApplications();
       fetchPositions();
       fetchFeedItems();
-    }
-
-    const savedContacts = localStorage.getItem("job-contacts");
-    if (savedContacts) {
-      setContacts(JSON.parse(savedContacts));
+      fetchContacts();
     }
   }, [user]);
 
@@ -135,6 +141,41 @@ const JobTracker = () => {
     }
 
     setPositions(data.map((p) => p.title));
+  };
+
+  const fetchContacts = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("bolt_contacts")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching contacts:", error);
+      return;
+    }
+
+    setContacts(data || []);
+  };
+
+  const fetchContactActions = async (contactId: string) => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("actions")
+      .select("*")
+      .eq("contact_id", contactId)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching contact actions:", error);
+      return;
+    }
+
+    setContactActions(data || []);
   };
 
   const fetchApplications = async () => {
@@ -267,24 +308,52 @@ const JobTracker = () => {
     }
   };
 
-  const handleAddContact = (contact: Omit<Contact, "id">) => {
-    const newContact = {
-      ...contact,
-      id: Date.now(),
-    };
+  const handleAddContact = async (
+    contact: Omit<Contact, "id" | "user_id" | "created_at" | "updated_at">
+  ) => {
+    if (!user) return;
 
-    setContacts([newContact, ...contacts]);
-    setShowContactForm(false);
+    try {
+      const { error } = await supabase.from("bolt_contacts").insert({
+        ...contact,
+        user_id: user.id,
+      });
+
+      if (error) throw error;
+
+      await fetchContacts();
+      setShowContactForm(false);
+    } catch (error) {
+      console.error("Error adding contact:", error);
+    }
   };
 
-  const handleUpdateContact = (updatedContact: Contact) => {
-    const updatedContacts = contacts.map((contact) =>
-      contact.id === updatedContact.id ? updatedContact : contact
-    );
+  const handleUpdateContact = async (updatedContact: Contact) => {
+    if (!user) return;
 
-    setContacts(updatedContacts);
-    setShowContactForm(false);
-    setEditingItem(null);
+    try {
+      const { error } = await supabase
+        .from("bolt_contacts")
+        .update({
+          name: updatedContact.name,
+          company: updatedContact.company,
+          role: updatedContact.role,
+          email: updatedContact.email,
+          phone: updatedContact.phone,
+          notes: updatedContact.notes,
+          last_contact_date: updatedContact.last_contact_date,
+        })
+        .eq("id", updatedContact.id)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      await fetchContacts();
+      setShowContactForm(false);
+      setEditingItem(null);
+    } catch (error) {
+      console.error("Error updating contact:", error);
+    }
   };
 
   const handleEditClick = (
@@ -299,13 +368,13 @@ const JobTracker = () => {
     }
   };
 
-  const handleDeleteClick = (id: number, type: "application" | "contact") => {
+  const handleDeleteClick = (id: string, type: "application" | "contact") => {
     setItemToDelete({ id, type });
     setShowConfirmDelete(true);
   };
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return;
+    if (!itemToDelete || !user) return;
 
     try {
       if (itemToDelete.type === "application") {
@@ -317,9 +386,14 @@ const JobTracker = () => {
         if (error) throw error;
         await fetchApplications();
       } else {
-        setContacts(
-          contacts.filter((contact) => contact.id !== itemToDelete.id)
-        );
+        const { error } = await supabase
+          .from("bolt_contacts")
+          .delete()
+          .eq("id", itemToDelete.id)
+          .eq("user_id", user.id);
+
+        if (error) throw error;
+        await fetchContacts();
       }
 
       setShowConfirmDelete(false);
@@ -380,7 +454,13 @@ const JobTracker = () => {
   };
 
   return (
-    <div className="flex h-full max-w-7xl mx-auto">
+    <div className="relative flex h-full max-w-7xl mx-auto">
+      {/* Hover trigger for secondary nav on mobile */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 z-20 md:hidden"
+        onMouseEnter={() => setSecondaryNavVisible(true)}
+      />
+
       {/* Secondary Navigation */}
       <SecondaryNav
         items={[
@@ -412,15 +492,45 @@ const JobTracker = () => {
             icon: <History className="h-3 w-3" />,
             href: "/job-tracker/interview-history",
           },
+          {
+            id: "todos",
+            label: "To-dos",
+            count: 0,
+            icon: <CheckSquare className="h-3 w-3" />,
+            href: "/job-tracker/todos",
+          },
+          {
+            id: "actions",
+            label: "Actions",
+            count: 4,
+            icon: <Zap className="h-3 w-3" />,
+            href: "/job-tracker/actions",
+          },
         ]}
-        activeItem={isNestedRoute ? "history" : activeTab}
+        activeItem={
+          isNestedRoute
+            ? location.pathname.includes("/interview-history")
+              ? "history"
+              : location.pathname.includes("/todos")
+              ? "todos"
+              : "actions"
+            : activeTab
+        }
         onChange={setActiveTab}
+        isVisible={secondaryNavVisible}
+        onMouseEnter={() => setSecondaryNavVisible(true)}
+        onMouseLeave={() => setSecondaryNavVisible(false)}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 p-6 space-y-4">
+      <div
+        className="flex-1 space-y-4 p-1"
+        onMouseEnter={() => setSecondaryNavVisible(false)}
+      >
         <Routes>
           <Route path="interview-history" element={<InterviewHistory />} />
+          <Route path="todos" element={<Todos />} />
+          <Route path="actions" element={<Actions />} />
           <Route
             path="*"
             element={
@@ -436,13 +546,6 @@ const JobTracker = () => {
                         ? "Contacts"
                         : "Activity Feed"}
                     </h1>
-                    <p className="text-sm text-neutral-600">
-                      {activeTab === "applications"
-                        ? "Track your job applications"
-                        : activeTab === "contacts"
-                        ? "Manage your networking contacts"
-                        : "Stay updated with your activity"}
-                    </p>
                   </div>
 
                   <button
@@ -485,19 +588,19 @@ const JobTracker = () => {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-neutral-200">
-                            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
+                            <th className="text-left py-1 px-1 text-xs font-medium text-neutral-500">
                               Company
                             </th>
-                            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
+                            <th className="text-left py-1 px-1 text-xs font-medium text-neutral-500">
                               Position
                             </th>
-                            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
+                            <th className="text-left py-1 px-1 text-xs font-medium text-neutral-500">
                               Applied
                             </th>
-                            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
+                            <th className="text-left py-1 px-1 text-xs font-medium text-neutral-500">
                               Status
                             </th>
-                            <th className="text-right py-1 px-2 text-xs font-medium text-neutral-500">
+                            <th className="text-right py-1 px-1 text-xs font-medium text-neutral-500">
                               Actions
                             </th>
                           </tr>
@@ -505,11 +608,11 @@ const JobTracker = () => {
                         <tbody>
                           {/* Quick Add Form */}
                           <tr className="border-b border-neutral-100">
-                            <td className="py-1 px-2">
+                            <td className="py-1 px-1">
                               <input
                                 type="text"
                                 placeholder="Company"
-                                className="input !py-1 !text-sm w-full"
+                                className="!py-1 !text-sm w-full"
                                 value={newApplication.company}
                                 onChange={(e) =>
                                   setNewApplication({
@@ -519,7 +622,7 @@ const JobTracker = () => {
                                 }
                               />
                             </td>
-                            <td className="py-1 px-2">
+                            <td className="py-1 px-1">
                               <Autocomplete
                                 value={newApplication.position}
                                 onChange={(value) =>
@@ -539,24 +642,24 @@ const JobTracker = () => {
                                 className="!py-1 !text-sm w-full"
                               />
                             </td>
-                            <td className="py-1 px-2">
+                            <td className="py-1 px-1">
                               <span className="text-sm text-neutral-500">
                                 Today
                               </span>
                             </td>
-                            <td className="py-1 px-2">
-                              <span className="inline-block rounded-full px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800">
-                                Applied
+                            <td className="py-1 px-1">
+                              <span className="inline-block rounded-full px-1 py-0.5 text-xs font-medium bg-primary-100 text-primary-800">
+                                A
                               </span>
                             </td>
-                            <td className="py-1 px-2 text-right">
+                            <td className="py-1 px-1 text-right">
                               <button
                                 onClick={handleAddApplication}
                                 disabled={
                                   !newApplication.company ||
                                   !newApplication.position
                                 }
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-primary btn-sm text-xs px-2 py-0.5"
                               >
                                 Add
                               </button>
@@ -569,7 +672,7 @@ const JobTracker = () => {
                               key={application.id}
                               className="border-b border-neutral-100 hover:bg-neutral-50"
                             >
-                              <td className="py-1 px-2">
+                              <td className="py-1 px-1">
                                 <div className="font-medium text-sm">
                                   {application.company.name}
                                 </div>
@@ -585,21 +688,24 @@ const JobTracker = () => {
                                   </a>
                                 )}
                               </td>
-                              <td className="py-1 px-2">
+                              <td className="py-1 px-1">
                                 <span className="text-sm">
                                   {application.position}
                                 </span>
                               </td>
-                              <td className="py-1 px-2">
+                              <td className="py-1 px-1">
                                 <span className="text-sm text-neutral-600">
                                   {new Date(
                                     application.applied_date
-                                  ).toLocaleDateString()}
+                                  ).toLocaleDateString("en-US", {
+                                    month: "numeric",
+                                    day: "numeric",
+                                  })}
                                 </span>
                               </td>
-                              <td className="py-1 px-2">
+                              <td className="py-1 px-1">
                                 <span
-                                  className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
+                                  className={`inline-block rounded-full px-1 py-0.5 text-xs font-medium ${
                                     application.status === "applied"
                                       ? "bg-primary-100 text-primary-800"
                                       : application.status === "interviewing"
@@ -611,12 +717,11 @@ const JobTracker = () => {
                                       : "bg-success-100 text-success-800"
                                   }`}
                                 >
-                                  {application.status.charAt(0).toUpperCase() +
-                                    application.status.slice(1)}
+                                  {application.status.charAt(0).toUpperCase()}
                                 </span>
                               </td>
-                              <td className="py-1 px-2 text-right">
-                                <div className="flex items-center justify-end space-x-1">
+                              <td className="py-1 px-1 text-right">
+                                <div className="flex items-center justify-end">
                                   <button
                                     onClick={() =>
                                       handleEditClick(
@@ -631,7 +736,7 @@ const JobTracker = () => {
                                   <button
                                     onClick={() =>
                                       handleDeleteClick(
-                                        application.id,
+                                        application.id.toString(),
                                         "application"
                                       )
                                     }
@@ -651,103 +756,18 @@ const JobTracker = () => {
 
                 {/* Contacts Tab */}
                 {activeTab === "contacts" && (
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-neutral-600">
-                        {contacts.length} total contacts
-                      </div>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => setShowContactForm(true)}
-                      >
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Add Contact
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <AnimatePresence>
-                        {contacts.map((contact) => (
-                          <motion.div
-                            key={contact.id}
-                            className="card bg-white !p-3"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                          >
-                            <div className="flex justify-between">
-                              <div>
-                                <h3 className="font-medium text-sm">
-                                  {contact.name}
-                                </h3>
-                                {contact.company && (
-                                  <p className="text-sm text-neutral-600">
-                                    {contact.company}
-                                  </p>
-                                )}
-
-                                <div className="mt-2 space-y-1">
-                                  {contact.email && (
-                                    <div className="flex items-center text-xs text-neutral-600">
-                                      <Mail className="h-3 w-3 mr-1" />
-                                      <a
-                                        href={`mailto:${contact.email}`}
-                                        className="hover:text-primary-600"
-                                      >
-                                        {contact.email}
-                                      </a>
-                                    </div>
-                                  )}
-
-                                  {contact.phone && (
-                                    <div className="flex items-center text-xs text-neutral-600">
-                                      <Phone className="h-3 w-3 mr-1" />
-                                      <a
-                                        href={`tel:${contact.phone}`}
-                                        className="hover:text-primary-600"
-                                      >
-                                        {contact.phone}
-                                      </a>
-                                    </div>
-                                  )}
-
-                                  {contact.lastContactDate && (
-                                    <div className="flex items-center text-xs text-neutral-500">
-                                      <Calendar className="h-3 w-3 mr-1" />
-                                      Last Contact:{" "}
-                                      {new Date(
-                                        contact.lastContactDate
-                                      ).toLocaleDateString()}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="flex items-start space-x-1">
-                                <button
-                                  onClick={() =>
-                                    handleEditClick(contact, "contact")
-                                  }
-                                  className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                </button>
-
-                                <button
-                                  onClick={() =>
-                                    handleDeleteClick(contact.id, "contact")
-                                  }
-                                  className="p-1 text-neutral-500 hover:text-error-600 hover:bg-neutral-100 rounded"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  </div>
+                  <ContactsTab
+                    contacts={contacts}
+                    onAddContact={() => setShowContactForm(true)}
+                    onEditContact={(contact) =>
+                      handleEditClick(contact, "contact")
+                    }
+                    onDeleteContact={(contactId) =>
+                      handleDeleteClick(contactId, "contact")
+                    }
+                    onFetchContactActions={fetchContactActions}
+                    contactActions={contactActions}
+                  />
                 )}
 
                 {/* Feed Tab */}

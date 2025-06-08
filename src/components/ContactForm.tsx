@@ -14,64 +14,69 @@ interface ContactFormProps {
 
 export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactFormProps) => {
   const [formData, setFormData] = useState({
-    name: '',
-    company: '',
-    email: '',
-    phone: '',
-    notes: '',
-    lastContactDate: ''
+    name: "",
+    company: "",
+    role: "",
+    email: "",
+    phone: "",
+    notes: "",
+    last_contact_date: "",
   });
-  
+
   // Load initial data if provided (for editing)
   useEffect(() => {
     if (initialData) {
       setFormData({
         name: initialData.name,
-        company: initialData.company || '',
-        email: initialData.email || '',
-        phone: initialData.phone || '',
-        notes: initialData.notes || '',
-        lastContactDate: initialData.lastContactDate 
-          ? new Date(initialData.lastContactDate).toISOString().split('T')[0]
-          : ''
+        company: initialData.company || "",
+        role: initialData.role || "",
+        email: initialData.email || "",
+        phone: initialData.phone || "",
+        notes: initialData.notes || "",
+        last_contact_date: initialData.last_contact_date
+          ? new Date(initialData.last_contact_date).toISOString().split("T")[0]
+          : "",
       });
     } else {
       // Reset form for new entries
       setFormData({
-        name: '',
-        company: '',
-        email: '',
-        phone: '',
-        notes: '',
-        lastContactDate: ''
+        name: "",
+        company: "",
+        role: "",
+        email: "",
+        phone: "",
+        notes: "",
+        last_contact_date: "",
       });
     }
   }, [initialData, isOpen]);
-  
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: value
+      [name]: value,
     });
   };
-  
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const submissionData = {
       ...formData,
-      lastContactDate: formData.lastContactDate 
-        ? new Date(formData.lastContactDate).getTime()
+      last_contact_date: formData.last_contact_date
+        ? new Date(formData.last_contact_date).toISOString()
         : null,
-      ...(initialData && { id: initialData.id }) // Preserve ID for updates
+      ...(initialData && { id: initialData.id }), // Preserve ID for updates
     };
-    
+
     onSubmit(submissionData);
   };
-  
+
   if (!isOpen) return null;
-  
+
   return (
     <motion.div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -88,22 +93,25 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">
-              {initialData ? 'Edit Contact' : 'Add Contact'}
+              {initialData ? "Edit Contact" : "Add Contact"}
             </h2>
-            <button 
+            <button
               onClick={onClose}
               className="p-1 rounded-md text-neutral-500 hover:bg-neutral-100"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-neutral-700 mb-1">
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-neutral-700 mb-1"
+              >
                 Name
               </label>
-              <input 
+              <input
                 type="text"
                 id="name"
                 name="name"
@@ -114,28 +122,54 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
                 required
               />
             </div>
-            
-            <div>
-              <label htmlFor="company" className="block text-sm font-medium text-neutral-700 mb-1">
-                Company (Optional)
-              </label>
-              <input 
-                type="text"
-                id="company"
-                name="company"
-                value={formData.company}
-                onChange={handleChange}
-                className="input"
-                placeholder="Company name"
-              />
-            </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-1">
+                <label
+                  htmlFor="company"
+                  className="block text-sm font-medium text-neutral-700 mb-1"
+                >
+                  Company (Optional)
+                </label>
+                <input
+                  type="text"
+                  id="company"
+                  name="company"
+                  value={formData.company}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="Company name"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="role"
+                  className="block text-sm font-medium text-neutral-700 mb-1"
+                >
+                  Role (Optional)
+                </label>
+                <input
+                  type="text"
+                  id="role"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="Job title"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-neutral-700 mb-1"
+                >
                   Email (Optional)
                 </label>
-                <input 
+                <input
                   type="email"
                   id="email"
                   name="email"
@@ -145,12 +179,15 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
                   placeholder="email@example.com"
                 />
               </div>
-              
+
               <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-neutral-700 mb-1">
+                <label
+                  htmlFor="phone"
+                  className="block text-sm font-medium text-neutral-700 mb-1"
+                >
                   Phone (Optional)
                 </label>
-                <input 
+                <input
                   type="tel"
                   id="phone"
                   name="phone"
@@ -161,26 +198,32 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
                 />
               </div>
             </div>
-            
+
             <div>
-              <label htmlFor="lastContactDate" className="block text-sm font-medium text-neutral-700 mb-1">
+              <label
+                htmlFor="last_contact_date"
+                className="block text-sm font-medium text-neutral-700 mb-1"
+              >
                 Last Contact Date (Optional)
               </label>
-              <input 
+              <input
                 type="date"
-                id="lastContactDate"
-                name="lastContactDate"
-                value={formData.lastContactDate}
+                id="last_contact_date"
+                name="last_contact_date"
+                value={formData.last_contact_date}
                 onChange={handleChange}
                 className="input"
               />
             </div>
-            
+
             <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-neutral-700 mb-1">
+              <label
+                htmlFor="notes"
+                className="block text-sm font-medium text-neutral-700 mb-1"
+              >
                 Notes (Optional)
               </label>
-              <textarea 
+              <textarea
                 id="notes"
                 name="notes"
                 value={formData.notes}
@@ -189,21 +232,18 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
                 placeholder="Add any notes about this contact..."
               />
             </div>
-            
+
             <div className="flex justify-end space-x-3 pt-2">
-              <button 
+              <button
                 type="button"
                 onClick={onClose}
                 className="btn btn-outline"
               >
                 Cancel
               </button>
-              
-              <button 
-                type="submit"
-                className="btn btn-primary"
-              >
-                {initialData ? 'Update' : 'Save'}
+
+              <button type="submit" className="btn btn-primary">
+                {initialData ? "Update" : "Save"}
               </button>
             </div>
           </form>
