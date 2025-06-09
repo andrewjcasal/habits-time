@@ -340,10 +340,15 @@ const TimeTracker = () => {
       const startTime = new Date(splitModalLog.start_time);
       const endTime = new Date(splitModalLog.end_time!);
 
-      // Parse the split time and set it to the same date as start time
+      // Parse the split time and handle day crossing
       const [hours, minutes] = splitTime.split(":").map(Number);
       const splitDateTime = new Date(startTime);
       splitDateTime.setHours(hours, minutes, 0, 0);
+
+      // If split time appears to be before start time, it's likely the next day
+      if (splitDateTime < startTime) {
+        splitDateTime.setDate(splitDateTime.getDate() + 1);
+      }
 
       // Validate split time is between start and end
       if (splitDateTime <= startTime || splitDateTime >= endTime) {
