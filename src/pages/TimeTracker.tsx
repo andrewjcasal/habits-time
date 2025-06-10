@@ -17,6 +17,9 @@ import { format, startOfDay, endOfDay, subDays, addDays } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
+import SplitLogModal from "../components/SplitLogModal";
+import AddLogModal from "../components/AddLogModal";
+import TimeLogRow from "../components/TimeLogRow";
 
 interface TimeLog {
   id: string;
@@ -73,6 +76,16 @@ const TimeTracker = () => {
   const [splitModalLog, setSplitModalLog] = useState<TimeLog | null>(null);
   const [splitTime, setSplitTime] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [showAddLogModal, setShowAddLogModal] = useState(false);
+  const [newLogActivityType, setNewLogActivityType] = useState<string>("");
+  const [newLogStartTime, setNewLogStartTime] = useState<string>("");
+  const [newLogEndTime, setNewLogEndTime] = useState<string>("");
+  const [newLogIsInProgress, setNewLogIsInProgress] = useState(false);
+  const [creatingLog, setCreatingLog] = useState(false);
+  const [activityTypeInput, setActivityTypeInput] = useState<string>("");
+  const [filteredActivityTypes, setFilteredActivityTypes] = useState<
+    ActivityType[]
+  >([]);
 
   // Calculate total time for the day
   const totalTime = timeLogs.reduce((acc, log) => {
@@ -189,6 +202,7 @@ const TimeTracker = () => {
 
     let content = `# Time Tracking Report${isToday ? " (Today)" : ""}\n`;
     content += `**Date:** ${dateStr}\n\n`;
+    content += `**Time:** ${format(new Date(), "h:mm a")}\n\n`;
 
     // Summary Section
     content += `## Summary\n`;
@@ -284,52 +298,204 @@ const TimeTracker = () => {
     }
   };
 
-  const updateTimeLogActivityType = async (
-    timeLogId: string,
-    newActivityTypeId: string
-  ) => {
-    if (!user) return;
-
-    setUpdating(timeLogId);
-    try {
-      const { error } = await supabase
-        .from("time_logs")
-        .update({ activity_type_id: newActivityTypeId })
-        .eq("id", timeLogId)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-
-      // Refresh the logs
-      await fetchTimeLogs();
-      setOpenMenuId(null);
-    } catch (err) {
-      console.error("Error updating time log:", err);
-      setError("Failed to update activity type");
-    } finally {
-      setUpdating(null);
-    }
-  };
-
   const openSplitModal = (timeLogId: string) => {
     const log = timeLogs.find((l) => l.id === timeLogId);
-    if (!log || !log.end_time) {
-      setError("Cannot split log without an end time");
+    if (!log) {
+      setError("Log not found");
       return;
     }
 
     setSplitModalLog(log);
     setOpenMenuId(null);
 
-    // Set default split time to middle
+    // Set default split time
     const startTime = new Date(log.start_time);
-    const endTime = new Date(log.end_time);
-    const duration = endTime.getTime() - startTime.getTime();
-    const midTime = new Date(startTime.getTime() + duration / 2);
+    let defaultTime: string;
 
-    // Format time for input field (HH:MM format)
-    const timeString = format(midTime, "HH:mm");
-    setSplitTime(timeString);
+    if (log.end_time) {
+      // For completed logs, set to middle
+      const endTime = new Date(log.end_time);
+      const duration = endTime.getTime() - startTime.getTime();
+      const midTime = new Date(startTime.getTime() + duration / 2);
+      defaultTime = format(midTime, "HH:mm");
+    } else {
+      // For in-progress logs, set to current time
+      const now = new Date();
+      defaultTime = format(now, "HH:mm");
+    }
+
+    setSplitTime(defaultTime);
+  };
+
+  const openAddLogModal = () => {
+    setShowAddLogModal(true);
+    // Set default start time to current time
+    const now = new Date();
+    setNewLogStartTime(format(now, "HH:mm"));
+    setNewLogEndTime("");
+    setNewLogActivityType("");
+    setNewLogIsInProgress(false);
+  };
+
+  const closeAddLogModal = () => {
+    setShowAddLogModal(false);
+    setNewLogActivityType("");
+    setNewLogStartTime("");
+    setNewLogEndTime("");
+    setNewLogIsInProgress(false);
+  };
+
+  const createNewLog = async () => {
+    if (!user || !newLogActivityType.trim() || !newLogStartTime) return;
+
+    setCreatingLog(true);
+    try {
+      // Parse start time
+      const [startHours, startMinutes] = newLogStartTime.split(":").map(Number);
+      const startDateTime = new Date(selectedDate);
+      startDateTime.setHours(startHours, startMinutes, 0, 0);
+
+      // Parse end time if provided
+      let endDateTime: Date | null = null;
+      if (!newLogIsInProgress && newLogEndTime) {
+        const [endHours, endMinutes] = newLogEndTime.split(":").map(Number);
+        endDateTime = new Date(selectedDate);
+        endDateTime.setHours(endHours, endMinutes, 0, 0);
+
+        // Handle day crossing - if end time is before start time, assume next day
+        if (endDateTime <= startDateTime) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+
+        // Validate end time is after start time
+        if (endDateTime <= startDateTime) {
+          setError("End time must be after start time");
+          return;
+        }
+      }
+
+      // Find or create activity type
+      let activityTypeId: string;
+      const existingActivityType = activityTypes.find(
+        (at) =>
+          at.name.toLowerCase() === newLogActivityType.trim().toLowerCase()
+      );
+
+      if (existingActivityType) {
+        activityTypeId = existingActivityType.id;
+      } else {
+        // Create new activity type
+        const { data: newActivityType, error: createError } = await supabase
+          .from("activity_types")
+          .insert([
+            {
+              name: newLogActivityType.trim(),
+              user_id: user.id,
+            },
+          ])
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        activityTypeId = newActivityType.id;
+      }
+
+      // Create the time log
+      const logData = {
+        activity_type_id: activityTypeId,
+        user_id: user.id,
+        start_time: startDateTime.toISOString(),
+        ...(endDateTime && { end_time: endDateTime.toISOString() }),
+      };
+
+      const { error: insertError } = await supabase
+        .from("time_logs")
+        .insert([logData]);
+
+      if (insertError) throw insertError;
+
+      // Refresh data and close modal
+      await fetchTimeLogs();
+      await fetchActivityTypes();
+      closeAddLogModal();
+    } catch (err) {
+      console.error("Error creating time log:", err);
+      setError("Failed to create time log");
+    } finally {
+      setCreatingLog(false);
+    }
+  };
+
+  const startEditingActivityType = (logId: string, currentName: string) => {
+    setActivityTypeInput(currentName);
+    setFilteredActivityTypes(activityTypes);
+  };
+
+  const handleActivityTypeInputChange = (value: string) => {
+    setActivityTypeInput(value);
+
+    if (value.trim() === "") {
+      setFilteredActivityTypes(activityTypes);
+    } else {
+      const filtered = activityTypes.filter((type) =>
+        type.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredActivityTypes(filtered);
+    }
+  };
+
+  const selectActivityType = async (
+    logId: string,
+    activityTypeName: string
+  ) => {
+    if (!user) return;
+
+    setUpdating(logId);
+    try {
+      // Find existing activity type or create new one
+      let activityTypeId: string;
+      const existingActivityType = activityTypes.find(
+        (at) => at.name.toLowerCase() === activityTypeName.toLowerCase()
+      );
+
+      if (existingActivityType) {
+        activityTypeId = existingActivityType.id;
+      } else {
+        // Create new activity type
+        const { data: newActivityType, error: createError } = await supabase
+          .from("activity_types")
+          .insert([
+            {
+              name: activityTypeName.trim(),
+              user_id: user.id,
+            },
+          ])
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        activityTypeId = newActivityType.id;
+      }
+
+      // Update the time log
+      const { error } = await supabase
+        .from("time_logs")
+        .update({ activity_type_id: activityTypeId })
+        .eq("id", logId)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      // Refresh data
+      await fetchTimeLogs();
+      await fetchActivityTypes();
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error("Error updating activity type:", err);
+      setError("Failed to update activity type");
+    } finally {
+      setUpdating(null);
+    }
   };
 
   const splitTimeLog = async () => {
@@ -338,7 +504,9 @@ const TimeTracker = () => {
     setSplitting(splitModalLog.id);
     try {
       const startTime = new Date(splitModalLog.start_time);
-      const endTime = new Date(splitModalLog.end_time!);
+      const endTime = splitModalLog.end_time
+        ? new Date(splitModalLog.end_time)
+        : null;
 
       // Parse the split time and handle day crossing
       const [hours, minutes] = splitTime.split(":").map(Number);
@@ -350,9 +518,21 @@ const TimeTracker = () => {
         splitDateTime.setDate(splitDateTime.getDate() + 1);
       }
 
-      // Validate split time is between start and end
-      if (splitDateTime <= startTime || splitDateTime >= endTime) {
-        setError("Split time must be between start and end time");
+      // Validate split time
+      if (splitDateTime <= startTime) {
+        setError("Split time must be after start time");
+        return;
+      }
+
+      // For completed logs, validate that split time is before end time
+      if (endTime && splitDateTime >= endTime) {
+        setError("Split time must be before end time");
+        return;
+      }
+
+      // For in-progress logs, validate that split time is not in the future
+      if (!endTime && splitDateTime > new Date()) {
+        setError("Split time cannot be in the future for in-progress logs");
         return;
       }
 
@@ -366,14 +546,17 @@ const TimeTracker = () => {
       if (updateError) throw updateError;
 
       // Create a new log for the second part
-      const { error: insertError } = await supabase.from("time_logs").insert([
-        {
-          activity_type_id: splitModalLog.activity_types.id,
-          user_id: user.id,
-          start_time: splitDateTime.toISOString(),
-          end_time: endTime.toISOString(),
-        },
-      ]);
+      const newLogData = {
+        activity_type_id: splitModalLog.activity_types.id,
+        user_id: user.id,
+        start_time: splitDateTime.toISOString(),
+        // Only set end_time if the original log was completed
+        ...(endTime && { end_time: endTime.toISOString() }),
+      };
+
+      const { error: insertError } = await supabase
+        .from("time_logs")
+        .insert([newLogData]);
 
       if (insertError) throw insertError;
 
@@ -460,7 +643,11 @@ const TimeTracker = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (openMenuId) {
-        setOpenMenuId(null);
+        const target = event.target as Element;
+        // Don't close if clicking inside the dropdown menu
+        if (!target.closest('[data-dropdown-menu="true"]')) {
+          setOpenMenuId(null);
+        }
       }
     };
 
@@ -701,8 +888,27 @@ const TimeTracker = () => {
 
       {/* Time Logs */}
       <div className="bg-white rounded-lg border border-neutral-200">
-        <div className="px-2 py-1 border-b border-neutral-200">
+        <div className="px-2 py-1 border-b border-neutral-200 flex items-center justify-between">
           <h3 className="font-semibold text-neutral-900">Time Logs</h3>
+          <button
+            onClick={openAddLogModal}
+            className="p-1 hover:bg-neutral-100 rounded transition-colors text-neutral-600 hover:text-neutral-900"
+            title="Add New Log"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+          </button>
         </div>
 
         <div className="divide-y divide-neutral-200">
@@ -731,207 +937,55 @@ const TimeTracker = () => {
             </div>
           ) : (
             timeLogs.map((log, index) => (
-              <motion.div
+              <TimeLogRow
                 key={log.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="pl-2 pr-0.5 py-0.5 hover:bg-neutral-50 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <div>
-                        <h4 className="font-medium text-neutral-900">
-                          {log.activity_types?.name}
-                        </h4>
-                        <div className="flex items-center text-sm text-neutral-600 mt-0.5 gap-0.5">
-                          <span className="flex items-center">
-                            {formatTime(log.start_time)}
-                          </span>
-                          {log.end_time && (
-                            <>
-                              <ArrowRight className="h-2 w-2" />
-                              <span className="flex items-center">
-                                {formatTime(log.end_time)}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-0.5">
-                    <div className="text-right">
-                      {log.duration ? (
-                        <span className="font-semibold text-neutral-900">
-                          {formatDuration(log.duration)}
-                        </span>
-                      ) : (
-                        <span className="text-warning-600 text-sm font-medium">
-                          In Progress
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Hamburger Menu */}
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(openMenuId === log.id ? null : log.id);
-                        }}
-                        className="p-1 hover:bg-neutral-100 rounded transition-colors"
-                        disabled={updating === log.id}
-                      >
-                        <MoreHorizontal className="h-3 w-3 text-neutral-500" />
-                      </button>
-
-                      {/* Dropdown Menu */}
-                      <AnimatePresence>
-                        {openMenuId === log.id && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-neutral-200 z-50"
-                          >
-                            <div className="p-1">
-                              <div className="px-2 py-1 text-xs font-medium text-neutral-600 border-b border-neutral-100 mb-1">
-                                Actions
-                              </div>
-
-                              {/* Split Log Option */}
-                              {log.end_time && (
-                                <button
-                                  onClick={() => openSplitModal(log.id)}
-                                  className="w-full text-left px-2 py-1 text-xs rounded hover:bg-neutral-50 transition-colors flex items-center text-neutral-900 mb-1"
-                                  disabled={
-                                    splitting === log.id || updating === log.id
-                                  }
-                                >
-                                  <Scissors className="h-3 w-3 mr-1" />
-                                  {splitting === log.id
-                                    ? "Splitting..."
-                                    : "Split Log"}
-                                </button>
-                              )}
-
-                              <div className="px-2 py-1 text-xs font-medium text-neutral-600 border-b border-neutral-100 mb-1 mt-2">
-                                Change Activity Type
-                              </div>
-                              <div className="max-h-24 overflow-y-auto">
-                                {activityTypes.map((activityType) => (
-                                  <button
-                                    key={activityType.id}
-                                    onClick={() =>
-                                      updateTimeLogActivityType(
-                                        log.id,
-                                        activityType.id
-                                      )
-                                    }
-                                    className={`w-full text-left px-2 py-1 text-xs rounded hover:bg-neutral-50 transition-colors flex items-center ${
-                                      activityType.id === log.activity_types?.id
-                                        ? "bg-primary-50 text-primary-700"
-                                        : "text-neutral-900"
-                                    }`}
-                                    disabled={
-                                      updating === log.id ||
-                                      splitting === log.id
-                                    }
-                                  >
-                                    <Edit className="h-3 w-3 mr-1" />
-                                    {activityType.name}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+                log={log}
+                index={index}
+                openMenuId={openMenuId}
+                setOpenMenuId={setOpenMenuId}
+                updating={updating}
+                splitting={splitting}
+                activityTypeInput={activityTypeInput}
+                filteredActivityTypes={filteredActivityTypes}
+                formatTime={formatTime}
+                formatDuration={formatDuration}
+                openSplitModal={openSplitModal}
+                startEditingActivityType={startEditingActivityType}
+                handleActivityTypeInputChange={handleActivityTypeInputChange}
+                selectActivityType={selectActivityType}
+              />
             ))
           )}
         </div>
       </div>
 
-      {/* Split Log Modal */}
-      {splitModalLog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-lg shadow-xl w-full max-w-md p-4"
-          >
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-                Split Time Log
-              </h3>
-              <div className="p-3 bg-neutral-50 rounded-lg">
-                <div className="font-medium text-neutral-900">
-                  {splitModalLog.activity_types?.name}
-                </div>
-                <div className="text-sm text-neutral-600 mt-1">
-                  {formatTime(splitModalLog.start_time)} →{" "}
-                  {splitModalLog.end_time && formatTime(splitModalLog.end_time)}
-                  {splitModalLog.duration && (
-                    <span className="ml-2 font-medium">
-                      ({formatDuration(splitModalLog.duration)})
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+      <SplitLogModal
+        splitModalLog={splitModalLog}
+        setSplitModalLog={setSplitModalLog}
+        splitTime={splitTime}
+        setSplitTime={setSplitTime}
+        splitting={splitting}
+        splitTimeLog={splitTimeLog}
+        formatTime={formatTime}
+        formatDuration={formatDuration}
+      />
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-neutral-700 mb-2">
-                Split at time:
-              </label>
-              <input
-                type="time"
-                value={splitTime}
-                onChange={(e) => setSplitTime(e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                min={format(new Date(splitModalLog.start_time), "HH:mm")}
-                max={
-                  splitModalLog.end_time
-                    ? format(new Date(splitModalLog.end_time), "HH:mm")
-                    : undefined
-                }
-              />
-              <div className="text-xs text-neutral-500 mt-1">
-                Choose a time between {formatTime(splitModalLog.start_time)} and{" "}
-                {splitModalLog.end_time && formatTime(splitModalLog.end_time)}
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setSplitModalLog(null);
-                  setSplitTime("");
-                }}
-                className="px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
-                disabled={splitting === splitModalLog.id}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={splitTimeLog}
-                disabled={splitting === splitModalLog.id || !splitTime}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:bg-neutral-300 rounded-lg transition-colors"
-              >
-                {splitting === splitModalLog.id ? "Splitting..." : "Split Log"}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <AddLogModal
+        showAddLogModal={showAddLogModal}
+        closeAddLogModal={closeAddLogModal}
+        selectedDate={selectedDate}
+        newLogActivityType={newLogActivityType}
+        setNewLogActivityType={setNewLogActivityType}
+        newLogStartTime={newLogStartTime}
+        setNewLogStartTime={setNewLogStartTime}
+        newLogEndTime={newLogEndTime}
+        setNewLogEndTime={setNewLogEndTime}
+        newLogIsInProgress={newLogIsInProgress}
+        setNewLogIsInProgress={setNewLogIsInProgress}
+        creatingLog={creatingLog}
+        createNewLog={createNewLog}
+        activityTypes={activityTypes}
+      />
     </div>
   );
 };
