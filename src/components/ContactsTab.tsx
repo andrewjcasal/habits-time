@@ -33,24 +33,25 @@ export const ContactsTab = ({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="text-sm text-neutral-600">
-          {contacts.length} total contacts
+    <div>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-neutral-600">
+            {contacts.length} total contacts
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={onAddContact}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Add Contact
+          </button>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={onAddContact}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          Add Contact
-        </button>
+
+        <ContactsTable
+          contacts={contacts}
+          onContactClick={handleContactClick}
+          onEditContact={onEditContact}
+          onDeleteContact={onDeleteContact}
+        />
       </div>
-
-      <ContactsTable
-        contacts={contacts}
-        onContactClick={handleContactClick}
-        onEditContact={onEditContact}
-        onDeleteContact={onDeleteContact}
-      />
-
       <ContactActionsModal
         contact={selectedContact}
         actions={contactActions}

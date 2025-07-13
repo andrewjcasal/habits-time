@@ -10,6 +10,10 @@ import {
   Settings,
   Heart,
   Clock,
+  Star,
+  Calendar,
+  FileText,
+  Trophy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,11 +24,10 @@ const MainLayout = () => {
 
   const navItems = [
     { path: "/dashboard", label: "Dashboard", icon: Home },
-    { path: "/spaced-rep", label: "Neetcode 150", icon: Code },
-    { path: "/interview-prep", label: "Interview Prep", icon: Layout },
-    { path: "/job-tracker", label: "Job Tracker", icon: Briefcase },
     { path: "/time-tracker", label: "Time Tracker", icon: Clock },
-    { path: "/follow-reactions", label: "Follow Reactions", icon: Heart },
+    { path: "/habits", label: "Habits", icon: Heart },
+    { path: "/wins", label: "Wins", icon: Trophy },
+    { path: "/notes", label: "Notes", icon: FileText },
   ];
 
   const settingsItem = { path: "/settings", label: "Settings", icon: Settings };
@@ -34,11 +37,11 @@ const MainLayout = () => {
   return (
     <div className="flex min-h-screen bg-neutral-50">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-56 flex-col bg-white border-r border-neutral-200">
+      <aside className="hidden md:flex w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
         <div className="p-4">
           <h1 className="text-lg font-semibold text-primary-700 flex items-center">
             <Users className="w-4 h-4 mr-2 text-primary-600" />
-            FrontPrep
+            Habits
           </h1>
         </div>
 
@@ -79,7 +82,7 @@ const MainLayout = () => {
       </aside>
 
       {/* Mobile Vertical Sidebar */}
-      <aside className="z-100 md:hidden w-18 flex flex-col bg-white border-r border-neutral-200 relative z-10">
+      <aside className="z-100 md:hidden w-18 flex flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
         {/* App Icon */}
         <div className="p-1 border-b border-neutral-100">
           <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
@@ -175,7 +178,7 @@ const MainLayout = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main className="flex-1 md:ml-56 ml-18">
         <Outlet />
       </main>
     </div>

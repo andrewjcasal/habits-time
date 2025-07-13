@@ -10,7 +10,7 @@ const AuthLayout = () => {
             <div className="flex items-center">
               <Users className="h-8 w-8 text-primary-600" />
               <span className="ml-2 text-xl font-semibold text-neutral-900">
-                FrontPrep
+                Habits
               </span>
             </div>
           </div>

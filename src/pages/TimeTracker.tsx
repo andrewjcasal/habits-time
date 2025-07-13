@@ -286,7 +286,7 @@ const TimeTracker = () => {
 
     try {
       const { data, error } = await supabase
-        .from("activity_types")
+        .from("habits_activity_types")
         .select("id, name")
         .eq("user_id", user.id)
         .order("name");
@@ -386,7 +386,7 @@ const TimeTracker = () => {
       } else {
         // Create new activity type
         const { data: newActivityType, error: createError } = await supabase
-          .from("activity_types")
+          .from("habits_activity_types")
           .insert([
             {
               name: newLogActivityType.trim(),
@@ -409,7 +409,7 @@ const TimeTracker = () => {
       };
 
       const { error: insertError } = await supabase
-        .from("time_logs")
+        .from("habits_time_logs")
         .insert([logData]);
 
       if (insertError) throw insertError;
@@ -463,7 +463,7 @@ const TimeTracker = () => {
       } else {
         // Create new activity type
         const { data: newActivityType, error: createError } = await supabase
-          .from("activity_types")
+          .from("habits_activity_types")
           .insert([
             {
               name: activityTypeName.trim(),
@@ -479,7 +479,7 @@ const TimeTracker = () => {
 
       // Update the time log
       const { error } = await supabase
-        .from("time_logs")
+        .from("habits_time_logs")
         .update({ activity_type_id: activityTypeId })
         .eq("id", logId)
         .eq("user_id", user.id);
@@ -538,7 +538,7 @@ const TimeTracker = () => {
 
       // Update the original log to end at split time
       const { error: updateError } = await supabase
-        .from("time_logs")
+        .from("habits_time_logs")
         .update({ end_time: splitDateTime.toISOString() })
         .eq("id", splitModalLog.id)
         .eq("user_id", user.id);
@@ -555,7 +555,7 @@ const TimeTracker = () => {
       };
 
       const { error: insertError } = await supabase
-        .from("time_logs")
+        .from("habits_time_logs")
         .insert([newLogData]);
 
       if (insertError) throw insertError;
@@ -583,16 +583,16 @@ const TimeTracker = () => {
       const endOfSelectedDay = endOfDay(selectedDate);
 
       const { data, error } = await supabase
-        .from("time_logs")
+        .from("habits_time_logs")
         .select(
           `
           *,
-          activity_types (
+          habits_activity_types (
             id,
             name,
             is_favorite,
-            activity_type_categories (
-              categories (
+            habits_activity_type_categories (
+              habits_categories (
                 id,
                 name,
                 color,

@@ -117,3 +117,64 @@ export interface TodoType {
   name: string;
   script: string;
 }
+
+// Essential for daily time tracking
+export interface Essential {
+  id: string;
+  user_id: string;
+  activity_type_id: string;
+  daily_minutes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Daily override for essentials
+export interface DailyOverride {
+  id: string;
+  user_id: string;
+  essential_id: string;
+  date: string;
+  minutes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Behavior for dashboard
+export interface Behavior {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Daily reflection
+export interface DailyReflection {
+  id: string;
+  user_id: string;
+  reflection_date: string;
+  content: string;
+  reddit_links?: RedditPost[];
+  generated_at: string;
+}
+
+// Reddit post
+export interface RedditPost {
+  title: string;
+  url: string;
+  subreddit: string;
+  upvotes: number;
+  comments: number;
+}
+
+// Habit note
+export interface HabitNote {
+  id: string;
+  user_id: string;
+  note_date: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}

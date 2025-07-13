@@ -12,12 +12,12 @@ import AuthLayout from "./layouts/AuthLayout";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import SpacedRep from "./pages/SpacedRep";
-import InterviewPrep from "./pages/InterviewPrep";
-import JobTracker from "./pages/JobTracker";
-import InterviewHistory from "./pages/InterviewHistory";
-import FollowReactions from "./pages/FollowReactions";
 import TimeTracker from "./pages/TimeTracker";
+import Essentials from "./pages/Essentials";
+import DailyOverrides from "./pages/DailyOverrides";
+import Habits from "./pages/Habits";
+import Wins from "./pages/Wins";
+import Notes from "./pages/Notes";
 
 // Components
 import { WelcomeModal } from "./components/WelcomeModal";
@@ -68,11 +68,12 @@ function App() {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="spaced-rep" element={<SpacedRep />} />
-            <Route path="interview-prep" element={<InterviewPrep />} />
-            <Route path="job-tracker/*" element={<JobTracker />} />
             <Route path="time-tracker" element={<TimeTracker />} />
-            <Route path="follow-reactions" element={<FollowReactions />} />
+            <Route path="essentials" element={<Essentials />} />
+            <Route path="daily-overrides" element={<DailyOverrides />} />
+            <Route path="habits" element={<Habits />} />
+            <Route path="wins" element={<Wins />} />
+            <Route path="notes" element={<Notes />} />
           </Route>
         ) : (
           <Route path="*" element={<Navigate to="/" replace />} />

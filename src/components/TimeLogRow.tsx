@@ -4,7 +4,7 @@ import { MoreHorizontal, Edit, ArrowRight, Scissors } from "lucide-react";
 
 interface TimeLog {
   id: string;
-  activity_types: {
+  habits_activity_types: {
     id: string;
     name: string;
     is_favorite?: boolean;
@@ -12,7 +12,7 @@ interface TimeLog {
   start_time: string;
   end_time: string | null;
   duration?: number;
-  categories?: Array<{
+  habits_categories?: Array<{
     id: string;
     name: string;
     color: string;
@@ -72,7 +72,7 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
           <div className="flex items-center space-x-2">
             <div>
               <h4 className="font-medium text-neutral-900">
-                {log.activity_types?.name}
+                {log.habits_activity_types?.name}
               </h4>
               <div className="flex items-center text-sm text-neutral-600 mt-0.5 gap-0.5">
                 <span className="flex items-center">
@@ -154,7 +154,7 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
                           value={
                             openMenuId === log.id
                               ? activityTypeInput
-                              : log.activity_types?.name || ""
+                              : log.habits_activity_types?.name || ""
                           }
                           onChange={(e) =>
                             handleActivityTypeInputChange(e.target.value)
@@ -165,7 +165,7 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
                             if (openMenuId === log.id) {
                               startEditingActivityType(
                                 log.id,
-                                log.activity_types?.name || ""
+                                log.habits_activity_types?.name || ""
                               );
                             }
                           }}

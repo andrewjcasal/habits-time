@@ -11,25 +11,33 @@ export const WelcomeModal = ({ onClose }: WelcomeModalProps) => {
   
   const steps = [
     {
-      title: 'Welcome to FrontPrep',
-      description: 'Your all-in-one interview preparation platform for front-end engineers.',
-      image: 'https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
+      title: "Welcome to Habits",
+      description:
+        "Your all-in-one interview preparation platform for front-end engineers.",
+      image:
+        "https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
     },
     {
-      title: 'Practice Coding Problems',
-      description: 'Master the Neetcode 150 with our spaced repetition system for optimal retention.',
-      image: 'https://images.pexels.com/photos/374016/pexels-photo-374016.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
+      title: "Practice Coding Problems",
+      description:
+        "Master the Neetcode 150 with our spaced repetition system for optimal retention.",
+      image:
+        "https://images.pexels.com/photos/374016/pexels-photo-374016.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
     },
     {
-      title: 'Prepare for Interviews',
-      description: 'Practice with our AI interviewer to improve your technical and communication skills.',
-      image: 'https://images.pexels.com/photos/7654586/pexels-photo-7654586.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
+      title: "Prepare for Interviews",
+      description:
+        "Practice with our AI interviewer to improve your technical and communication skills.",
+      image:
+        "https://images.pexels.com/photos/7654586/pexels-photo-7654586.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
     },
     {
-      title: 'Track Your Job Search',
-      description: 'Keep track of applications, interviews, and networking contacts all in one place.',
-      image: 'https://images.pexels.com/photos/7376/startup-photos.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
-    }
+      title: "Track Your Job Search",
+      description:
+        "Keep track of applications, interviews, and networking contacts all in one place.",
+      image:
+        "https://images.pexels.com/photos/7376/startup-photos.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
+    },
   ];
   
   const handleNext = () => {

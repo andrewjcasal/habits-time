@@ -1,273 +1,274 @@
 import {
-  ArrowRight,
-  BookOpen,
-  Code,
-  Clock,
-  Calendar,
-  Target,
-  Users,
-  TrendingUp,
-  Layout,
-  Briefcase,
-  Heart,
+  Sparkles,
+  RefreshCw,
+  Tag,
+  ExternalLink,
+  ArrowUp,
+  MessageCircle,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-
-// Components
-import { Stat } from "../components/Stat";
-import { ProgressRing } from "../components/ProgressRing";
+import { useBehaviors } from "../hooks/useBehaviors";
+import { useReflections } from "../hooks/useReflections";
+import { DailyReflection } from "../types";
 
 const Dashboard = () => {
-  const [stats, setStats] = useState({
-    problemsSolved: 0,
-    streak: 0,
-    interviewsCompleted: 0,
-    applicationsSent: 0,
-  });
+  const { behaviors, loading: behaviorsLoading } = useBehaviors();
+  const {
+    generateReflection,
+    getTodaysReflection,
+    loading: reflectionLoading,
+  } = useReflections();
+  const [todaysReflection, setTodaysReflection] =
+    useState<DailyReflection | null>(null);
+  const [generatingReflection, setGeneratingReflection] = useState(false);
 
-  const [recentActivity, setRecentActivity] = useState<
-    Array<{
-      type: string;
-      title: string;
-      timestamp: number;
-    }>
-  >([]);
-
-  // Fetch stats and activity from localStorage
   useEffect(() => {
-    // Get Neetcode progress
-    const neetcodeData = localStorage.getItem("neetcode-progress");
-    const problems = neetcodeData ? JSON.parse(neetcodeData) : [];
-    const problemsSolved = problems.filter((p: any) => p.completed).length;
-
-    // Get streak
-    const streakData = localStorage.getItem("streak-data");
-    const streak = streakData ? JSON.parse(streakData).currentStreak : 0;
-
-    // Get interview count
-    const interviewHistory = localStorage.getItem("interview-history");
-    const interviews = interviewHistory ? JSON.parse(interviewHistory) : [];
-    const interviewsCompleted = interviews.length;
-
-    // Get application count
-    const jobApplications = localStorage.getItem("job-applications");
-    const applications = jobApplications ? JSON.parse(jobApplications) : [];
-    const applicationsSent = applications.length;
-
-    // Set stats
-    setStats({
-      problemsSolved,
-      streak,
-      interviewsCompleted,
-      applicationsSent,
-    });
-
-    // Get recent activity
-    const activity = [
-      ...problems
-        .filter((p: any) => p.lastAttempted)
-        .map((p: any) => ({
-          type: "problem",
-          title: p.title,
-          timestamp: p.lastAttempted,
-        })),
-      ...interviews.map((i: any) => ({
-        type: "interview",
-        title: i.title,
-        timestamp: i.date,
-      })),
-      ...applications
-        .filter((a: any) => a.dateApplied)
-        .map((a: any) => ({
-          type: "application",
-          title: a.company,
-          timestamp: a.dateApplied,
-        })),
-    ];
-
-    // Sort by timestamp (most recent first) and take the 5 most recent
-    const sortedActivity = activity
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 5);
-
-    setRecentActivity(sortedActivity);
+    loadTodaysReflection();
   }, []);
 
-  // Calculate Neetcode 150 progress
-  const neetcodeProgress = Math.round((stats.problemsSolved / 150) * 100);
+  const loadTodaysReflection = async () => {
+    try {
+      const reflection = await getTodaysReflection();
+      setTodaysReflection(reflection);
+    } catch (error) {
+      console.error("Error loading today's reflection:", error);
+    }
+  };
+
+  const handleGenerateReflection = async () => {
+    try {
+      setGeneratingReflection(true);
+      const reflection = await generateReflection();
+      if (reflection) {
+        setTodaysReflection(reflection);
+      }
+    } catch (error) {
+      console.error("Error generating reflection:", error);
+    } finally {
+      setGeneratingReflection(false);
+    }
+  };
+
+  const getCategoryColor = (category?: string) => {
+    const colors = {
+      health: "bg-green-100 text-green-800",
+      mindfulness: "bg-purple-100 text-purple-800",
+      productivity: "bg-blue-100 text-blue-800",
+      social: "bg-orange-100 text-orange-800",
+    };
+    return (
+      colors[category as keyof typeof colors] || "bg-gray-100 text-gray-800"
+    );
+  };
+
+  const groupedBehaviors = behaviors.reduce((acc, behavior) => {
+    const category = behavior.category || "other";
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(behavior);
+    return acc;
+  }, {} as Record<string, typeof behaviors>);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-neutral-900">Dashboard</h1>
+    <div className="max-w-6xl mx-auto px-4 py-4">
+      {/* Header */}
+      <div className="mb-4">
+        <h1 className="text-3xl font-light text-gray-900 mb-2">
+          Daily Reflection
+        </h1>
+        <p className="text-gray-600">
+          Your journey of growth and self-discovery
+        </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Stat
-          title="Neetcode Problems"
-          value={`${stats.problemsSolved}/150`}
-          icon={BookOpen}
-          href="/spaced-rep"
-          trend={`${neetcodeProgress}% complete`}
-        />
-
-        <Stat
-          title="Current Streak"
-          value={`${stats.streak} days`}
-          icon={Clock}
-          trend={stats.streak > 0 ? "Keep it up!" : "Start today!"}
-        />
-
-        <Stat
-          title="Interviews Completed"
-          value={stats.interviewsCompleted.toString()}
-          icon={Users}
-          href="/interview-prep"
-          trend={
-            stats.interviewsCompleted > 0 ? `Last: 2 days ago` : "Practice now!"
-          }
-        />
-
-        <Stat
-          title="Applications Sent"
-          value={stats.applicationsSent.toString()}
-          icon={Target}
-          href="/job-tracker"
-          trend={`${Math.round(stats.applicationsSent * 0.15)} responses`}
-        />
-      </div>
-
-      {/* Modules Quick Access */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-        <Link
-          to="/spaced-rep"
-          className="card bg-white hover:shadow-lg transition-shadow group"
-        >
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
-              <Code className="w-6 h-6 text-primary-600" />
-            </div>
-            <h3 className="ml-4 font-medium text-lg">Neetcode 150</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content - Reflection */}
+        <div className="lg:col-span-2">
+          {/* Generate Button */}
+          <div className="mb-4">
+            <button
+              onClick={handleGenerateReflection}
+              disabled={generatingReflection || reflectionLoading}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {generatingReflection ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Generate Today's Reflection
+                </>
+              )}
+            </button>
           </div>
-          <p className="text-neutral-600 mb-4">
-            Practice coding interview problems with spaced repetition to
-            maximize retention.
-          </p>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <ProgressRing
-                progress={neetcodeProgress}
-                size={36}
-                strokeWidth={3}
-                color="#3B82F6"
-              />
-              <span className="ml-2 text-sm text-neutral-600">
-                {neetcodeProgress}% complete
-              </span>
-            </div>
-            <span className="text-primary-600 group-hover:translate-x-0.5 transition-transform flex items-center">
-              Continue <ArrowRight className="ml-1 w-4 h-4" />
-            </span>
-          </div>
-        </Link>
 
-        <Link
-          to="/interview-prep"
-          className="card bg-white hover:shadow-lg transition-shadow group"
-        >
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-secondary-100 flex items-center justify-center">
-              <Layout className="w-6 h-6 text-secondary-600" />
-            </div>
-            <h3 className="ml-4 font-medium text-lg">Interview Prep</h3>
-          </div>
-          <p className="text-neutral-600 mb-4">
-            Personalized interview preparation based on job posts. Practice with
-            an AI interviewer.
-          </p>
-          <div className="mt-auto flex justify-end">
-            <span className="text-secondary-600 group-hover:translate-x-0.5 transition-transform flex items-center">
-              Get started <ArrowRight className="ml-1 w-4 h-4" />
-            </span>
-          </div>
-        </Link>
-
-        <Link
-          to="/job-tracker"
-          className="card bg-white hover:shadow-lg transition-shadow group"
-        >
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-accent-100 flex items-center justify-center">
-              <Briefcase className="w-6 h-6 text-accent-600" />
-            </div>
-            <h3 className="ml-4 font-medium text-lg">Job Tracker</h3>
-          </div>
-          <p className="text-neutral-600 mb-4">
-            Track applications and networking contacts. Stay organized in your
-            job search.
-          </p>
-          <div className="mt-auto flex justify-end">
-            <span className="text-accent-600 group-hover:translate-x-0.5 transition-transform flex items-center">
-              View tracker <ArrowRight className="ml-1 w-4 h-4" />
-            </span>
-          </div>
-        </Link>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="card bg-white mt-6">
-        <div className="flex items-center mb-4">
-          <h3 className="font-medium text-lg">Recent Activity</h3>
-          <TrendingUp className="ml-2 w-4 h-4 text-success-500" />
-        </div>
-
-        {recentActivity.length > 0 ? (
-          <ul className="space-y-3">
-            {recentActivity.map((activity, index) => (
-              <li
-                key={index}
-                className="flex items-center justify-between p-3 rounded-md hover:bg-neutral-50"
-              >
-                <div className="flex items-center">
-                  <span
-                    className={`w-2 h-2 rounded-full mr-3 ${
-                      activity.type === "problem"
-                        ? "bg-primary-500"
-                        : activity.type === "interview"
-                        ? "bg-secondary-500"
-                        : "bg-accent-500"
-                    }`}
-                  />
-                  <div>
-                    <p className="font-medium">{activity.title}</p>
-                    <p className="text-sm text-neutral-500">
-                      {activity.type === "problem"
-                        ? "Solved problem"
-                        : activity.type === "interview"
-                        ? "Completed interview"
-                        : "Applied to company"}
-                    </p>
+          {/* Reflection Content */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            {todaysReflection ? (
+              <div>
+                <div className="prose prose-lg max-w-none">
+                  <div
+                    className="text-gray-800 leading-relaxed"
+                    style={{
+                      fontFamily: "Georgia, Times, serif",
+                      fontSize: "18px",
+                      lineHeight: "1.7",
+                    }}
+                  >
+                    {todaysReflection.content
+                      .split("\n\n")
+                      .map((paragraph, index) => (
+                        <p key={index} className="mb-4">
+                          {paragraph}
+                        </p>
+                      ))}
                   </div>
                 </div>
-                <span className="text-sm text-neutral-500">
-                  {formatDistanceToNow(new Date(activity.timestamp), {
-                    addSuffix: true,
-                  })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="text-center py-6 text-neutral-500">
-            <p>
-              No recent activity yet. Start using the app to track your
-              progress!
-            </p>
+                {/* Reddit Links Section */}
+                {todaysReflection.reddit_links &&
+                  Array.isArray(todaysReflection.reddit_links) &&
+                  todaysReflection.reddit_links.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                        <ExternalLink className="w-5 h-5" />
+                        From People 1-2 Steps Ahead
+                      </h3>
+                      <div className="space-y-3">
+                        {todaysReflection.reddit_links.map((post, index) => (
+                          <a
+                            key={index}
+                            href={post.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-900 group-hover:text-blue-700 line-clamp-2">
+                                  {post.title}
+                                </h4>
+                                <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                                  <span className="font-medium">
+                                    r/{post.subreddit}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <ArrowUp className="w-3 h-3" />
+                                    {post.upvotes}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <MessageCircle className="w-3 h-3" />
+                                    {post.comments}
+                                  </div>
+                                </div>
+                              </div>
+                              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0 ml-3" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-500">
+                    Generated on{" "}
+                    {new Date(todaysReflection.generated_at).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }
+                    )}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Sparkles className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No reflection yet
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Generate your daily reflection to get personalized insights
+                  based on your recent habits and notes.
+                </p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Sidebar - Behaviors */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-8">
+            <h2 className="text-xl font-medium text-gray-900 mb-4">
+              Behaviors to Consider
+            </h2>
+
+            {behaviorsLoading ? (
+              <div className="animate-pulse space-y-4">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-16 bg-gray-200 rounded"></div>
+                ))}
+              </div>
+            ) : behaviors.length > 0 ? (
+              <div className="space-y-4">
+                {Object.entries(groupedBehaviors).map(
+                  ([category, categoryBehaviors]) => (
+                    <div key={category}>
+                      {category !== "other" && (
+                        <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wide mb-3">
+                          {category}
+                        </h3>
+                      )}
+                      <div className="space-y-3">
+                        {categoryBehaviors.map((behavior) => (
+                          <div
+                            key={behavior.id}
+                            className="bg-white border border-gray-200 rounded-lg p-4"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <h4 className="font-medium text-gray-900">
+                                {behavior.name}
+                              </h4>
+                              {behavior.category && (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(
+                                    behavior.category
+                                  )}`}
+                                >
+                                  <Tag className="w-3 h-3" />
+                                  {behavior.category}
+                                </span>
+                              )}
+                            </div>
+                            {behavior.description && (
+                              <p className="text-sm text-gray-600">
+                                {behavior.description}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Tag className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600 text-sm">
+                  No behaviors available. Add some behaviors to get personalized
+                  suggestions.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
