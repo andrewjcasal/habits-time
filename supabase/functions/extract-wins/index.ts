@@ -59,6 +59,23 @@ Deno.serve(async (req: Request) => {
 
     console.log('DEBUG - Extracting wins from note:', noteId, 'Content length:', noteContent.length)
 
+    // Create Supabase client with service role key for admin access
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Get recent wins to avoid duplicates
+    const { data: recentWins } = await supabase
+      .from('wins')
+      .select('title, description')
+      .eq('user_id', userId)
+      .order('extracted_at', { ascending: false })
+      .limit(10)
+
+    const recentWinsText = recentWins && recentWins.length > 0 
+      ? recentWins.map(w => `- ${w.title}${w.description ? `: ${w.description}` : ''}`).join('\n')
+      : 'No recent wins found'
+
+    console.log('DEBUG - Recent wins for context:', recentWinsText)
+
     // Call OpenAI to extract wins
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -91,6 +108,11 @@ Ignore:
 - Routine daily activities
 - Mundane updates
 - Complaints or problems
+
+IMPORTANT: Avoid extracting wins that are similar or duplicate to these recent wins:
+${recentWinsText}
+
+Only extract wins that are genuinely NEW and different from what's already been recorded. If a win is too similar to an existing one, skip it.
 
 Keep titles under 60 characters and celebratory in tone. Only return wins that are clearly positive achievements.
 
@@ -164,9 +186,6 @@ Return ONLY valid JSON array format, no markdown or extra text:`
 
     console.log('DEBUG - Extracted wins:', extractedWins)
 
-    // Create Supabase client with service role key for admin access
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     // Insert wins into database (duplicate prevention handled by unique constraint)
     let successCount = 0
     let duplicateCount = 0
@@ -189,7 +208,8 @@ Return ONLY valid JSON array format, no markdown or extra text:`
           })
 
         if (error) {
-          if (error.message.includes('unique_user_win')) {
+          const errorMessage = error.message || error.toString() || 'Unknown error'
+          if (errorMessage.includes('unique_user_win') || errorMessage.includes('duplicate key')) {
             console.log('DEBUG - Duplicate win skipped:', win.title)
             duplicateCount++
           } else {

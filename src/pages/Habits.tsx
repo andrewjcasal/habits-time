@@ -3,6 +3,7 @@ import { Clock, Play, CheckCircle2, Circle, RefreshCw } from "lucide-react";
 import { useHabits } from "../hooks/useHabits";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
+import HabitContext from "../components/HabitContext";
 
 const Habits = () => {
   const { user } = useAuth();
@@ -18,6 +19,7 @@ const Habits = () => {
   const [editingHabit, setEditingHabit] = useState<string | null>(null);
   const [tempTime, setTempTime] = useState("");
   const [routineLogs, setRoutineLogs] = useState<any[]>([]);
+  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
 
   const toggleCompletion = async (habitId: string) => {
     const habit = habits.find(h => h.id === habitId);
@@ -130,9 +132,34 @@ const Habits = () => {
     }
   };
 
+  // Get next habit coming up (uncompleted habit with earliest start time)
+  const getNextHabit = () => {
+    const uncompletedHabits = habits.filter(habit => {
+      const dailyLog = habit.habits_daily_logs?.[0];
+      return !dailyLog?.actual_start_time;
+    });
+    
+    if (uncompletedHabits.length === 0) return habits[0]; // Default to first habit if all completed
+    
+    // Sort by start time and return the earliest
+    return uncompletedHabits.sort((a, b) => {
+      const timeA = a.current_start_time || '23:59';
+      const timeB = b.current_start_time || '23:59';
+      return timeA.localeCompare(timeB);
+    })[0];
+  };
+
   useEffect(() => {
     fetchRoutineLogs();
   }, [user]);
+
+  useEffect(() => {
+    // Auto-select the next habit when habits load
+    if (habits.length > 0 && !selectedHabitId) {
+      const nextHabit = getNextHabit();
+      setSelectedHabitId(nextHabit?.id || null);
+    }
+  }, [habits, selectedHabitId]);
 
   if (loading) {
     return (
@@ -153,42 +180,42 @@ const Habits = () => {
   }
 
   return (
-    <div className="p-4 max-w-6xl mx-auto">
-
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900 mb-2">Habits</h1>
-          <p className="text-neutral-600">
-            Track your daily routines. Each day, habits start 15 minutes earlier if completed on time, or stay the same if not completed.
-          </p>
-        </div>
-        <button
-          onClick={updateHabitStartTimes}
-          className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          <span>Update Times</span>
-        </button>
+    <div className="h-screen flex flex-col">
+      <div className="p-4 border-b border-gray-200">
+        <h1 className="text-2xl font-bold text-neutral-900">Habits</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {habits.map((habit) => {
-          const dailyLog = habit.habits_daily_logs?.[0];
-          const isCompleted = dailyLog?.actual_start_time || false;
-          
-          return (
-            <div
-              key={habit.id}
-              className={`bg-white rounded-lg border p-3 transition-all ${
-                isCompleted 
-                  ? 'border-green-200 bg-green-50' 
-                  : 'border-neutral-200 hover:border-neutral-300'
-              }`}
-            >
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0">
+        {/* Habits List - Outlook style */}
+        <div className="border-r border-gray-200">
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <h2 className="text-sm font-semibold text-gray-900">Daily Habits</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {habits.map((habit, index) => {
+              const dailyLog = habit.habits_daily_logs?.[0];
+              const isCompleted = dailyLog?.actual_start_time || false;
+              const isSelected = selectedHabitId === habit.id;
+              
+              return (
+                <div
+                  key={habit.id}
+                  onClick={() => setSelectedHabitId(habit.id)}
+                  className={`border-b border-gray-200 p-3 cursor-pointer transition-colors ${
+                    isSelected 
+                      ? 'bg-yellow-100 border-l-4 border-l-yellow-500' 
+                      : isCompleted
+                        ? 'bg-green-50 hover:bg-green-100' 
+                        : 'bg-white hover:bg-gray-50'
+                  }`}
+                >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => toggleCompletion(habit.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCompletion(habit.id);
+                    }}
                     className="flex-shrink-0"
                   >
                     {isCompleted ? (
@@ -218,7 +245,7 @@ const Habits = () => {
 
                 <div className="flex items-center">
                   {editingHabit === habit.id ? (
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="time"
                         value={tempTime}
@@ -241,7 +268,8 @@ const Habits = () => {
                     </div>
                   ) : (
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setEditingHabit(habit.id);
                         setTempTime(habit.current_start_time || '09:00');
                       }}
@@ -257,21 +285,27 @@ const Habits = () => {
               </div>
             </div>
           );
-        })}
+          })}
+          </div>
+        </div>
+
+        {/* Context Panel - Show only selected habit */}
+        <div className="bg-white">
+          {selectedHabitId && (() => {
+            const selectedHabit = habits.find(h => h.id === selectedHabitId);
+            return selectedHabit ? (
+              <HabitContext
+                key={`context-${selectedHabit.id}`}
+                habitId={selectedHabit.id}
+                habitName={selectedHabit.name}
+                initialContext={selectedHabit.context}
+              />
+            ) : null;
+          })()}
+        </div>
       </div>
 
-      <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <h3 className="font-medium text-blue-900 mb-2">How it works</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• If you complete a habit on time, it starts 15 minutes earlier the next day</li>
-          <li>• If you don't complete a habit, it maintains the same start time the next day</li>
-          <li>• This encourages consistency - completing on time moves you toward your ideal schedule</li>
-          <li>• Click the time to manually adjust when needed</li>
-          <li>• Mark habits as complete by clicking the circle</li>
-        </ul>
-      </div>
-
-      <div className="mt-6">
+      <div className="mt-8 mx-6">
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">Last 7 Days - Morning & Shutdown Routines</h3>
         <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
           <div className="overflow-x-auto">

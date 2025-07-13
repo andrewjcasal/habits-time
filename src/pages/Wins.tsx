@@ -76,37 +76,45 @@ const Wins = () => {
 
   if (loading) {
     return (
-      <div className="p-4 max-w-4xl mx-auto">
+      <div className="p-2 max-w-4xl mx-auto">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
+    <div className="p-2 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-3">
         <div className="flex items-center gap-3 mb-2">
           <Trophy className="w-8 h-8 text-yellow-500" />
-          <h1 className="text-3xl font-light text-gray-900">Wins & Achievements</h1>
+          <h1 className="text-3xl font-light text-gray-900">
+            Wins & Achievements
+          </h1>
         </div>
-        <p className="text-gray-600">Celebrate your progress and accomplishments</p>
-        
+        <p className="text-gray-600">
+          Celebrate your progress and accomplishments
+        </p>
+
         {/* Stats */}
-        <div className="flex gap-6 mt-4">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
-            <div className="text-2xl font-bold text-yellow-700">{totalWins}</div>
+        <div className="flex gap-3 mt-2">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1">
+            <div className="text-2xl font-bold text-yellow-700">
+              {totalWins}
+            </div>
             <div className="text-sm text-yellow-600">Total Wins</div>
           </div>
-          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-            <div className="text-2xl font-bold text-green-700">{thisWeekWins}</div>
+          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-1">
+            <div className="text-2xl font-bold text-green-700">
+              {thisWeekWins}
+            </div>
             <div className="text-sm text-green-600">This Week</div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-2 mb-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
@@ -114,13 +122,13 @@ const Wins = () => {
             placeholder="Search wins..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full pl-10 pr-4 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value as any)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
         >
           <option value="all">All Sources</option>
           <option value="note">From Notes</option>
@@ -133,41 +141,46 @@ const Wins = () => {
         <div className="text-center py-12">
           <Trophy className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {searchTerm || filterType !== 'all' ? 'No wins found' : 'No wins yet'}
+            {searchTerm || filterType !== "all"
+              ? "No wins found"
+              : "No wins yet"}
           </h3>
-          <p className="text-gray-600 mb-6">
-            {searchTerm || filterType !== 'all' 
-              ? 'Try adjusting your search or filter'
-              : 'Start writing notes about your achievements and they\'ll appear here automatically!'
-            }
+          <p className="text-gray-600 mb-3">
+            {searchTerm || filterType !== "all"
+              ? "Try adjusting your search or filter"
+              : "Start writing notes about your achievements and they'll appear here automatically!"}
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-2">
           {filteredWins.map((win) => {
             const SourceIcon = getSourceIcon(win.source_type);
-            
+
             return (
               <div
                 key={win.id}
-                className="bg-white rounded-lg border border-gray-200 p-4 hover:border-yellow-300 hover:bg-yellow-50 transition-colors"
+                className="bg-white rounded-lg border border-gray-200 p-2 hover:border-yellow-300 hover:bg-yellow-50 transition-colors"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-1">
                       <Trophy className="w-5 h-5 text-yellow-500" />
-                      <h3 className="font-semibold text-gray-900">{win.title}</h3>
+                      <h3 className="font-semibold text-gray-900">
+                        {win.title}
+                      </h3>
                     </div>
-                    
+
                     {win.description && (
-                      <p className="text-gray-700 mb-3">{win.description}</p>
+                      <p className="text-gray-700 mb-2">{win.description}</p>
                     )}
-                    
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
                       <div className="flex items-center gap-1">
                         <SourceIcon className="w-4 h-4" />
                         <span className="capitalize">
-                          {win.source_type === 'habit_streak' ? 'Habit Streak' : 'Note'}
+                          {win.source_type === "habit_streak"
+                            ? "Habit Streak"
+                            : "Note"}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
