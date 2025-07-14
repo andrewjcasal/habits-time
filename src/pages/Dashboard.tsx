@@ -5,6 +5,7 @@ import {
   ExternalLink,
   ArrowUp,
   MessageCircle,
+  TrendingUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useBehaviors } from "../hooks/useBehaviors";
@@ -88,18 +89,12 @@ const Dashboard = () => {
             <button
               onClick={handleGenerateReflection}
               disabled={generatingReflection || reflectionLoading}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-2 px-2 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {generatingReflection ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Generating...
-                </>
+                <>Generating...</>
               ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Generate Today's Reflection
-                </>
+                <>Generate Today's Reflection</>
               )}
             </button>
           </div>
@@ -130,48 +125,57 @@ const Dashboard = () => {
                 {todaysReflection.reddit_links &&
                   Array.isArray(todaysReflection.reddit_links) &&
                   todaysReflection.reddit_links.length > 0 && (
-                    <div className="mt-6 pt-4 border-t border-gray-200">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                        <ExternalLink className="w-5 h-5" />
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" />
                         From People 1-2 Steps Ahead
                       </h3>
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {todaysReflection.reddit_links.map((post, index) => (
-                          <a
-                            key={index}
-                            href={post.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-gray-900 group-hover:text-blue-700 line-clamp-2">
-                                  {post.title}
-                                </h4>
-                                <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                                  <span className="font-medium">
-                                    r/{post.subreddit}
-                                  </span>
-                                  <div className="flex items-center gap-1">
+                          <div key={index}>
+                            <a
+                              href={post.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block group"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-3 text-sm text-gray-600">
+                                  <div className="flex flex-col items-center gap-0.5 w-4">
                                     <ArrowUp className="w-3 h-3" />
-                                    {post.upvotes}
+                                    <span className="text-sm text-gray-700">
+                                      {post.upvotes}
+                                    </span>
                                   </div>
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex flex-col items-center gap-0.5 w-3">
                                     <MessageCircle className="w-3 h-3" />
-                                    {post.comments}
+                                    <span className="text-sm text-gray-700">
+                                      {post.comments}
+                                    </span>
                                   </div>
                                 </div>
+                                <div className="flex-1 min-w-0 ml-4">
+                                  <h4 className="font-medium text-emerald-700 group-hover:text-indigo-600 line-clamp-2">
+                                    {post.title}
+                                  </h4>
+                                  <span className="font-medium text-xs text-gray-600 mt-1 block">
+                                    r/{post.subreddit}
+                                  </span>
+                                </div>
+                                <ExternalLink className="w-2 h-2 mt-[2px] text-gray-400 group-hover:text-blue-600 flex-shrink-0 ml-3" />
                               </div>
-                              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0 ml-3" />
-                            </div>
-                          </a>
+                            </a>
+                            {index <
+                              todaysReflection.reddit_links.length - 1 && (
+                              <div className="mt-2 border-t border-gray-200"></div>
+                            )}
+                          </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                <div className="mt-6 pt-4 border-t border-gray-200">
+                <div className="mt-3 pt-1 border-t border-gray-200">
                   <p className="text-sm text-gray-500">
                     Generated on{" "}
                     {new Date(todaysReflection.generated_at).toLocaleDateString(

@@ -14,6 +14,7 @@ import {
   Calendar,
   FileText,
   Trophy,
+  CheckSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -26,6 +27,7 @@ const MainLayout = () => {
     { path: "/dashboard", label: "Dashboard", icon: Home },
     { path: "/time-tracker", label: "Time Tracker", icon: Clock },
     { path: "/habits", label: "Habits", icon: Heart },
+    { path: "/todoist", label: "Todoist", icon: CheckSquare },
     { path: "/wins", label: "Wins", icon: Trophy },
     { path: "/notes", label: "Notes", icon: FileText },
   ];

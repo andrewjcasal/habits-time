@@ -16,6 +16,7 @@ import TimeTracker from "./pages/TimeTracker";
 import Essentials from "./pages/Essentials";
 import DailyOverrides from "./pages/DailyOverrides";
 import Habits from "./pages/Habits";
+import Todoist from "./pages/Todoist";
 import Wins from "./pages/Wins";
 import Notes from "./pages/Notes";
 
@@ -72,6 +73,7 @@ function App() {
             <Route path="essentials" element={<Essentials />} />
             <Route path="daily-overrides" element={<DailyOverrides />} />
             <Route path="habits" element={<Habits />} />
+            <Route path="todoist" element={<Todoist />} />
             <Route path="wins" element={<Wins />} />
             <Route path="notes" element={<Notes />} />
           </Route>
