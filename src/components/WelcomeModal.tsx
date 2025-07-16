@@ -11,7 +11,7 @@ export const WelcomeModal = ({ onClose }: WelcomeModalProps) => {
   
   const steps = [
     {
-      title: "Welcome to Habits",
+      title: "Welcome to Reflectify",
       description:
         "Your all-in-one interview preparation platform for front-end engineers.",
       image:

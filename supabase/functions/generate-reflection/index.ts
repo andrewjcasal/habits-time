@@ -196,6 +196,7 @@ Prioritize posts about:
 - Don't get too into specific tools. If a person wants to build finance routines, but doesn't state what they use, don't assume any one tool, i.e. "Excel"
 - Don't assume too specific combined topics, i.e. "unprocessed eating on a budget" if the user has difficulties with maintaining finance habits and food habits; but recommend if the user is comfortable with finance habits, budgeting habits, and food habits in general
 - No manifestation or medical/health posts, except for AuDHD, ADHD, executive dysfunction, and symptoms like fatigue, energy crash, brain fog.
+- Min 2 posts if the user shares any frustrations and missteps through the current routine, provide resources to get back on track.
 - Limit 1 post that's ADHD/AuDHD related.
 - Limit 1 post focusing on relationships, and ONLY if it's about building habits within relationships or partners supporting each other's habit development. 
 - Limit 1 post focused on weight loss, 2 if the user in their notes mention weight loss routines.
@@ -478,6 +479,7 @@ FOCUS ON:
 - If you see notes from a week ago vs recent notes, highlight improvements: "A week ago you mentioned X, and now I see Y - that's real progress"
 - Concrete next steps to build on current momentum
 - Brief celebration of wins, then challenge them to go further
+- Acknowledge missteps and frustrations the user might be having; notice any breaks or lateness in routine, make compromises, and get back on track.
 
 TONE: Supportive coach focused on forward momentum, not feelings processing.
 

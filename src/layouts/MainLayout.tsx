@@ -15,11 +15,16 @@ import {
   FileText,
   Trophy,
   CheckSquare,
+  FolderOpen,
+  LogOut,
+  Bot,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../hooks/useAuth";
 
 const MainLayout = () => {
   const location = useLocation();
+  const { signOut } = useAuth();
   console.log(location);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
@@ -27,6 +32,9 @@ const MainLayout = () => {
     { path: "/dashboard", label: "Dashboard", icon: Home },
     { path: "/time-tracker", label: "Time Tracker", icon: Clock },
     { path: "/habits", label: "Habits", icon: Heart },
+    { path: "/projects", label: "Projects", icon: FolderOpen },
+    { path: "/calendar", label: "Calendar", icon: Calendar },
+    { path: "/community", label: "Community", icon: Users },
     { path: "/todoist", label: "Todoist", icon: CheckSquare },
     { path: "/wins", label: "Wins", icon: Trophy },
     { path: "/notes", label: "Notes", icon: FileText },
@@ -42,8 +50,8 @@ const MainLayout = () => {
       <aside className="hidden md:flex w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
         <div className="p-4">
           <h1 className="text-lg font-semibold text-primary-700 flex items-center">
-            <Users className="w-4 h-4 mr-2 text-primary-600" />
-            Habits
+            <Bot className="w-4 h-4 mr-2 text-primary-600" />
+            Reflectify
           </h1>
         </div>
 
@@ -72,7 +80,7 @@ const MainLayout = () => {
           </ul>
         </nav>
 
-        <div className="mt-auto p-1 border-t border-neutral-200">
+        <div className="mt-auto p-1 border-t border-neutral-200 space-y-1">
           <NavLink
             to="/settings"
             className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
@@ -80,6 +88,13 @@ const MainLayout = () => {
             <Settings className="mr-2 h-3.5 w-3.5" />
             Settings
           </NavLink>
+          <button
+            onClick={signOut}
+            className="w-full flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+          >
+            <LogOut className="mr-2 h-3.5 w-3.5" />
+            Logout
+          </button>
         </div>
       </aside>
 
@@ -142,8 +157,8 @@ const MainLayout = () => {
           </ul>
         </nav>
 
-        {/* Settings Icon */}
-        <div className="mt-auto p-1 border-t border-neutral-100">
+        {/* Settings & Logout Icons */}
+        <div className="mt-auto p-1 border-t border-neutral-100 space-y-1">
           <div className="relative">
             <NavLink
               to="/settings"
@@ -167,6 +182,39 @@ const MainLayout = () => {
                 >
                   <div className="text-sm font-medium text-neutral-900">
                     {settingsItem.label}
+                  </div>
+                  {/* Arrow */}
+                  <div className="absolute right-full top-1/2 transform -translate-y-1/2">
+                    <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          
+          <div className="relative">
+            <button
+              onClick={signOut}
+              className="flex items-center justify-center w-6 h-6 rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-200"
+              onMouseEnter={() => setHoveredItem("logout")}
+              onMouseLeave={() => setHoveredItem(null)}
+            >
+              <LogOut className="h-3 w-3" />
+            </button>
+
+            {/* Logout Popover */}
+            <AnimatePresence>
+              {hoveredItem === "logout" && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
+                  style={{ zIndex: 1000 }}
+                >
+                  <div className="text-sm font-medium text-neutral-900">
+                    Logout
                   </div>
                   {/* Arrow */}
                   <div className="absolute right-full top-1/2 transform -translate-y-1/2">

@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
-import { Clock, Play, CheckCircle2, Circle, RefreshCw } from "lucide-react";
+import {
+  Clock,
+  Play,
+  CheckCircle2,
+  Circle,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useHabits } from "../hooks/useHabits";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
@@ -7,14 +15,18 @@ import HabitContext from "../components/HabitContext";
 
 const Habits = () => {
   const { user } = useAuth();
-  const { 
-    habits, 
-    loading, 
-    error, 
-    logHabitCompletion, 
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const {
+    habits,
+    loading,
+    error,
+    logHabitCompletion,
     updateHabitStartTime,
-    updateHabitStartTimes 
-  } = useHabits();
+    updateHabitStartTimes,
+    getNextHabit,
+  } = useHabits(selectedDate);
 
   const [editingHabit, setEditingHabit] = useState<string | null>(null);
   const [tempTime, setTempTime] = useState("");
@@ -22,19 +34,51 @@ const Habits = () => {
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
 
   const toggleCompletion = async (habitId: string) => {
-    const habit = habits.find(h => h.id === habitId);
+    const habit = habits.find((h) => h.id === habitId);
     const currentLog = habit?.habits_daily_logs?.[0];
     const newCompletionState = !currentLog?.is_completed;
-    
+
     const now = new Date();
     const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
-    
+
     await logHabitCompletion(
-      habitId, 
+      habitId,
       newCompletionState,
       newCompletionState ? currentTime : undefined,
       newCompletionState ? currentTime : undefined
     );
+  };
+
+  const navigateDate = (direction: "prev" | "next") => {
+    const current = new Date(selectedDate);
+    if (direction === "prev") {
+      current.setDate(current.getDate() - 1);
+    } else {
+      current.setDate(current.getDate() + 1);
+    }
+    setSelectedDate(current.toISOString().split("T")[0]);
+  };
+
+  const formatDateDisplay = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const todayString = today.toISOString().split("T")[0];
+    const yesterdayString = yesterday.toISOString().split("T")[0];
+
+    if (dateString === todayString) {
+      return "Today";
+    } else if (dateString === yesterdayString) {
+      return "Yesterday";
+    } else {
+      return date.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      });
+    }
   };
 
   const updateTime = async (habitId: string, newTime: string) => {
@@ -43,10 +87,10 @@ const Habits = () => {
   };
 
   const formatTime = (time: string | null) => {
-    if (!time) return '9:00 AM';
-    const [hours, minutes] = time.split(':');
+    if (!time) return "9:00 AM";
+    const [hours, minutes] = time.split(":");
     const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const ampm = hour >= 12 ? "PM" : "AM";
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
   };
@@ -57,11 +101,11 @@ const Habits = () => {
     try {
       // Get sleep logs to determine day boundaries
       const { data: sleepLogs, error: sleepError } = await supabase
-        .from('habits_time_logs')
-        .select('start_time')
-        .eq('user_id', user.id)
-        .eq('activity_type_id', '951bc26a-a863-4996-8a02-f4da2d148aa9')
-        .order('start_time', { ascending: false })
+        .from("habits_time_logs")
+        .select("start_time")
+        .eq("user_id", user.id)
+        .eq("activity_type_id", "951bc26a-a863-4996-8a02-f4da2d148aa9")
+        .order("start_time", { ascending: false })
         .limit(10);
 
       if (sleepError) throw sleepError;
@@ -70,10 +114,11 @@ const Habits = () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 14);
       const endDate = new Date();
-      
+
       const { data, error } = await supabase
-        .from('habits_daily_logs')
-        .select(`
+        .from("habits_daily_logs")
+        .select(
+          `
           log_date,
           actual_start_time,
           actual_end_time,
@@ -82,71 +127,60 @@ const Habits = () => {
             id,
             name
           )
-        `)
-        .eq('user_id', user.id)
-        .gte('log_date', startDate.toISOString().split('T')[0])
-        .lte('log_date', endDate.toISOString().split('T')[0])
-        .in('habits.id', ['ad94f045-1f1f-49c6-aef1-578d0013cf9e', '0edf2ca9-b14f-451f-9043-e13cb8daf684'])
-        .order('log_date', { ascending: false });
+        `
+        )
+        .eq("user_id", user.id)
+        .gte("log_date", startDate.toISOString().split("T")[0])
+        .lte("log_date", endDate.toISOString().split("T")[0])
+        .in("habits.id", [
+          "ad94f045-1f1f-49c6-aef1-578d0013cf9e",
+          "0edf2ca9-b14f-451f-9043-e13cb8daf684",
+        ])
+        .order("log_date", { ascending: false });
 
       if (error) throw error;
 
       // Group logs by sleep cycles instead of calendar days
       const groupedLogs = [];
-      const sleepBoundaries = sleepLogs?.map(log => new Date(log.start_time)) || [];
-      
+      const sleepBoundaries =
+        sleepLogs?.map((log) => new Date(log.start_time)) || [];
+
       for (let i = 0; i < 7; i++) {
         const currentSleep = sleepBoundaries[i];
         const previousSleep = sleepBoundaries[i + 1];
-        
+
         if (!currentSleep) continue;
-        
+
         // Find logs that occurred between previous sleep and current sleep
-        const dayLogs = data?.filter(log => {
-          const logDateTime = new Date(log.created_at);
-          
-          // Must be before current sleep
-          if (logDateTime >= currentSleep) return false;
-          
-          // If there's a previous sleep, must be after that sleep
-          if (previousSleep && logDateTime < previousSleep) return false;
-          
-          return true;
-        }) || [];
-        
+        const dayLogs =
+          data?.filter((log) => {
+            const logDateTime = new Date(log.created_at);
+
+            // Must be before current sleep
+            if (logDateTime >= currentSleep) return false;
+
+            // If there's a previous sleep, must be after that sleep
+            if (previousSleep && logDateTime < previousSleep) return false;
+
+            return true;
+          }) || [];
+
         // Use the day before sleep as the display date
         const displayDate = new Date(currentSleep);
         displayDate.setDate(displayDate.getDate() - 1);
-        
+
         groupedLogs.push({
-          sleepDate: currentSleep.toISOString().split('T')[0],
+          sleepDate: currentSleep.toISOString().split("T")[0],
           sleepTime: currentSleep,
           displayDate: displayDate,
-          logs: dayLogs
+          logs: dayLogs,
         });
       }
 
       setRoutineLogs(groupedLogs);
     } catch (err) {
-      console.error('Error fetching routine logs:', err);
+      console.error("Error fetching routine logs:", err);
     }
-  };
-
-  // Get next habit coming up (uncompleted habit with earliest start time)
-  const getNextHabit = () => {
-    const uncompletedHabits = habits.filter(habit => {
-      const dailyLog = habit.habits_daily_logs?.[0];
-      return !dailyLog?.actual_start_time;
-    });
-    
-    if (uncompletedHabits.length === 0) return habits[0]; // Default to first habit if all completed
-    
-    // Sort by start time and return the earliest
-    return uncompletedHabits.sort((a, b) => {
-      const timeA = a.current_start_time || '23:59';
-      const timeB = b.current_start_time || '23:59';
-      return timeA.localeCompare(timeB);
-    })[0];
   };
 
   useEffect(() => {
@@ -154,9 +188,12 @@ const Habits = () => {
   }, [user]);
 
   useEffect(() => {
+    console.log("abc");
     // Auto-select the next habit when habits load
     if (habits.length > 0 && !selectedHabitId) {
+      console.log("abc 123");
       const nextHabit = getNextHabit();
+      console.log("abc next", nextHabit);
       setSelectedHabitId(nextHabit?.id || null);
     }
   }, [habits, selectedHabitId]);
@@ -189,156 +226,201 @@ const Habits = () => {
         {/* Habits List - Outlook style */}
         <div className="border-r border-gray-200">
           <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-            <h2 className="text-sm font-semibold text-gray-900">Daily Habits</h2>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => navigateDate("prev")}
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <h2 className="text-sm font-semibold text-gray-900">
+                {formatDateDisplay(selectedDate)}
+              </h2>
+              <button
+                onClick={() => navigateDate("next")}
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto">
             {habits.map((habit, index) => {
               const dailyLog = habit.habits_daily_logs?.[0];
               const isCompleted = dailyLog?.actual_start_time || false;
               const isSelected = selectedHabitId === habit.id;
-              
+
               return (
                 <div
                   key={habit.id}
                   onClick={() => setSelectedHabitId(habit.id)}
                   className={`border-b border-gray-200 p-3 cursor-pointer transition-colors ${
-                    isSelected 
-                      ? 'bg-yellow-100 border-l-4 border-l-yellow-500' 
+                    isSelected
+                      ? "bg-yellow-100 border-l-4 border-l-yellow-500"
                       : isCompleted
-                        ? 'bg-green-50 hover:bg-green-100' 
-                        : 'bg-white hover:bg-gray-50'
+                      ? "bg-green-50 hover:bg-green-100"
+                      : "bg-white hover:bg-gray-50"
                   }`}
                 >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleCompletion(habit.id);
-                    }}
-                    className="flex-shrink-0"
-                  >
-                    {isCompleted ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <Circle className="w-5 h-5 text-neutral-400 hover:text-neutral-600" />
-                    )}
-                  </button>
-                  
-                  <div className="min-w-0 flex-1">
-                    <h3 className={`font-medium text-sm ${
-                      isCompleted ? 'text-green-800' : 'text-neutral-900'
-                    }`}>
-                      {habit.name}
-                    </h3>
-                    <div className="flex items-center space-x-1 text-xs text-neutral-600">
-                      <Clock className="w-3 h-3" />
-                      <span>{habit.duration}m</span>
-                      {dailyLog?.actual_start_time && dailyLog?.actual_end_time && (
-                        <span className="text-green-600">
-                          • {formatTime(dailyLog.actual_start_time)}
-                        </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCompletion(habit.id);
+                        }}
+                        className="flex-shrink-0"
+                      >
+                        {isCompleted ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <Circle className="w-5 h-5 text-neutral-400 hover:text-neutral-600" />
+                        )}
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <h3
+                          className={`font-medium text-sm ${
+                            isCompleted ? "text-green-800" : "text-neutral-900"
+                          }`}
+                        >
+                          {habit.name}
+                        </h3>
+                        <div className="flex items-center space-x-1 text-xs text-neutral-600">
+                          <Clock className="w-3 h-3" />
+                          <span>{habit.duration}m</span>
+                          {dailyLog?.actual_start_time &&
+                            dailyLog?.actual_end_time && (
+                              <span className="text-green-600">
+                                • {formatTime(dailyLog.actual_start_time)}
+                              </span>
+                            )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center">
+                      {editingHabit === habit.id ? (
+                        <div
+                          className="flex items-center space-x-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="time"
+                            value={tempTime}
+                            onChange={(e) => setTempTime(e.target.value)}
+                            className="px-1 py-1 border border-neutral-300 rounded text-xs w-16"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => updateTime(habit.id, tempTime)}
+                            className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingHabit(null)}
+                            className="px-2 py-1 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingHabit(habit.id);
+                            setTempTime(habit.current_start_time || "09:00");
+                          }}
+                          className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 rounded hover:bg-neutral-200 transition-colors"
+                        >
+                          <Play className="w-3 h-3" />
+                          <span className="font-mono text-xs">
+                            {formatTime(habit.current_start_time)}
+                          </span>
+                        </button>
                       )}
                     </div>
                   </div>
                 </div>
-
-                <div className="flex items-center">
-                  {editingHabit === habit.id ? (
-                    <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="time"
-                        value={tempTime}
-                        onChange={(e) => setTempTime(e.target.value)}
-                        className="px-1 py-1 border border-neutral-300 rounded text-xs w-16"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => updateTime(habit.id, tempTime)}
-                        className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setEditingHabit(null)}
-                        className="px-2 py-1 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingHabit(habit.id);
-                        setTempTime(habit.current_start_time || '09:00');
-                      }}
-                      className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 rounded hover:bg-neutral-200 transition-colors"
-                    >
-                      <Play className="w-3 h-3" />
-                      <span className="font-mono text-xs">
-                        {formatTime(habit.current_start_time)}
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-          })}
+              );
+            })}
           </div>
         </div>
 
         {/* Context Panel - Show only selected habit */}
         <div className="bg-white">
-          {selectedHabitId && (() => {
-            const selectedHabit = habits.find(h => h.id === selectedHabitId);
-            return selectedHabit ? (
-              <HabitContext
-                key={`context-${selectedHabit.id}`}
-                habitId={selectedHabit.id}
-                habitName={selectedHabit.name}
-                initialContext={selectedHabit.context}
-              />
-            ) : null;
-          })()}
+          {selectedHabitId &&
+            (() => {
+              const selectedHabit = habits.find(
+                (h) => h.id === selectedHabitId
+              );
+              return selectedHabit ? (
+                <HabitContext
+                  key={`context-${selectedHabit.id}`}
+                  habitId={selectedHabit.id}
+                  habitName={selectedHabit.name}
+                  initialContext={selectedHabit.context}
+                />
+              ) : null;
+            })()}
         </div>
       </div>
 
       <div className="mt-8 mx-6">
-        <h3 className="text-lg font-semibold text-neutral-900 mb-4">Last 7 Days - Morning & Shutdown Routines</h3>
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
+          Last 7 Days - Morning & Shutdown Routines
+        </h3>
         <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-neutral-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-neutral-900">Date</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-neutral-900">Morning Routine</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-neutral-900">Shutdown</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-neutral-900">
+                    Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-neutral-900">
+                    Morning Routine
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-neutral-900">
+                    Shutdown
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200">
                 {routineLogs.map((dayGroup, i) => {
-                  const displayDate = dayGroup.displayDate.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric' 
-                  });
-                  
-                  const morningLog = dayGroup.logs.find(log => 
-                    log.habits.name === 'Morning Routine'
+                  const displayDate = dayGroup.displayDate.toLocaleDateString(
+                    "en-US",
+                    {
+                      month: "short",
+                      day: "numeric",
+                    }
                   );
-                  const shutdownLog = dayGroup.logs.find(log => 
-                    log.habits.name === 'Shutdown'
+
+                  const morningLog = dayGroup.logs.find(
+                    (log) => log.habits.name === "Morning Routine"
+                  );
+                  const shutdownLog = dayGroup.logs.find(
+                    (log) => log.habits.name === "Shutdown"
                   );
 
                   return (
-                    <tr key={dayGroup.sleepDate} className="hover:bg-neutral-50">
-                      <td className="px-4 py-3 text-sm text-neutral-900">{displayDate}</td>
-                      <td className="px-4 py-3 text-sm text-neutral-600">
-                        {morningLog ? formatTime(morningLog.actual_start_time) : '-'}
+                    <tr
+                      key={dayGroup.sleepDate}
+                      className="hover:bg-neutral-50"
+                    >
+                      <td className="px-4 py-3 text-sm text-neutral-900">
+                        {displayDate}
                       </td>
                       <td className="px-4 py-3 text-sm text-neutral-600">
-                        {shutdownLog ? formatTime(shutdownLog.actual_start_time) : '-'}
+                        {morningLog
+                          ? formatTime(morningLog.actual_start_time)
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-neutral-600">
+                        {shutdownLog
+                          ? formatTime(shutdownLog.actual_start_time)
+                          : "-"}
                       </td>
                     </tr>
                   );

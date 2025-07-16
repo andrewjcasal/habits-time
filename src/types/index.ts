@@ -178,3 +178,112 @@ export interface HabitNote {
   created_at: string;
   updated_at: string;
 }
+
+// Project
+export interface Project {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  status: 'active' | 'completed' | 'archived';
+  color?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Task
+export interface Task {
+  id: string;
+  project_id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  status: 'todo' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  due_date?: string;
+  estimated_hours?: number;
+  parent_task_id?: string;
+  created_at: string;
+  updated_at: string;
+  subtasks?: Task[];
+}
+
+// Person
+export interface Person {
+  id: string;
+  user_id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  role?: string;
+  notes?: string;
+  linkedin_url?: string;
+  twitter_url?: string;
+  website_url?: string;
+  last_contact_date?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Experience
+export interface Experience {
+  id: string;
+  user_id: string;
+  person_id: string;
+  title: string;
+  description?: string;
+  experience_date: string;
+  type: 'shared' | 'individual' | 'meeting' | 'event' | 'other';
+  location?: string;
+  attendees?: string;
+  outcome?: string;
+  follow_up_needed: boolean;
+  follow_up_date?: string;
+  connection_strength: 'strengthened' | 'maintained' | 'weakened' | 'neutral';
+  topics_discussed?: string[];
+  next_steps?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Contract
+export interface Contract {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  status: 'active' | 'completed' | 'cancelled';
+  start_date?: string;
+  end_date?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Session
+export interface Session {
+  id: string;
+  user_id: string;
+  project_id: string;
+  scheduled_date: string;
+  scheduled_hours: number;
+  actual_start_time?: string;
+  actual_end_time?: string;
+  actual_hours?: number;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  projects?: {
+    name: string;
+    color?: string;
+  };
+}
+
+// Contract Session
+export interface ContractSession {
+  id: string;
+  contract_id: string;
+  session_id: string;
+  created_at: string;
+}

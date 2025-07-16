@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { supabase, Habit, HabitDailyLog, HabitWithType } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
-export function useHabits() {
+export function useHabits(selectedDate?: string) {
   const { user } = useAuth();
   const [habits, setHabits] = useState<HabitWithType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sleepStartTime, setSleepStartTime] = useState<string | null>(null);
 
   const fetchHabits = async () => {
     if (!user) return;
@@ -15,9 +16,9 @@ export function useHabits() {
       setLoading(true);
       setError(null);
 
-      // Use local date instead of UTC date
+      // Use selected date or local date instead of UTC date
       const now = new Date();
-      const today = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+      const today = selectedDate || new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
       console.log('Fetching habits for user:', user.id, 'local date:', today, 'UTC would be:', new Date().toISOString().split('T')[0]);
 
       // Check if we should auto-uncheck habits based on sleep start time
@@ -39,7 +40,7 @@ export function useHabits() {
       
       console.log('All visible habits:', visibleHabits);
 
-      // Get the most recent sleep start time
+      // Get the most recent sleep start time from habits_time_logs
       const { data: recentSleep } = await supabase
         .from('habits_time_logs')
         .select('start_time')
@@ -49,14 +50,15 @@ export function useHabits() {
         .limit(1)
         .single();
 
-      let sleepStartTime: string | null = null;
+      let currentSleepStartTime: string | null = null;
       if (recentSleep?.start_time) {
         const sleepDate = new Date(recentSleep.start_time);
-        sleepStartTime = sleepDate.toTimeString().split(' ')[0]; // Get HH:MM:SS format
-        console.log('Most recent sleep start time:', sleepStartTime);
+        currentSleepStartTime = sleepDate.toTimeString().split(' ')[0]; // Get HH:MM:SS format
+        console.log('Most recent sleep start time:', currentSleepStartTime);
       }
 
-      console.log('sleep start', sleepStartTime)
+      setSleepStartTime(currentSleepStartTime);
+      console.log('sleep start', currentSleepStartTime)
       
       // Build the query - show all habits but filter daily logs by sleep time
       let query = supabase
@@ -70,11 +72,11 @@ export function useHabits() {
         `)
         .or(`user_id.eq.${user.id},user_id.is.null`)
         .eq('is_visible', true)
-        .eq('habits_daily_logs.log_date', today); // Only today's logs for checked status
+        .eq('habits_daily_logs.log_date', today); // Only selected date's logs for checked status
 
-      // Add sleep time filter to habits_daily_logs if we have a recent sleep time
-      if (sleepStartTime) {
-        query = query.gte('habits_daily_logs.created_at', new Date(today + 'T' + sleepStartTime).toISOString());
+      // Add sleep time filter to habits_daily_logs if we have a recent sleep time and viewing today
+      if (currentSleepStartTime && today === new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]) {
+        query = query.gte('habits_daily_logs.created_at', new Date(today + 'T' + currentSleepStartTime).toISOString());
       }
 
       const { data, error } = await query.order('current_start_time', { ascending: true });
@@ -104,13 +106,13 @@ export function useHabits() {
     if (!user) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const logDate = selectedDate || new Date().toISOString().split('T')[0];
       const habit = habits.find(h => h.id === habitId);
       
       const logData = {
         habit_id: habitId,
         user_id: user.id,
-        log_date: today,
+        log_date: logDate,
         scheduled_start_time: habit?.current_start_time,
         actual_start_time: actualStartTime,
         actual_end_time: actualEndTime,
@@ -249,7 +251,44 @@ export function useHabits() {
 
   useEffect(() => {
     fetchHabits();
-  }, [user]);
+  }, [user, selectedDate]);
+
+  // Get next habit coming up (uncompleted habit with earliest start time after sleep)
+  const getNextHabit = () => {
+    // Filter for uncompleted habits that occur after sleep time
+    const uncompletedHabitsAfterSleep = habits.filter(habit => {
+      const dailyLog = habit.habits_daily_logs?.[0];
+      const isNotCompleted = !dailyLog?.actual_start_time;
+      
+      // If not completed, check if it's after sleep time
+      if (isNotCompleted && sleepStartTime && habit.current_start_time) {
+        return habit.current_start_time > sleepStartTime;
+      }
+      
+      // If no sleep time or no start time, include all uncompleted habits
+      return isNotCompleted;
+    });
+    
+    console.log('abc 555', uncompletedHabitsAfterSleep)
+    if (uncompletedHabitsAfterSleep.length === 0) {
+      console.log('abc 666')
+      // If no uncompleted habits after sleep, default to first habit after sleep time
+      const habitsAfterSleep = habits.filter(habit => {
+        if (!sleepStartTime || !habit.current_start_time) return true;
+        return habit.current_start_time > sleepStartTime;
+      });
+
+      console.log('habits sleep', habitsAfterSleep)
+      return habitsAfterSleep[0] || habits[0];
+    }
+    
+    // Sort by start time and return the earliest
+    return uncompletedHabitsAfterSleep.sort((a, b) => {
+      const timeA = a.current_start_time || '23:59';
+      const timeB = b.current_start_time || '23:59';
+      return timeA.localeCompare(timeB);
+    })[0];
+  };
 
   return {
     habits,
@@ -259,5 +298,6 @@ export function useHabits() {
     updateHabitStartTime,
     updateHabitStartTimes,
     refetch: fetchHabits,
+    getNextHabit,
   };
 }

@@ -19,6 +19,10 @@ import Habits from "./pages/Habits";
 import Todoist from "./pages/Todoist";
 import Wins from "./pages/Wins";
 import Notes from "./pages/Notes";
+import Community from "./pages/Community";
+import PersonDetail from "./pages/PersonDetail";
+import Projects from "./pages/Projects";
+import Calendar from "./pages/Calendar";
 
 // Components
 import { WelcomeModal } from "./components/WelcomeModal";
@@ -30,10 +34,10 @@ function App() {
 
   useEffect(() => {
     // Check if this is the first time the user has visited the app
-    const hasVisited = localStorage.getItem("hasVisitedFrontPrep");
+    const hasVisited = localStorage.getItem("hasVisitedReflectify");
     if (!hasVisited && user) {
       setShowWelcome(true);
-      localStorage.setItem("hasVisitedFrontPrep", "true");
+      localStorage.setItem("hasVisitedReflectify", "true");
     }
   }, [user]);
 
@@ -73,9 +77,13 @@ function App() {
             <Route path="essentials" element={<Essentials />} />
             <Route path="daily-overrides" element={<DailyOverrides />} />
             <Route path="habits" element={<Habits />} />
+            <Route path="projects" element={<Projects />} />
+            <Route path="calendar" element={<Calendar />} />
             <Route path="todoist" element={<Todoist />} />
             <Route path="wins" element={<Wins />} />
             <Route path="notes" element={<Notes />} />
+            <Route path="community" element={<Community />} />
+            <Route path="community/:personId" element={<PersonDetail />} />
           </Route>
         ) : (
           <Route path="*" element={<Navigate to="/" replace />} />
