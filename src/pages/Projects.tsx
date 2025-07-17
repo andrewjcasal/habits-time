@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -172,7 +172,7 @@ const Projects = () => {
     }
   };
 
-  const handleProjectSelect = (project: Project) => {
+  const handleProjectSelect = useCallback((project: Project) => {
     setSelectedProject(project);
     setShowProjectDropdown(false);
     
@@ -181,7 +181,7 @@ const Projects = () => {
     
     // Save to localStorage
     localStorage.setItem('selectedProject', JSON.stringify(project));
-  };
+  }, [setSearchParams]);
 
   // Initialize project from URL or localStorage
   useEffect(() => {
@@ -266,7 +266,7 @@ const Projects = () => {
     }
   };
 
-  const generateCalendarDays = (month: number, year: number) => {
+  const generateCalendarDays = useCallback((month: number, year: number) => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const firstDayOfWeek = firstDay.getDay();
@@ -285,32 +285,31 @@ const Projects = () => {
     }
     
     return days;
-  };
+  }, []);
 
   const isDateSelected = (date: Date) => {
     return selectedDates.some(d => d.toDateString() === date.toDateString());
   };
 
-  const getUpcomingSessions = () => {
+  const upcomingSessions = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return sessions.filter(session => {
       const sessionDate = new Date(session.scheduled_date + 'T00:00:00');
       return sessionDate >= today && session.status === 'scheduled';
     });
-  };
+  }, [sessions]);
 
-  const getPastSessions = () => {
+  const pastSessions = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return sessions.filter(session => {
       const sessionDate = new Date(session.scheduled_date + 'T00:00:00');
       return sessionDate < today || session.status === 'completed';
     });
-  };
+  }, [sessions]);
 
-  const distributeTasksAcrossSessions = () => {
-    const upcomingSessions = getUpcomingSessions();
+  const sessionsWithTasks = useMemo(() => {
     const incompleteTasks = tasks.filter(task => task.status !== 'completed');
     
     // Create a copy of sessions with task assignments
@@ -354,9 +353,9 @@ const Projects = () => {
     }
 
     return sessionsWithTasks;
-  };
+  }, [upcomingSessions, tasks]);
 
-  const generateClipboardText = (currentSessionIndex: number, sessionsWithTasks: any[]) => {
+  const generateClipboardText = useCallback((currentSessionIndex: number, sessionsWithTasks: any[]) => {
     const currentSession = sessionsWithTasks[currentSessionIndex];
     const currentTasks = currentSession?.assignedTasks || [];
     
@@ -383,9 +382,9 @@ const Projects = () => {
     }
     
     return clipboardText || 'No tasks assigned';
-  };
+  }, []);
 
-  const handleCopyToClipboard = async (sessionIndex: number, sessionsWithTasks: any[]) => {
+  const handleCopyToClipboard = useCallback(async (sessionIndex: number, sessionsWithTasks: any[]) => {
     const text = generateClipboardText(sessionIndex, sessionsWithTasks);
     try {
       await navigator.clipboard.writeText(text);
@@ -394,7 +393,7 @@ const Projects = () => {
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
     }
-  };
+  }, [generateClipboardText]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1170,8 +1169,8 @@ const Projects = () => {
                   ) : (
                     (() => {
                       const sessionsToShow = activeSessionTab === 'upcoming' 
-                        ? distributeTasksAcrossSessions() 
-                        : getPastSessions();
+                        ? sessionsWithTasks 
+                        : pastSessions;
                       
                       if (sessionsToShow.length === 0) {
                         return (
@@ -1200,15 +1199,30 @@ const Projects = () => {
                             return (
                               <div
                                 key={session.id}
-                                className="py-2 px-1 border-b border-neutral-100 hover:bg-neutral-50 transition-colors"
+                                className="py-2 px-1 border-b border-neutral-100 hover:bg-neutral-50 transition-colors group"
                               >
                                 <div className="flex items-center justify-between">
-                                  <div className="text-sm text-neutral-900">
-                                    {new Date(session.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', {
-                                      weekday: 'long',
-                                      month: 'short',
-                                      day: 'numeric'
-                                    })}
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-sm text-neutral-900">
+                                      {new Date(session.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        month: 'short',
+                                        day: 'numeric'
+                                      })}
+                                    </div>
+                                    {session.actual_start_time && session.actual_end_time && (
+                                      <div className="text-xs text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {(() => {
+                                          const formatTime12Hour = (timeStr: string) => {
+                                            const [hours, minutes] = timeStr.split(':').map(Number);
+                                            const ampm = hours >= 12 ? 'PM' : 'AM';
+                                            const hour12 = hours % 12 || 12;
+                                            return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                                          };
+                                          return `${formatTime12Hour(session.actual_start_time)} - ${formatTime12Hour(session.actual_end_time)}`;
+                                        })()}
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-neutral-500">

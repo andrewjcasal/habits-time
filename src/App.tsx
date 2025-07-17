@@ -23,6 +23,7 @@ import Community from "./pages/Community";
 import PersonDetail from "./pages/PersonDetail";
 import Projects from "./pages/Projects";
 import Calendar from "./pages/Calendar";
+import Settings from "./pages/Settings";
 
 // Components
 import { WelcomeModal } from "./components/WelcomeModal";
@@ -84,6 +85,7 @@ function App() {
             <Route path="notes" element={<Notes />} />
             <Route path="community" element={<Community />} />
             <Route path="community/:personId" element={<PersonDetail />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
         ) : (
           <Route path="*" element={<Navigate to="/" replace />} />

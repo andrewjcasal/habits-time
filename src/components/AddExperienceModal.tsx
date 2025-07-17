@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Users, User, Building, MapPin } from 'lucide-react';
 import { Experience } from '../types';
+import { usePeople } from '../hooks/usePeople';
 
 interface AddExperienceModalProps {
   isOpen: boolean;
@@ -11,10 +12,11 @@ interface AddExperienceModalProps {
 }
 
 export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, personName }: AddExperienceModalProps) {
+  const { people } = usePeople();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    experience_date: '',
+    experience_date: new Date().toISOString().split('T')[0],
     type: 'shared' as const,
     location: '',
     attendees: '',
@@ -25,6 +27,21 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
     next_steps: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attendeeSearch, setAttendeeSearch] = useState('');
+  const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +55,7 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
         experience_date: formData.experience_date,
         type: formData.type,
         location: formData.location || undefined,
-        attendees: formData.attendees || undefined,
+        attendees: selectedAttendees.length > 0 ? selectedAttendees.join(', ') : undefined,
         outcome: formData.outcome || undefined,
         follow_up_needed: formData.follow_up_needed,
         follow_up_date: formData.follow_up_date || undefined,
@@ -50,7 +67,7 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
       setFormData({
         title: '',
         description: '',
-        experience_date: '',
+        experience_date: new Date().toISOString().split('T')[0],
         type: 'shared',
         location: '',
         attendees: '',
@@ -60,6 +77,9 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
         connection_strength: 'neutral',
         next_steps: '',
       });
+      setAttendeeSearch('');
+      setSelectedAttendees([]);
+      setShowDropdown(false);
       onClose();
     } catch (error) {
       console.error('Error adding experience:', error);
@@ -74,7 +94,7 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-3 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
             Add Experience with {personName}
           </h2>
@@ -87,9 +107,9 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-3 space-y-3">
           {/* Title and Date */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Title *
@@ -118,7 +138,7 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
           </div>
 
           {/* Type and Location */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Type
@@ -150,17 +170,75 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
           </div>
 
           {/* Attendees */}
-          <div>
+          <div className="relative" ref={dropdownRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Other Attendees
             </label>
-            <input
-              type="text"
-              value={formData.attendees}
-              onChange={(e) => setFormData({ ...formData, attendees: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., John Smith, Sarah Johnson (optional)"
-            />
+            <div className="mb-2">
+              <input
+                type="text"
+                value={attendeeSearch}
+                onChange={(e) => {
+                  setAttendeeSearch(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Search people to add as attendees..."
+              />
+              {showDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                  {people
+                    .filter(person => 
+                      person.id !== personId && 
+                      !selectedAttendees.includes(person.name) &&
+                      person.name.toLowerCase().includes(attendeeSearch.toLowerCase())
+                    )
+                    .map(person => (
+                      <button
+                        key={person.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedAttendees(prev => [...prev, person.name]);
+                          setAttendeeSearch('');
+                          setShowDropdown(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                      >
+                        {person.name}
+                      </button>
+                    ))}
+                  {people.filter(person => 
+                    person.id !== personId && 
+                    !selectedAttendees.includes(person.name) &&
+                    person.name.toLowerCase().includes(attendeeSearch.toLowerCase())
+                  ).length === 0 && (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      No people found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {selectedAttendees.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedAttendees.map(attendee => (
+                  <span
+                    key={attendee}
+                    className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                  >
+                    {attendee}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAttendees(prev => prev.filter(a => a !== attendee))}
+                      className="ml-1 text-blue-600 hover:text-blue-800"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Description */}
@@ -223,7 +301,7 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
           </div>
 
           {/* Follow-up */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -253,7 +331,7 @@ export function AddExperienceModal({ isOpen, onClose, onSubmit, personId, person
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}

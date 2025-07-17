@@ -267,8 +267,8 @@ export interface Session {
   project_id: string;
   scheduled_date: string;
   scheduled_hours: number;
-  actual_start_time?: string;
-  actual_end_time?: string;
+  actual_start_time?: string; // Now stores time only (HH:MM:SS)
+  actual_end_time?: string; // Now stores time only (HH:MM:SS)
   actual_hours?: number;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   notes?: string;
@@ -286,4 +286,21 @@ export interface ContractSession {
   contract_id: string;
   session_id: string;
   created_at: string;
+}
+
+// Meeting
+export interface Meeting {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  location?: string;
+  attendees?: string[];
+  meeting_type: 'general' | 'work' | 'personal' | 'appointment';
+  priority: 'low' | 'medium' | 'high';
+  status: 'scheduled' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
 }
