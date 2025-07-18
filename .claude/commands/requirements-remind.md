@@ -3,8 +3,9 @@
 Quick correction when deviating from requirements gathering rules.
 
 ## Aliases:
+
 - /requirements-remind
-- /remind  
+- /remind
 - /r
 
 ## Instructions:
@@ -20,7 +21,7 @@ Quick correction when deviating from requirements gathering rules.
 🔔 Requirements Gathering Reminder
 
 You are gathering requirements for: [active-requirement]
-Current phase: [Initial Setup/Context Discovery/Targeted Context/Expert Requirements]  
+Current phase: [Initial Setup/Context Discovery/Targeted Context/Expert Requirements]
 Progress: [X/Y questions]
 
 📋 PHASE-SPECIFIC RULES:
@@ -62,18 +63,23 @@ Please continue with the current question or read the next one from the file.
 ## Common Correction Scenarios:
 
 ### Open-ended question asked:
+
 "Let me rephrase as a yes/no question..."
 
 ### Multiple questions asked:
+
 "Let me ask one question at a time..."
 
 ### Implementation started:
+
 "I apologize. Let me continue with requirements gathering..."
 
 ### No default provided:
+
 "Let me add a default for that question..."
 
 ## Auto-trigger Patterns:
+
 - Detect code blocks → remind no implementation
 - Multiple "?" in response → remind one question
 - Response > 100 words → remind to be concise

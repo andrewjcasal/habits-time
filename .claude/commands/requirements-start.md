@@ -5,19 +5,21 @@ Begin gathering requirements for: $ARGUMENTS
 ## Full Workflow:
 
 ### Phase 1: Initial Setup & Codebase Analysis
+
 1. Create timestamp-based folder: requirements/YYYY-MM-DD-HHMM-[slug]
 2. Extract slug from $ARGUMENTS (e.g., "add user profile" → "user-profile")
 3. Create initial files:
    - 00-initial-request.md with the user's request
    - metadata.json with status tracking
 4. Read and update requirements/.current-requirement with folder name
-5. Use mcp__RepoPrompt__get_file_tree (if available) to understand overall structure:
+5. Use mcp**RepoPrompt**get_file_tree (if available) to understand overall structure:
    - Get high-level architecture overview
    - Identify main components and services
    - Understand technology stack
    - Note patterns and conventions
 
 ### Phase 2: Context Discovery Questions
+
 6. Generate the five most important yes/no questions to understand the problem space:
    - Questions informed by codebase structure
    - Questions about user interactions and workflows
@@ -30,9 +32,10 @@ Begin gathering requirements for: $ARGUMENTS
    - Only after all questions are asked, record answers in 02-discovery-answers.md as received and update metadata.json. Not before.
 
 ### Phase 3: Targeted Context Gathering (Autonomous)
+
 7. After all discovery questions answered:
-   - Use mcp__RepoPrompt__search (if available) to find specific files based on discovery answers
-   - Use mcp__RepoPrompt__set_selection and read_selected_files (if available) to batch read relevant code
+   - Use mcp**RepoPrompt**search (if available) to find specific files based on discovery answers
+   - Use mcp**RepoPrompt**set_selection and read_selected_files (if available) to batch read relevant code
    - Deep dive into similar features and patterns
    - Analyze specific implementation details
    - Use WebSearch and or context7 for best practices or library documentation
@@ -44,6 +47,7 @@ Begin gathering requirements for: $ARGUMENTS
      - Integration points identified
 
 ### Phase 4: Expert Requirements Questions
+
 8. Now ask questions like a senior developer who knows the codebase:
    - Write the top 5 most pressing unanswered detailed yes/no questions to 04-detail-questions.md
    - Questions should be as if you were speaking to the product manager who knows nothing of the code
@@ -53,6 +57,7 @@ Begin gathering requirements for: $ARGUMENTS
    - Only after all questions are asked, record answers in 05-detail-answers.md as received
 
 ### Phase 5: Requirements Documentation
+
 9. Generate comprehensive requirements spec in 06-requirements-spec.md:
    - Problem statement and solution overview
    - Functional requirements based on all answers
@@ -64,6 +69,7 @@ Begin gathering requirements for: $ARGUMENTS
 ## Question Formats:
 
 ### Discovery Questions (Phase 2):
+
 ```
 ## Q1: Will users interact with this feature through a visual interface?
 **Default if unknown:** Yes (most features have some UI component)
@@ -82,6 +88,7 @@ Begin gathering requirements for: $ARGUMENTS
 ```
 
 ### Expert Questions (Phase 4):
+
 ```
 ## Q7: Should we extend the existing UserService at services/UserService.ts?
 **Default if unknown:** Yes (maintains architectural consistency)
@@ -91,6 +98,7 @@ Begin gathering requirements for: $ARGUMENTS
 ```
 
 ## Important Rules:
+
 - ONLY yes/no questions with smart defaults
 - ONE question at a time
 - Write ALL questions to file BEFORE asking any
@@ -100,6 +108,7 @@ Begin gathering requirements for: $ARGUMENTS
 - Use tools available if recommended ones aren't installed or available
 
 ## Metadata Structure:
+
 ```json
 {
   "id": "feature-slug",
@@ -117,6 +126,7 @@ Begin gathering requirements for: $ARGUMENTS
 ```
 
 ## Phase Transitions:
+
 - After each phase, announce: "Phase complete. Starting [next phase]..."
 - Save all work before moving to next phase
 - User can check progress anytime with /requirements-status

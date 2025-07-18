@@ -1,22 +1,22 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 
 export interface SecondaryNavItem {
-  id: string;
-  label: string;
-  count?: number;
-  icon?: React.ReactNode;
-  href?: string;
+  id: string
+  label: string
+  count?: number
+  icon?: React.ReactNode
+  href?: string
 }
 
 interface SecondaryNavProps {
-  items: SecondaryNavItem[];
-  activeItem: string;
-  onChange: (itemId: string) => void;
-  isVisible?: boolean;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
+  items: SecondaryNavItem[]
+  activeItem: string
+  onChange: (itemId: string) => void
+  isVisible?: boolean
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
 }
 
 export const SecondaryNav = ({
@@ -27,30 +27,30 @@ export const SecondaryNav = ({
   onMouseEnter,
   onMouseLeave,
 }: SecondaryNavProps) => {
-  const navigate = useNavigate();
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const navigate = useNavigate()
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   const handleItemClick = (item: SecondaryNavItem) => {
     if (item.href) {
-      navigate(item.href);
+      navigate(item.href)
     } else {
-      onChange(item.id);
+      onChange(item.id)
     }
-  };
+  }
 
   return (
     <>
       {/* Desktop Version */}
       <div
         className={`hidden md:flex w-64 bg-white border-r border-neutral-200 flex-shrink-0 transition-all duration-200 ${
-          isVisible ? "translate-x-0" : "-translate-x-full"
+          isVisible ? 'translate-x-0' : '-translate-x-full'
         }`}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
         <nav className="p-2 w-full">
           <ul className="space-y-1">
-            {items.map((item) => (
+            {items.map(item => (
               <li key={item.id} className="relative">
                 <button
                   onClick={() => handleItemClick(item)}
@@ -58,26 +58,24 @@ export const SecondaryNav = ({
                     w-full flex items-center justify-between rounded-lg px-1 py-1 text-sm font-medium transition-colors
                     ${
                       activeItem === item.id
-                        ? "bg-primary-50 text-primary-700"
-                        : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
                     }
                   `}
                 >
                   <div className="flex items-center">
-                    {item.icon && (
-                      <span className="mr-1 flex-shrink-1">{item.icon}</span>
-                    )}
+                    {item.icon && <span className="mr-1 flex-shrink-1">{item.icon}</span>}
                     <span>{item.label}</span>
                   </div>
 
-                  {typeof item.count === "number" && (
+                  {typeof item.count === 'number' && (
                     <span
                       className={`
                       ml-2 rounded-full px-2.5 py-0.5 text-xs font-medium
                       ${
                         activeItem === item.id
-                          ? "bg-primary-100 text-primary-800"
-                          : "bg-neutral-100 text-neutral-600"
+                          ? 'bg-primary-100 text-primary-800'
+                          : 'bg-neutral-100 text-neutral-600'
                       }
                     `}
                     >
@@ -108,8 +106,8 @@ export const SecondaryNav = ({
           {/* Navigation Icons */}
           <nav className="flex-1 py-2">
             <ul className="space-y-1">
-              {items.map((item) => {
-                const active = activeItem === item.id;
+              {items.map(item => {
+                const active = activeItem === item.id
                 return (
                   <li key={item.id} className="relative px-1.5">
                     <div className="relative">
@@ -117,18 +115,16 @@ export const SecondaryNav = ({
                         onClick={() => handleItemClick(item)}
                         className={`flex items-center justify-center w-5 h-5 rounded-full transition-all duration-200 ${
                           active
-                            ? "bg-primary-100 text-primary-700"
-                            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                            ? 'bg-primary-100 text-primary-700'
+                            : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                         }`}
                         onMouseEnter={() => setHoveredItem(item.id)}
                         onMouseLeave={() => setHoveredItem(null)}
                       >
-                        {item.icon || (
-                          <div className="w-2 h-2 rounded-full bg-current"></div>
-                        )}
-                        {typeof item.count === "number" && item.count > 0 && (
+                        {item.icon || <div className="w-2 h-2 rounded-full bg-current"></div>}
+                        {typeof item.count === 'number' && item.count > 0 && (
                           <span className="absolute top-0 -right-1 w-2 h-2 bg-primary-600 text-white text-xs rounded-full flex items-center justify-center">
-                            {item.count > 9 ? ":)" : item.count}
+                            {item.count > 9 ? ':)' : item.count}
                           </span>
                         )}
                       </button>
@@ -144,13 +140,9 @@ export const SecondaryNav = ({
                             className="absolute left-full -top-0.5 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
                             style={{ zIndex: 1000 }}
                           >
-                            <div className="text-sm font-medium text-neutral-900">
-                              {item.label}
-                            </div>
-                            {typeof item.count === "number" && (
-                              <div className="text-xs text-neutral-600">
-                                {item.count} items
-                              </div>
+                            <div className="text-sm font-medium text-neutral-900">{item.label}</div>
+                            {typeof item.count === 'number' && (
+                              <div className="text-xs text-neutral-600">{item.count} items</div>
                             )}
                             {/* Arrow */}
                             <div className="absolute right-full top-1/2 transform -translate-y-1/2">
@@ -161,12 +153,12 @@ export const SecondaryNav = ({
                       </AnimatePresence>
                     </div>
                   </li>
-                );
+                )
               })}
             </ul>
           </nav>
         </aside>
       )}
     </>
-  );
-};
+  )
+}

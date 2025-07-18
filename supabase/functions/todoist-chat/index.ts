@@ -1,4 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -8,15 +8,15 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 interface ChatRequest {
-  taskId: string;
-  taskTitle: string;
-  taskDescription?: string;
-  messages: Array<{role: 'user' | 'assistant', content: string}>;
-  userMessage: string;
-  action?: 'chat' | 'update_task';
-  newTitle?: string;
-  contextToAdd?: string;
-  newDescription?: string;
+  taskId: string
+  taskTitle: string
+  taskDescription?: string
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+  userMessage: string
+  action?: 'chat' | 'update_task'
+  newTitle?: string
+  contextToAdd?: string
+  newDescription?: string
 }
 
 Deno.serve(async (req: Request) => {
@@ -27,13 +27,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (!openaiApiKey || !todoistApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'API keys not configured' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      return new Response(JSON.stringify({ error: 'API keys not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -41,64 +38,67 @@ Deno.serve(async (req: Request) => {
     // Get user from JWT
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
 
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const { 
-      taskId, 
-      taskTitle, 
-      taskDescription = '', 
-      messages, 
-      userMessage, 
+    const {
+      taskId,
+      taskTitle,
+      taskDescription = '',
+      messages,
+      userMessage,
       action = 'chat',
       newTitle,
       contextToAdd,
-      newDescription
+      newDescription,
     }: ChatRequest = await req.json()
 
     if (!taskId || !taskTitle) {
-      return new Response(
-        JSON.stringify({ error: 'taskId and taskTitle are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'taskId and taskTitle are required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // Handle task update action
     if (action === 'update_task') {
       if (!newTitle && !contextToAdd && !newDescription) {
         return new Response(
-          JSON.stringify({ error: 'newTitle, contextToAdd, or newDescription required for update action' }),
+          JSON.stringify({
+            error: 'newTitle, contextToAdd, or newDescription required for update action',
+          }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
       // Prepare update payload
       const updatePayload: any = {}
-      
+
       if (newTitle) {
         updatePayload.content = newTitle
       }
-      
+
       if (newDescription) {
         // Use the provided new description directly
         updatePayload.description = newDescription
       } else if (contextToAdd) {
         // Add context to description, preserving existing content
-        const updatedDescription = taskDescription 
+        const updatedDescription = taskDescription
           ? `${contextToAdd}\n\n---\n\n${taskDescription}`
           : contextToAdd
         updatePayload.description = updatedDescription
@@ -108,10 +108,10 @@ Deno.serve(async (req: Request) => {
       const todoistResponse = await fetch(`https://api.todoist.com/rest/v2/tasks/${taskId}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${todoistApiKey}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${todoistApiKey}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updatePayload)
+        body: JSON.stringify(updatePayload),
       })
 
       if (!todoistResponse.ok) {
@@ -125,10 +125,10 @@ Deno.serve(async (req: Request) => {
       const updatedTask = await todoistResponse.json()
 
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           success: true,
           action: 'update_task',
-          updatedTask
+          updatedTask,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -136,10 +136,10 @@ Deno.serve(async (req: Request) => {
 
     // Handle chat action
     if (!userMessage) {
-      return new Response(
-        JSON.stringify({ error: 'userMessage is required for chat action' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'userMessage is required for chat action' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // Build conversation for OpenAI
@@ -164,40 +164,40 @@ Only use these suggestions when they would genuinely help clarify or improve the
     const conversationMessages = [
       { role: 'system', content: systemPrompt },
       ...messages,
-      { role: 'user', content: userMessage }
+      { role: 'user', content: userMessage },
     ]
 
     // Call OpenAI
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: conversationMessages,
         temperature: 0.7,
-        max_tokens: 300
-      })
+        max_tokens: 300,
+      }),
     })
 
     if (!openaiResponse.ok) {
       console.error('OpenAI API error:', openaiResponse.status, openaiResponse.statusText)
-      return new Response(
-        JSON.stringify({ error: `OpenAI API error: ${openaiResponse.status}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: `OpenAI API error: ${openaiResponse.status}` }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const openaiData = await openaiResponse.json()
     const assistantMessage = openaiData.choices[0]?.message?.content
 
     if (!assistantMessage) {
-      return new Response(
-        JSON.stringify({ error: 'No response from OpenAI' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'No response from OpenAI' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // Parse for special suggestions
@@ -223,22 +223,21 @@ Only use these suggestions when they would genuinely help clarify or improve the
         action: 'chat',
         message: cleanedMessage,
         suggestedTitle,
-        suggestedContext
+        suggestedContext,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-
   } catch (error) {
     console.error('Error in todoist-chat function:', error)
     const errorMessage = error.message || error.toString() || 'Unknown error'
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Internal server error',
-        details: errorMessage
+        details: errorMessage,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
   }

@@ -1,68 +1,66 @@
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react'
+import { X } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 // Types
-import { Contact } from '../types';
+import { Contact } from '../types'
 
 interface ContactFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: any) => void;
-  initialData?: Contact;
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (data: any) => void
+  initialData?: Contact
 }
 
 export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactFormProps) => {
   const [formData, setFormData] = useState({
-    name: "",
-    company: "",
-    role: "",
-    email: "",
-    phone: "",
-    notes: "",
-    last_contact_date: "",
-  });
+    name: '',
+    company: '',
+    role: '',
+    email: '',
+    phone: '',
+    notes: '',
+    last_contact_date: '',
+  })
 
   // Load initial data if provided (for editing)
   useEffect(() => {
     if (initialData) {
       setFormData({
         name: initialData.name,
-        company: initialData.company || "",
-        role: initialData.role || "",
-        email: initialData.email || "",
-        phone: initialData.phone || "",
-        notes: initialData.notes || "",
+        company: initialData.company || '',
+        role: initialData.role || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        notes: initialData.notes || '',
         last_contact_date: initialData.last_contact_date
-          ? new Date(initialData.last_contact_date).toISOString().split("T")[0]
-          : "",
-      });
+          ? new Date(initialData.last_contact_date).toISOString().split('T')[0]
+          : '',
+      })
     } else {
       // Reset form for new entries
       setFormData({
-        name: "",
-        company: "",
-        role: "",
-        email: "",
-        phone: "",
-        notes: "",
-        last_contact_date: "",
-      });
+        name: '',
+        company: '',
+        role: '',
+        email: '',
+        phone: '',
+        notes: '',
+        last_contact_date: '',
+      })
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen])
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
     setFormData({
       ...formData,
       [name]: value,
-    });
-  };
+    })
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
 
     const submissionData = {
       ...formData,
@@ -70,12 +68,12 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
         ? new Date(formData.last_contact_date).toISOString()
         : null,
       ...(initialData && { id: initialData.id }), // Preserve ID for updates
-    };
+    }
 
-    onSubmit(submissionData);
-  };
+    onSubmit(submissionData)
+  }
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <motion.div
@@ -93,7 +91,7 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">
-              {initialData ? "Edit Contact" : "Add Contact"}
+              {initialData ? 'Edit Contact' : 'Add Contact'}
             </h2>
             <button
               onClick={onClose}
@@ -105,10 +103,7 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-neutral-700 mb-1"
-              >
+              <label htmlFor="name" className="block text-sm font-medium text-neutral-700 mb-1">
                 Name
               </label>
               <input
@@ -143,10 +138,7 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
               </div>
 
               <div>
-                <label
-                  htmlFor="role"
-                  className="block text-sm font-medium text-neutral-700 mb-1"
-                >
+                <label htmlFor="role" className="block text-sm font-medium text-neutral-700 mb-1">
                   Role (Optional)
                 </label>
                 <input
@@ -163,10 +155,7 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-neutral-700 mb-1"
-                >
+                <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-1">
                   Email (Optional)
                 </label>
                 <input
@@ -181,10 +170,7 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
               </div>
 
               <div>
-                <label
-                  htmlFor="phone"
-                  className="block text-sm font-medium text-neutral-700 mb-1"
-                >
+                <label htmlFor="phone" className="block text-sm font-medium text-neutral-700 mb-1">
                   Phone (Optional)
                 </label>
                 <input
@@ -217,10 +203,7 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
             </div>
 
             <div>
-              <label
-                htmlFor="notes"
-                className="block text-sm font-medium text-neutral-700 mb-1"
-              >
+              <label htmlFor="notes" className="block text-sm font-medium text-neutral-700 mb-1">
                 Notes (Optional)
               </label>
               <textarea
@@ -234,21 +217,17 @@ export const ContactForm = ({ isOpen, onClose, onSubmit, initialData }: ContactF
             </div>
 
             <div className="flex justify-end space-x-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn btn-outline"
-              >
+              <button type="button" onClick={onClose} className="btn btn-outline">
                 Cancel
               </button>
 
               <button type="submit" className="btn btn-primary">
-                {initialData ? "Update" : "Save"}
+                {initialData ? 'Update' : 'Save'}
               </button>
             </div>
           </form>
         </div>
       </motion.div>
     </motion.div>
-  );
-};
+  )
+}

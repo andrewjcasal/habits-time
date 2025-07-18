@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface InterviewHistoryRowProps {
-  company: string;
-  position: string;
-  interviews: string[];
-  readinessScore: number;
+  company: string
+  position: string
+  interviews: string[]
+  readinessScore: number
 }
 
 // Individual Interview Pill Component
@@ -13,142 +13,141 @@ const InterviewPill = ({
   interview,
   readinessScore,
 }: {
-  interview: string;
-  readinessScore: number;
+  interview: string
+  readinessScore: number
 }) => {
-  const [showPopover, setShowPopover] = useState(false);
+  const [showPopover, setShowPopover] = useState(false)
 
   const getInterviewTypeColor = (type: string) => {
     switch (type.toLowerCase()) {
-      case "behavioral":
-        return "bg-blue-100 text-blue-800";
-      case "technical":
-        return "bg-purple-100 text-purple-800";
-      case "system design":
-        return "bg-green-100 text-green-800";
-      case "api design":
-        return "bg-orange-100 text-orange-800";
-      case "coding":
-        return "bg-indigo-100 text-indigo-800";
-      case "react ui":
-        return "bg-cyan-100 text-cyan-800";
-      case "react fundamentals":
-        return "bg-emerald-100 text-emerald-800";
-      case "design patterns":
-        return "bg-violet-100 text-violet-800";
-      case "collaboration":
-        return "bg-pink-100 text-pink-800";
+      case 'behavioral':
+        return 'bg-blue-100 text-blue-800'
+      case 'technical':
+        return 'bg-purple-100 text-purple-800'
+      case 'system design':
+        return 'bg-green-100 text-green-800'
+      case 'api design':
+        return 'bg-orange-100 text-orange-800'
+      case 'coding':
+        return 'bg-indigo-100 text-indigo-800'
+      case 'react ui':
+        return 'bg-cyan-100 text-cyan-800'
+      case 'react fundamentals':
+        return 'bg-emerald-100 text-emerald-800'
+      case 'design patterns':
+        return 'bg-violet-100 text-violet-800'
+      case 'collaboration':
+        return 'bg-pink-100 text-pink-800'
       default:
-        return "bg-neutral-100 text-neutral-800";
+        return 'bg-neutral-100 text-neutral-800'
     }
-  };
+  }
 
   const getReadinessLevel = (score: number) => {
     if (score >= 85)
       return {
-        level: "Excellent",
-        color: "text-success-600",
-        bgColor: "bg-success-50",
-      };
+        level: 'Excellent',
+        color: 'text-success-600',
+        bgColor: 'bg-success-50',
+      }
     if (score >= 75)
       return {
-        level: "Good",
-        color: "text-warning-600",
-        bgColor: "bg-warning-50",
-      };
+        level: 'Good',
+        color: 'text-warning-600',
+        bgColor: 'bg-warning-50',
+      }
     if (score >= 65)
       return {
-        level: "Fair",
-        color: "text-warning-600",
-        bgColor: "bg-warning-50",
-      };
+        level: 'Fair',
+        color: 'text-warning-600',
+        bgColor: 'bg-warning-50',
+      }
     return {
-      level: "Needs Work",
-      color: "text-error-600",
-      bgColor: "bg-error-50",
-    };
-  };
+      level: 'Needs Work',
+      color: 'text-error-600',
+      bgColor: 'bg-error-50',
+    }
+  }
 
   const getInterviewSpecificScore = (type: string, baseScore: number) => {
     // Simulate different readiness scores for different interview types
     const variations = {
       behavioral: -5,
       technical: 0,
-      "system design": -3,
-      "api design": 2,
+      'system design': -3,
+      'api design': 2,
       coding: -2,
-      "react ui": 1,
-      "react fundamentals": -1,
-      "design patterns": 3,
+      'react ui': 1,
+      'react fundamentals': -1,
+      'design patterns': 3,
       collaboration: -4,
-    };
+    }
 
-    const variation =
-      variations[type.toLowerCase() as keyof typeof variations] || 0;
-    return Math.max(0, Math.min(100, baseScore + variation));
-  };
+    const variation = variations[type.toLowerCase() as keyof typeof variations] || 0
+    return Math.max(0, Math.min(100, baseScore + variation))
+  }
 
   const getInterviewSpecificDetails = (type: string) => {
     const details = {
       behavioral: {
-        preparation: "Strong",
-        experience: "Excellent",
-        confidence: "Good",
+        preparation: 'Strong',
+        experience: 'Excellent',
+        confidence: 'Good',
       },
       technical: {
-        preparation: "Strong",
-        experience: "Good",
-        confidence: "Strong",
+        preparation: 'Strong',
+        experience: 'Good',
+        confidence: 'Strong',
       },
-      "system design": {
-        preparation: "Good",
-        experience: "Good",
-        confidence: "Fair",
+      'system design': {
+        preparation: 'Good',
+        experience: 'Good',
+        confidence: 'Fair',
       },
-      "api design": {
-        preparation: "Excellent",
-        experience: "Strong",
-        confidence: "Strong",
+      'api design': {
+        preparation: 'Excellent',
+        experience: 'Strong',
+        confidence: 'Strong',
       },
       coding: {
-        preparation: "Strong",
-        experience: "Strong",
-        confidence: "Good",
+        preparation: 'Strong',
+        experience: 'Strong',
+        confidence: 'Good',
       },
-      "react ui": {
-        preparation: "Excellent",
-        experience: "Strong",
-        confidence: "Excellent",
+      'react ui': {
+        preparation: 'Excellent',
+        experience: 'Strong',
+        confidence: 'Excellent',
       },
-      "react fundamentals": {
-        preparation: "Good",
-        experience: "Good",
-        confidence: "Good",
+      'react fundamentals': {
+        preparation: 'Good',
+        experience: 'Good',
+        confidence: 'Good',
       },
-      "design patterns": {
-        preparation: "Excellent",
-        experience: "Strong",
-        confidence: "Strong",
+      'design patterns': {
+        preparation: 'Excellent',
+        experience: 'Strong',
+        confidence: 'Strong',
       },
       collaboration: {
-        preparation: "Good",
-        experience: "Fair",
-        confidence: "Good",
+        preparation: 'Good',
+        experience: 'Fair',
+        confidence: 'Good',
       },
-    };
+    }
 
     return (
       details[type.toLowerCase() as keyof typeof details] || {
-        preparation: "Good",
-        experience: "Good",
-        confidence: "Good",
+        preparation: 'Good',
+        experience: 'Good',
+        confidence: 'Good',
       }
-    );
-  };
+    )
+  }
 
-  const specificScore = getInterviewSpecificScore(interview, readinessScore);
-  const readiness = getReadinessLevel(specificScore);
-  const details = getInterviewSpecificDetails(interview);
+  const specificScore = getInterviewSpecificScore(interview, readinessScore)
+  const readiness = getReadinessLevel(specificScore)
+  const details = getInterviewSpecificDetails(interview)
 
   return (
     <div className="relative">
@@ -175,9 +174,7 @@ const InterviewPill = ({
           >
             <div className="space-y-3">
               <div>
-                <h5 className="font-medium text-neutral-900">
-                  {interview} Readiness
-                </h5>
+                <h5 className="font-medium text-neutral-900">{interview} Readiness</h5>
                 <p className="text-xs text-neutral-600 mt-1">
                   Your preparation level for this interview type
                 </p>
@@ -185,23 +182,19 @@ const InterviewPill = ({
 
               <div className={`p-3 rounded-lg ${readiness.bgColor}`}>
                 <div className="flex items-center justify-between">
-                  <span className={`font-medium ${readiness.color}`}>
-                    {readiness.level}
-                  </span>
-                  <span className={`text-sm ${readiness.color}`}>
-                    {specificScore}%
-                  </span>
+                  <span className={`font-medium ${readiness.color}`}>{readiness.level}</span>
+                  <span className={`text-sm ${readiness.color}`}>{specificScore}%</span>
                 </div>
                 <div className="mt-2 bg-white bg-opacity-50 rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-300 ${
                       specificScore >= 85
-                        ? "bg-success-500"
+                        ? 'bg-success-500'
                         : specificScore >= 75
-                        ? "bg-warning-500"
-                        : specificScore >= 65
-                        ? "bg-warning-500"
-                        : "bg-error-500"
+                          ? 'bg-warning-500'
+                          : specificScore >= 65
+                            ? 'bg-warning-500'
+                            : 'bg-error-500'
                     }`}
                     style={{ width: `${specificScore}%` }}
                   />
@@ -229,8 +222,8 @@ const InterviewPill = ({
         )}
       </AnimatePresence>
     </div>
-  );
-};
+  )
+}
 
 export const InterviewHistoryRow = ({
   company,
@@ -251,14 +244,10 @@ export const InterviewHistoryRow = ({
         {/* Interview Types - Horizontal List with Individual Popovers */}
         <div className="flex flex-wrap gap-2">
           {interviews.map((interview, index) => (
-            <InterviewPill
-              key={index}
-              interview={interview}
-              readinessScore={readinessScore}
-            />
+            <InterviewPill key={index} interview={interview} readinessScore={readinessScore} />
           ))}
         </div>
       </div>
     </div>
-  );
-};
+  )
+}

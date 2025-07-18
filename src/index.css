@@ -7,28 +7,28 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   body {
     @apply bg-neutral-50 text-neutral-900;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
-  
+
   h1 {
     @apply text-2xl font-semibold leading-tight;
   }
-  
+
   h2 {
     @apply text-xl font-semibold leading-tight;
   }
-  
+
   h3 {
     @apply text-lg font-semibold leading-tight;
   }
-  
+
   h4 {
     @apply text-base font-medium leading-tight;
   }
-  
+
   p {
     @apply leading-relaxed;
   }
@@ -38,39 +38,39 @@
   .btn {
     @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
   }
-  
+
   .btn-primary {
     @apply bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-500;
   }
-  
+
   .btn-secondary {
     @apply bg-neutral-200 text-neutral-900 hover:bg-neutral-300 focus-visible:ring-neutral-500;
   }
-  
+
   .btn-accent {
     @apply bg-accent-600 text-white hover:bg-accent-700 focus-visible:ring-accent-500;
   }
-  
+
   .btn-outline {
     @apply border border-neutral-300 bg-transparent hover:bg-neutral-100 focus-visible:ring-neutral-500;
   }
-  
+
   .card {
     @apply rounded-lg bg-white shadow-md;
   }
-  
+
   .input {
     @apply w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm placeholder-neutral-400 
            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
            disabled:cursor-not-allowed disabled:opacity-50;
   }
-  
+
   .select {
     @apply w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm 
            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
            disabled:cursor-not-allowed disabled:opacity-50;
   }
-  
+
   .badge {
     @apply inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium;
   }

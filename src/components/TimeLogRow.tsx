@@ -1,46 +1,46 @@
-import React from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { MoreHorizontal, Edit, ArrowRight, Scissors } from "lucide-react";
+import React from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { MoreHorizontal, Edit, ArrowRight, Scissors } from 'lucide-react'
 
 interface TimeLog {
-  id: string;
+  id: string
   habits_activity_types: {
-    id: string;
-    name: string;
-    is_favorite?: boolean;
-  };
-  start_time: string;
-  end_time: string | null;
-  duration?: number;
+    id: string
+    name: string
+    is_favorite?: boolean
+  }
+  start_time: string
+  end_time: string | null
+  duration?: number
   habits_categories?: Array<{
-    id: string;
-    name: string;
-    color: string;
-    is_favorite?: boolean;
-  }>;
+    id: string
+    name: string
+    color: string
+    is_favorite?: boolean
+  }>
 }
 
 interface ActivityType {
-  id: string;
-  name: string;
-  is_favorite?: boolean;
+  id: string
+  name: string
+  is_favorite?: boolean
 }
 
 interface TimeLogRowProps {
-  log: TimeLog;
-  index: number;
-  openMenuId: string | null;
-  setOpenMenuId: (id: string | null) => void;
-  updating: string | null;
-  splitting: string | null;
-  activityTypeInput: string;
-  filteredActivityTypes: ActivityType[];
-  formatTime: (timeString: string) => string;
-  formatDuration: (milliseconds: number) => string;
-  openSplitModal: (logId: string) => void;
-  startEditingActivityType: (logId: string, currentName: string) => void;
-  handleActivityTypeInputChange: (value: string) => void;
-  selectActivityType: (logId: string, activityTypeName: string) => void;
+  log: TimeLog
+  index: number
+  openMenuId: string | null
+  setOpenMenuId: (id: string | null) => void
+  updating: string | null
+  splitting: string | null
+  activityTypeInput: string
+  filteredActivityTypes: ActivityType[]
+  formatTime: (timeString: string) => string
+  formatDuration: (milliseconds: number) => string
+  openSplitModal: (logId: string) => void
+  startEditingActivityType: (logId: string, currentName: string) => void
+  handleActivityTypeInputChange: (value: string) => void
+  selectActivityType: (logId: string, activityTypeName: string) => void
 }
 
 const TimeLogRow: React.FC<TimeLogRowProps> = ({
@@ -71,19 +71,13 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
         <div className="flex-1">
           <div className="flex items-center space-x-2">
             <div>
-              <h4 className="font-medium text-neutral-900">
-                {log.habits_activity_types?.name}
-              </h4>
+              <h4 className="font-medium text-neutral-900">{log.habits_activity_types?.name}</h4>
               <div className="flex items-center text-sm text-neutral-600 mt-0.5 gap-0.5">
-                <span className="flex items-center">
-                  {formatTime(log.start_time)}
-                </span>
+                <span className="flex items-center">{formatTime(log.start_time)}</span>
                 {log.end_time && (
                   <>
                     <ArrowRight className="h-2 w-2" />
-                    <span className="flex items-center">
-                      {formatTime(log.end_time)}
-                    </span>
+                    <span className="flex items-center">{formatTime(log.end_time)}</span>
                   </>
                 )}
               </div>
@@ -94,22 +88,18 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
         <div className="flex items-center space-x-0.5">
           <div className="text-right">
             {log.duration ? (
-              <span className="font-semibold text-neutral-900">
-                {formatDuration(log.duration)}
-              </span>
+              <span className="font-semibold text-neutral-900">{formatDuration(log.duration)}</span>
             ) : (
-              <span className="text-warning-600 text-sm font-medium">
-                In Progress
-              </span>
+              <span className="text-warning-600 text-sm font-medium">In Progress</span>
             )}
           </div>
 
           {/* Hamburger Menu */}
           <div className="relative">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpenMenuId(openMenuId === log.id ? null : log.id);
+              onClick={e => {
+                e.stopPropagation()
+                setOpenMenuId(openMenuId === log.id ? null : log.id)
               }}
               className="p-1 hover:bg-neutral-100 rounded transition-colors"
               disabled={updating === log.id}
@@ -140,7 +130,7 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
                       disabled={splitting === log.id || updating === log.id}
                     >
                       <Scissors className="h-3 w-3 mr-1" />
-                      {splitting === log.id ? "Splitting..." : "Split Log"}
+                      {splitting === log.id ? 'Splitting...' : 'Split Log'}
                     </button>
 
                     <div className="px-2 py-1 text-xs font-medium text-neutral-600 border-b border-neutral-100 mb-1 mt-2">
@@ -154,58 +144,47 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
                           value={
                             openMenuId === log.id
                               ? activityTypeInput
-                              : log.habits_activity_types?.name || ""
+                              : log.habits_activity_types?.name || ''
                           }
-                          onChange={(e) =>
-                            handleActivityTypeInputChange(e.target.value)
-                          }
+                          onChange={e => handleActivityTypeInputChange(e.target.value)}
                           className="w-full px-2 py-1 text-xs border border-neutral-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-transparent"
                           placeholder="Type activity name..."
                           onFocus={() => {
                             if (openMenuId === log.id) {
                               startEditingActivityType(
                                 log.id,
-                                log.habits_activity_types?.name || ""
-                              );
+                                log.habits_activity_types?.name || ''
+                              )
                             }
                           }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && activityTypeInput.trim()) {
-                              selectActivityType(
-                                log.id,
-                                activityTypeInput.trim()
-                              );
-                            } else if (e.key === "Escape") {
-                              setOpenMenuId(null);
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && activityTypeInput.trim()) {
+                              selectActivityType(log.id, activityTypeInput.trim())
+                            } else if (e.key === 'Escape') {
+                              setOpenMenuId(null)
                             }
                           }}
                           disabled={updating === log.id || splitting === log.id}
                         />
 
                         {/* Suggestions dropdown */}
-                        {openMenuId === log.id &&
-                          filteredActivityTypes.length > 0 && (
-                            <div
-                              className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded shadow-lg z-10 max-h-32 overflow-y-auto"
-                              data-dropdown-menu="true"
-                            >
-                              {filteredActivityTypes.map((activityType) => (
-                                <button
-                                  key={activityType.id}
-                                  onClick={() =>
-                                    selectActivityType(
-                                      log.id,
-                                      activityType.name
-                                    )
-                                  }
-                                  className="w-full text-left px-2 py-1 text-xs hover:bg-neutral-50 transition-colors"
-                                  disabled={updating === log.id}
-                                >
-                                  {activityType.name}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                        {openMenuId === log.id && filteredActivityTypes.length > 0 && (
+                          <div
+                            className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded shadow-lg z-10 max-h-32 overflow-y-auto"
+                            data-dropdown-menu="true"
+                          >
+                            {filteredActivityTypes.map(activityType => (
+                              <button
+                                key={activityType.id}
+                                onClick={() => selectActivityType(log.id, activityType.name)}
+                                className="w-full text-left px-2 py-1 text-xs hover:bg-neutral-50 transition-colors"
+                                disabled={updating === log.id}
+                              >
+                                {activityType.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
 
                         {/* No matches found + create new option */}
                         {openMenuId === log.id &&
@@ -216,12 +195,7 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
                               data-dropdown-menu="true"
                             >
                               <button
-                                onClick={() =>
-                                  selectActivityType(
-                                    log.id,
-                                    activityTypeInput.trim()
-                                  )
-                                }
+                                onClick={() => selectActivityType(log.id, activityTypeInput.trim())}
                                 className="w-full text-left px-2 py-1 text-xs hover:bg-primary-50 transition-colors text-primary-700"
                                 disabled={updating === log.id}
                               >
@@ -236,17 +210,12 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
                           <button
                             onClick={() =>
                               activityTypeInput.trim() &&
-                              selectActivityType(
-                                log.id,
-                                activityTypeInput.trim()
-                              )
+                              selectActivityType(log.id, activityTypeInput.trim())
                             }
-                            disabled={
-                              !activityTypeInput.trim() || updating === log.id
-                            }
+                            disabled={!activityTypeInput.trim() || updating === log.id}
                             className="px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 disabled:bg-neutral-300 transition-colors"
                           >
-                            {updating === log.id ? "Updating..." : "Save"}
+                            {updating === log.id ? 'Updating...' : 'Save'}
                           </button>
                           <button
                             onClick={() => setOpenMenuId(null)}
@@ -266,7 +235,7 @@ const TimeLogRow: React.FC<TimeLogRowProps> = ({
         </div>
       </div>
     </motion.div>
-  );
-};
+  )
+}
 
-export default TimeLogRow;
+export default TimeLogRow

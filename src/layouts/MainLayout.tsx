@@ -1,6 +1,6 @@
-import { Outlet, NavLink } from "react-router-dom";
-import { useLocation } from "react-router";
-import { useState } from "react";
+import { Outlet, NavLink } from 'react-router-dom'
+import { useLocation } from 'react-router'
+import { useState } from 'react'
 import {
   Layout,
   Home,
@@ -18,31 +18,31 @@ import {
   FolderOpen,
   LogOut,
   Bot,
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "../hooks/useAuth";
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '../hooks/useAuth'
 
 const MainLayout = () => {
-  const location = useLocation();
-  const { signOut } = useAuth();
-  console.log(location);
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const location = useLocation()
+  const { signOut } = useAuth()
+  console.log(location)
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   const navItems = [
-    { path: "/dashboard", label: "Dashboard", icon: Home },
-    { path: "/time-tracker", label: "Time Tracker", icon: Clock },
-    { path: "/habits", label: "Habits", icon: Heart },
-    { path: "/projects", label: "Projects", icon: FolderOpen },
-    { path: "/calendar", label: "Calendar", icon: Calendar },
-    { path: "/community", label: "Community", icon: Users },
-    { path: "/todoist", label: "Todoist", icon: CheckSquare },
-    { path: "/wins", label: "Wins", icon: Trophy },
-    { path: "/notes", label: "Notes", icon: FileText },
-  ];
+    { path: '/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/time-tracker', label: 'Time Tracker', icon: Clock },
+    { path: '/habits', label: 'Habits', icon: Heart },
+    { path: '/projects', label: 'Projects', icon: FolderOpen },
+    { path: '/calendar', label: 'Calendar', icon: Calendar },
+    { path: '/community', label: 'Community', icon: Users },
+    { path: '/todoist', label: 'Todoist', icon: CheckSquare },
+    { path: '/wins', label: 'Wins', icon: Trophy },
+    { path: '/notes', label: 'Notes', icon: FileText },
+  ]
 
-  const settingsItem = { path: "/settings", label: "Settings", icon: Settings };
+  const settingsItem = { path: '/settings', label: 'Settings', icon: Settings }
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => location.pathname === path
 
   return (
     <div className="flex min-h-screen bg-neutral-50">
@@ -57,8 +57,8 @@ const MainLayout = () => {
 
         <nav className="flex-1 px-2 pb-4">
           <ul className="space-y-0.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
+            {navItems.map(item => {
+              const Icon = item.icon
               return (
                 <li key={item.path}>
                   <NavLink
@@ -66,8 +66,8 @@ const MainLayout = () => {
                     className={({ isActive }) =>
                       `flex items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
                         isActive
-                          ? "bg-primary-50 text-primary-700"
-                          : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                       }`
                     }
                   >
@@ -75,7 +75,7 @@ const MainLayout = () => {
                     {item.label}
                   </NavLink>
                 </li>
-              );
+              )
             })}
           </ul>
         </nav>
@@ -110,9 +110,9 @@ const MainLayout = () => {
         {/* Navigation Icons */}
         <nav className="flex-1 py-2">
           <ul className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.path);
+            {navItems.map(item => {
+              const Icon = item.icon
+              const active = isActive(item.path)
               return (
                 <li key={item.path} className="relative px-1">
                   <div className="relative">
@@ -120,8 +120,8 @@ const MainLayout = () => {
                       to={item.path}
                       className={`flex items-center justify-center w-6 h-6 rounded-full transition-all duration-200 ${
                         active
-                          ? "bg-primary-100 text-primary-400"
-                          : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                          ? 'bg-primary-100 text-primary-400'
+                          : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'
                       }`}
                       onMouseEnter={() => setHoveredItem(item.path)}
                       onMouseLeave={() => setHoveredItem(null)}
@@ -140,9 +140,7 @@ const MainLayout = () => {
                           className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
                           style={{ zIndex: 1000 }}
                         >
-                          <div className="text-sm font-medium text-neutral-900">
-                            {item.label}
-                          </div>
+                          <div className="text-sm font-medium text-neutral-900">{item.label}</div>
                           {/* Arrow */}
                           <div className="absolute right-full top-1/2 transform -translate-y-1/2">
                             <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
@@ -152,7 +150,7 @@ const MainLayout = () => {
                     </AnimatePresence>
                   </div>
                 </li>
-              );
+              )
             })}
           </ul>
         </nav>
@@ -180,9 +178,7 @@ const MainLayout = () => {
                   className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
                   style={{ zIndex: 1000 }}
                 >
-                  <div className="text-sm font-medium text-neutral-900">
-                    {settingsItem.label}
-                  </div>
+                  <div className="text-sm font-medium text-neutral-900">{settingsItem.label}</div>
                   {/* Arrow */}
                   <div className="absolute right-full top-1/2 transform -translate-y-1/2">
                     <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
@@ -191,12 +187,12 @@ const MainLayout = () => {
               )}
             </AnimatePresence>
           </div>
-          
+
           <div className="relative">
             <button
               onClick={signOut}
               className="flex items-center justify-center w-6 h-6 rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-200"
-              onMouseEnter={() => setHoveredItem("logout")}
+              onMouseEnter={() => setHoveredItem('logout')}
               onMouseLeave={() => setHoveredItem(null)}
             >
               <LogOut className="h-3 w-3" />
@@ -204,7 +200,7 @@ const MainLayout = () => {
 
             {/* Logout Popover */}
             <AnimatePresence>
-              {hoveredItem === "logout" && (
+              {hoveredItem === 'logout' && (
                 <motion.div
                   initial={{ opacity: 0, x: -10, scale: 0.95 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -213,9 +209,7 @@ const MainLayout = () => {
                   className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
                   style={{ zIndex: 1000 }}
                 >
-                  <div className="text-sm font-medium text-neutral-900">
-                    Logout
-                  </div>
+                  <div className="text-sm font-medium text-neutral-900">Logout</div>
                   {/* Arrow */}
                   <div className="absolute right-full top-1/2 transform -translate-y-1/2">
                     <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
@@ -232,7 +226,7 @@ const MainLayout = () => {
         <Outlet />
       </main>
     </div>
-  );
-};
+  )
+}
 
-export default MainLayout;
+export default MainLayout

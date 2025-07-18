@@ -1,103 +1,111 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { Contract, Session, ContractSession } from '../types';
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { Contract, Session, ContractSession } from '../types'
 
 export function useContracts() {
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchContracts();
-  }, []);
+    fetchContracts()
+  }, [])
 
   const fetchContracts = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) {
-        setError('User not authenticated');
-        return;
+        setError('User not authenticated')
+        return
       }
 
       const { data, error: fetchError } = await supabase
         .from('contracts')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
       if (fetchError) {
-        setError(fetchError.message);
-        return;
+        setError(fetchError.message)
+        return
       }
 
-      setContracts(data || []);
+      setContracts(data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const addContract = async (contract: Omit<Contract, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const addContract = async (
+    contract: Omit<Contract, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  ) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
         .from('contracts')
         .insert([{ ...contract, user_id: user.id }])
         .select()
-        .single();
+        .single()
 
-      if (error) throw error;
+      if (error) throw error
 
-      setContracts(prev => [data, ...prev]);
-      return data;
+      setContracts(prev => [data, ...prev])
+      return data
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to add contract');
+      throw err instanceof Error ? err : new Error('Failed to add contract')
     }
-  };
+  }
 
-  const updateContract = async (id: string, updates: Partial<Omit<Contract, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => {
+  const updateContract = async (
+    id: string,
+    updates: Partial<Omit<Contract, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+  ) => {
     try {
       const { data, error } = await supabase
         .from('contracts')
         .update(updates)
         .eq('id', id)
         .select()
-        .single();
+        .single()
 
-      if (error) throw error;
+      if (error) throw error
 
-      setContracts(prev => prev.map(c => c.id === id ? data : c));
-      return data;
+      setContracts(prev => prev.map(c => (c.id === id ? data : c)))
+      return data
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to update contract');
+      throw err instanceof Error ? err : new Error('Failed to update contract')
     }
-  };
+  }
 
   const deleteContract = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('contracts')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('contracts').delete().eq('id', id)
 
-      if (error) throw error;
+      if (error) throw error
 
-      setContracts(prev => prev.filter(c => c.id !== id));
+      setContracts(prev => prev.filter(c => c.id !== id))
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to delete contract');
+      throw err instanceof Error ? err : new Error('Failed to delete contract')
     }
-  };
+  }
 
   const findOrCreateContract = async (name: string): Promise<Contract> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
 
       // First, try to find existing contract
       const { data: existingContract, error: findError } = await supabase
@@ -106,14 +114,14 @@ export function useContracts() {
         .eq('user_id', user.id)
         .eq('name', name)
         .eq('status', 'active')
-        .single();
+        .single()
 
       if (findError && findError.code !== 'PGRST116') {
-        throw findError;
+        throw findError
       }
 
       if (existingContract) {
-        return existingContract;
+        return existingContract
       }
 
       // If not found, create new contract
@@ -121,16 +129,16 @@ export function useContracts() {
         .from('contracts')
         .insert([{ name, user_id: user.id, status: 'active' }])
         .select()
-        .single();
+        .single()
 
-      if (createError) throw createError;
+      if (createError) throw createError
 
-      setContracts(prev => [newContract, ...prev]);
-      return newContract;
+      setContracts(prev => [newContract, ...prev])
+      return newContract
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to find or create contract');
+      throw err instanceof Error ? err : new Error('Failed to find or create contract')
     }
-  };
+  }
 
   return {
     contracts,
@@ -140,107 +148,112 @@ export function useContracts() {
     updateContract,
     deleteContract,
     findOrCreateContract,
-    refetch: fetchContracts
-  };
+    refetch: fetchContracts,
+  }
 }
 
 export function useSessions(projectId?: string) {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchSessions();
-  }, [projectId]);
+    fetchSessions()
+  }, [projectId])
 
   const fetchSessions = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) {
-        setError('User not authenticated');
-        return;
+        setError('User not authenticated')
+        return
       }
 
       let query = supabase
         .from('sessions')
         .select('*, projects(name, color)')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
 
       if (projectId) {
-        query = query.eq('project_id', projectId);
+        query = query.eq('project_id', projectId)
       }
 
-      const { data, error: fetchError } = await query
-        .order('scheduled_date', { ascending: true });
+      const { data, error: fetchError } = await query.order('scheduled_date', { ascending: true })
 
       if (fetchError) {
-        setError(fetchError.message);
-        return;
+        setError(fetchError.message)
+        return
       }
 
-      setSessions(data || []);
+      setSessions(data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const addSession = async (session: Omit<Session, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const addSession = async (
+    session: Omit<Session, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  ) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
         .from('sessions')
         .insert([{ ...session, user_id: user.id }])
         .select()
-        .single();
+        .single()
 
-      if (error) throw error;
+      if (error) throw error
 
-      setSessions(prev => [data, ...prev]);
-      return data;
+      setSessions(prev => [data, ...prev])
+      return data
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to add session');
+      throw err instanceof Error ? err : new Error('Failed to add session')
     }
-  };
+  }
 
-  const updateSession = async (id: string, updates: Partial<Omit<Session, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => {
+  const updateSession = async (
+    id: string,
+    updates: Partial<Omit<Session, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+  ) => {
     try {
       const { data, error } = await supabase
         .from('sessions')
         .update(updates)
         .eq('id', id)
         .select()
-        .single();
+        .single()
 
-      if (error) throw error;
+      if (error) throw error
 
-      setSessions(prev => prev.map(s => s.id === id ? data : s));
-      return data;
+      setSessions(prev => prev.map(s => (s.id === id ? data : s)))
+      return data
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to update session');
+      throw err instanceof Error ? err : new Error('Failed to update session')
     }
-  };
+  }
 
   const deleteSession = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('sessions')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('sessions').delete().eq('id', id)
 
-      if (error) throw error;
+      if (error) throw error
 
-      setSessions(prev => prev.filter(s => s.id !== id));
+      setSessions(prev => prev.filter(s => s.id !== id))
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to delete session');
+      throw err instanceof Error ? err : new Error('Failed to delete session')
     }
-  };
+  }
 
   const linkSessionToContract = async (sessionId: string, contractId: string) => {
     try {
@@ -248,15 +261,15 @@ export function useSessions(projectId?: string) {
         .from('contract_sessions')
         .insert([{ session_id: sessionId, contract_id: contractId }])
         .select()
-        .single();
+        .single()
 
-      if (error) throw error;
+      if (error) throw error
 
-      return data;
+      return data
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to link session to contract');
+      throw err instanceof Error ? err : new Error('Failed to link session to contract')
     }
-  };
+  }
 
   const createSessionsWithContract = async (
     contractName: string,
@@ -264,8 +277,10 @@ export function useSessions(projectId?: string) {
     sessionData: Array<{ date: Date; hours: number }>
   ) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
 
       // Find or create contract
       const { data: contract, error: contractError } = await supabase
@@ -274,23 +289,23 @@ export function useSessions(projectId?: string) {
         .eq('user_id', user.id)
         .eq('name', contractName)
         .eq('status', 'active')
-        .single();
+        .single()
 
-      let finalContract;
+      let finalContract
       if (contractError && contractError.code === 'PGRST116') {
         // Contract doesn't exist, create it
         const { data: newContract, error: createError } = await supabase
           .from('contracts')
           .insert([{ name: contractName, user_id: user.id, status: 'active' }])
           .select()
-          .single();
+          .single()
 
-        if (createError) throw createError;
-        finalContract = newContract;
+        if (createError) throw createError
+        finalContract = newContract
       } else if (contractError) {
-        throw contractError;
+        throw contractError
       } else {
-        finalContract = contract;
+        finalContract = contract
       }
 
       // Create sessions
@@ -299,36 +314,36 @@ export function useSessions(projectId?: string) {
         user_id: user.id,
         scheduled_date: date.toISOString().split('T')[0],
         scheduled_hours: hours,
-        status: 'scheduled' as const
-      }));
+        status: 'scheduled' as const,
+      }))
 
       const { data: newSessions, error: sessionsError } = await supabase
         .from('sessions')
         .insert(sessionsToInsert)
-        .select();
+        .select()
 
-      if (sessionsError) throw sessionsError;
+      if (sessionsError) throw sessionsError
 
       // Link sessions to contract
       const contractSessionsToInsert = newSessions.map(session => ({
         contract_id: finalContract.id,
-        session_id: session.id
-      }));
+        session_id: session.id,
+      }))
 
       const { error: linkError } = await supabase
         .from('contract_sessions')
-        .insert(contractSessionsToInsert);
+        .insert(contractSessionsToInsert)
 
-      if (linkError) throw linkError;
+      if (linkError) throw linkError
 
       // Update local state
-      setSessions(prev => [...newSessions, ...prev]);
+      setSessions(prev => [...newSessions, ...prev])
 
-      return { contract: finalContract, sessions: newSessions };
+      return { contract: finalContract, sessions: newSessions }
     } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to create sessions with contract');
+      throw err instanceof Error ? err : new Error('Failed to create sessions with contract')
     }
-  };
+  }
 
   return {
     sessions,
@@ -339,6 +354,6 @@ export function useSessions(projectId?: string) {
     deleteSession,
     linkSessionToContract,
     createSessionsWithContract,
-    refetch: fetchSessions
-  };
+    refetch: fetchSessions,
+  }
 }

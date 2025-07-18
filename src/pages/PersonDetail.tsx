@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Phone,
@@ -21,21 +21,21 @@ import {
   AlertCircle,
   TrendingUp,
   TrendingDown,
-  Minus
-} from "lucide-react";
-import { usePeople } from "../hooks/usePeople";
-import { useExperiences } from "../hooks/useExperiences";
-import { Person, Experience } from "../types";
-import { AddExperienceModal } from "../components/AddExperienceModal";
+  Minus,
+} from 'lucide-react'
+import { usePeople } from '../hooks/usePeople'
+import { useExperiences } from '../hooks/useExperiences'
+import { Person, Experience } from '../types'
+import { AddExperienceModal } from '../components/AddExperienceModal'
 
 const PersonDetail = () => {
-  const { personId } = useParams();
-  const navigate = useNavigate();
-  const [person, setPerson] = useState<Person | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [showAddExperienceModal, setShowAddExperienceModal] = useState(false);
+  const { personId } = useParams()
+  const navigate = useNavigate()
+  const [person, setPerson] = useState<Person | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [showAddExperienceModal, setShowAddExperienceModal] = useState(false)
   const [editForm, setEditForm] = useState({
     name: '',
     email: '',
@@ -45,17 +45,22 @@ const PersonDetail = () => {
     notes: '',
     linkedin_url: '',
     twitter_url: '',
-    website_url: ''
-  });
+    website_url: '',
+  })
 
-  const { people, updatePerson, deletePerson } = usePeople();
-  const { experiences, loading: experiencesLoading, addExperience, deleteExperience } = useExperiences(person?.id);
+  const { people, updatePerson, deletePerson } = usePeople()
+  const {
+    experiences,
+    loading: experiencesLoading,
+    addExperience,
+    deleteExperience,
+  } = useExperiences(person?.id)
 
   useEffect(() => {
     if (personId && people.length > 0) {
-      const foundPerson = people.find(p => p.id === personId);
+      const foundPerson = people.find(p => p.id === personId)
       if (foundPerson) {
-        setPerson(foundPerson);
+        setPerson(foundPerson)
         setEditForm({
           name: foundPerson.name,
           email: foundPerson.email || '',
@@ -65,21 +70,21 @@ const PersonDetail = () => {
           notes: foundPerson.notes || '',
           linkedin_url: foundPerson.linkedin_url || '',
           twitter_url: foundPerson.twitter_url || '',
-          website_url: foundPerson.website_url || ''
-        });
+          website_url: foundPerson.website_url || '',
+        })
       } else {
-        setError('Person not found');
+        setError('Person not found')
       }
-      setLoading(false);
+      setLoading(false)
     } else if (people.length === 0) {
       // Still loading people
-      setLoading(true);
+      setLoading(true)
     }
-  }, [personId, people]);
+  }, [personId, people])
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!person) return;
+    e.preventDefault()
+    if (!person) return
 
     try {
       await updatePerson(person.id, {
@@ -92,29 +97,31 @@ const PersonDetail = () => {
         linkedin_url: editForm.linkedin_url || undefined,
         twitter_url: editForm.twitter_url || undefined,
         website_url: editForm.website_url || undefined,
-      });
-      setIsEditing(false);
+      })
+      setIsEditing(false)
     } catch (error) {
-      console.error('Error updating person:', error);
+      console.error('Error updating person:', error)
     }
-  };
+  }
 
   const handleDelete = async () => {
-    if (!person) return;
-    
+    if (!person) return
+
     if (window.confirm(`Are you sure you want to delete ${person.name}?`)) {
       try {
-        await deletePerson(person.id);
-        navigate('/community');
+        await deletePerson(person.id)
+        navigate('/community')
       } catch (error) {
-        console.error('Error deleting person:', error);
+        console.error('Error deleting person:', error)
       }
     }
-  };
+  }
 
-  const handleAddExperience = async (experienceData: Omit<Experience, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-    await addExperience(experienceData);
-  };
+  const handleAddExperience = async (
+    experienceData: Omit<Experience, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  ) => {
+    await addExperience(experienceData)
+  }
 
   const getExperienceTypeColor = (type: string) => {
     const colors = {
@@ -123,22 +130,22 @@ const PersonDetail = () => {
       meeting: 'bg-green-100 text-green-700',
       event: 'bg-purple-100 text-purple-700',
       other: 'bg-orange-100 text-orange-700',
-    };
-    return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-700';
-  };
+    }
+    return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-700'
+  }
 
   const getConnectionStrengthIcon = (strength: string) => {
     switch (strength) {
       case 'strengthened':
-        return <TrendingUp className="w-3 h-3 text-green-600" />;
+        return <TrendingUp className="w-3 h-3 text-green-600" />
       case 'maintained':
-        return <Minus className="w-3 h-3 text-blue-600" />;
+        return <Minus className="w-3 h-3 text-blue-600" />
       case 'weakened':
-        return <TrendingDown className="w-3 h-3 text-red-600" />;
+        return <TrendingDown className="w-3 h-3 text-red-600" />
       default:
-        return <Minus className="w-3 h-3 text-gray-400" />;
+        return <Minus className="w-3 h-3 text-gray-400" />
     }
-  };
+  }
 
   const getConnectionStrengthColor = (strength: string) => {
     const colors = {
@@ -146,9 +153,9 @@ const PersonDetail = () => {
       maintained: 'text-blue-600 bg-blue-50',
       weakened: 'text-red-600 bg-red-50',
       neutral: 'text-gray-600 bg-gray-50',
-    };
-    return colors[strength as keyof typeof colors] || 'text-gray-600 bg-gray-50';
-  };
+    }
+    return colors[strength as keyof typeof colors] || 'text-gray-600 bg-gray-50'
+  }
 
   if (loading) {
     return (
@@ -158,7 +165,7 @@ const PersonDetail = () => {
           <p className="text-gray-600">Loading person details...</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (error || !person) {
@@ -166,7 +173,9 @@ const PersonDetail = () => {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="text-center">
           <h2 className="text-xl font-medium text-gray-900 mb-2">Person Not Found</h2>
-          <p className="text-gray-600 mb-4">{error || 'The person you are looking for does not exist.'}</p>
+          <p className="text-gray-600 mb-4">
+            {error || 'The person you are looking for does not exist.'}
+          </p>
           <button
             onClick={() => navigate('/community')}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -175,7 +184,7 @@ const PersonDetail = () => {
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -184,7 +193,7 @@ const PersonDetail = () => {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center">
           <button
-            onClick={() => navigate("/community")}
+            onClick={() => navigate('/community')}
             className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -192,20 +201,21 @@ const PersonDetail = () => {
           <div className="flex items-center">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mr-4">
               <span className="text-blue-600 font-medium text-xl">
-                {person.name.split(' ').map(n => n[0]).join('')}
+                {person.name
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')}
               </span>
             </div>
             <div>
               <h1 className="text-3xl font-light text-gray-900">{person.name}</h1>
               {person.role && person.company && (
-                <p className="text-gray-600">{person.role} at {person.company}</p>
+                <p className="text-gray-600">
+                  {person.role} at {person.company}
+                </p>
               )}
-              {person.role && !person.company && (
-                <p className="text-gray-600">{person.role}</p>
-              )}
-              {!person.role && person.company && (
-                <p className="text-gray-600">{person.company}</p>
-              )}
+              {person.role && !person.company && <p className="text-gray-600">{person.role}</p>}
+              {!person.role && person.company && <p className="text-gray-600">{person.company}</p>}
             </div>
           </div>
         </div>
@@ -231,7 +241,7 @@ const PersonDetail = () => {
                 <input
                   type="text"
                   value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  onChange={e => setEditForm({ ...editForm, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
@@ -241,7 +251,7 @@ const PersonDetail = () => {
                 <input
                   type="email"
                   value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  onChange={e => setEditForm({ ...editForm, email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -250,7 +260,7 @@ const PersonDetail = () => {
                 <input
                   type="tel"
                   value={editForm.phone}
-                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -259,7 +269,7 @@ const PersonDetail = () => {
                 <input
                   type="text"
                   value={editForm.company}
-                  onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                  onChange={e => setEditForm({ ...editForm, company: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -268,7 +278,7 @@ const PersonDetail = () => {
                 <input
                   type="text"
                   value={editForm.role}
-                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  onChange={e => setEditForm({ ...editForm, role: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -277,7 +287,7 @@ const PersonDetail = () => {
                 <input
                   type="url"
                   value={editForm.linkedin_url}
-                  onChange={(e) => setEditForm({ ...editForm, linkedin_url: e.target.value })}
+                  onChange={e => setEditForm({ ...editForm, linkedin_url: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="https://linkedin.com/in/..."
                 />
@@ -287,7 +297,7 @@ const PersonDetail = () => {
                 <input
                   type="url"
                   value={editForm.twitter_url}
-                  onChange={(e) => setEditForm({ ...editForm, twitter_url: e.target.value })}
+                  onChange={e => setEditForm({ ...editForm, twitter_url: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="https://twitter.com/..."
                 />
@@ -297,7 +307,7 @@ const PersonDetail = () => {
                 <input
                   type="url"
                   value={editForm.website_url}
-                  onChange={(e) => setEditForm({ ...editForm, website_url: e.target.value })}
+                  onChange={e => setEditForm({ ...editForm, website_url: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="https://..."
                 />
@@ -307,7 +317,7 @@ const PersonDetail = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea
                 value={editForm.notes}
-                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={4}
                 placeholder="Add any notes about this person..."
@@ -359,7 +369,6 @@ const PersonDetail = () => {
               </button>
             </div>
 
-
             {/* Experiences List */}
             {experiencesLoading ? (
               <div className="text-center py-8">
@@ -370,12 +379,17 @@ const PersonDetail = () => {
               <div className="text-center py-8 text-gray-500">
                 <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No experiences yet</p>
-                <p className="text-xs text-gray-400">Add your first experience to start tracking your interactions</p>
+                <p className="text-xs text-gray-400">
+                  Add your first experience to start tracking your interactions
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {experiences.map((experience) => (
-                  <div key={experience.id} className="border border-gray-200 rounded-lg p-3 hover:border-gray-300 transition-colors">
+                {experiences.map(experience => (
+                  <div
+                    key={experience.id}
+                    className="border border-gray-200 rounded-lg p-3 hover:border-gray-300 transition-colors"
+                  >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-900">{experience.title}</h4>
@@ -384,7 +398,9 @@ const PersonDetail = () => {
                             <Calendar className="w-3 h-3 mr-1" />
                             {new Date(experience.experience_date).toLocaleDateString()}
                           </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getExperienceTypeColor(experience.type)}`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getExperienceTypeColor(experience.type)}`}
+                          >
                             {experience.type}
                           </span>
                           {experience.location && (
@@ -393,7 +409,9 @@ const PersonDetail = () => {
                               {experience.location}
                             </div>
                           )}
-                          <div className={`flex items-center px-2 py-1 rounded-full text-xs font-medium ${getConnectionStrengthColor(experience.connection_strength)}`}>
+                          <div
+                            className={`flex items-center px-2 py-1 rounded-full text-xs font-medium ${getConnectionStrengthColor(experience.connection_strength)}`}
+                          >
                             {getConnectionStrengthIcon(experience.connection_strength)}
                             <span className="ml-1">{experience.connection_strength}</span>
                           </div>
@@ -407,32 +425,32 @@ const PersonDetail = () => {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    
+
                     {experience.description && (
                       <p className="text-gray-600 text-sm mt-2">{experience.description}</p>
                     )}
-                    
+
                     {experience.attendees && (
                       <div className="flex items-center text-gray-500 text-sm mt-2">
                         <Users className="w-3 h-3 mr-1" />
                         <span>Also attended: {experience.attendees}</span>
                       </div>
                     )}
-                    
+
                     {experience.outcome && (
                       <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
                         <div className="font-medium text-blue-900 mb-1">Outcome:</div>
                         <div className="text-blue-800">{experience.outcome}</div>
                       </div>
                     )}
-                    
+
                     {experience.next_steps && (
                       <div className="mt-2 p-2 bg-orange-50 rounded text-sm">
                         <div className="font-medium text-orange-900 mb-1">Next Steps:</div>
                         <div className="text-orange-800">{experience.next_steps}</div>
                       </div>
                     )}
-                    
+
                     {experience.follow_up_needed && (
                       <div className="flex items-center mt-2 p-2 bg-yellow-50 rounded text-sm">
                         <AlertCircle className="w-3 h-3 text-yellow-600 mr-1" />
@@ -473,7 +491,7 @@ const PersonDetail = () => {
         />
       )}
     </div>
-  );
-};
+  )
+}
 
-export default PersonDetail;
+export default PersonDetail

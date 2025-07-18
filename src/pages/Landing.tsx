@@ -1,5 +1,16 @@
-import { Link } from 'react-router-dom';
-import { Heart, Bot, MessageCircle, TrendingUp, Sparkles, Calendar, BarChart3, BookOpen, Users, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom'
+import {
+  Heart,
+  Bot,
+  MessageCircle,
+  TrendingUp,
+  Sparkles,
+  Calendar,
+  BarChart3,
+  BookOpen,
+  Users,
+  ArrowRight,
+} from 'lucide-react'
 
 const Landing = () => {
   return (
@@ -17,8 +28,8 @@ const Landing = () => {
                 Insights
               </h1>
               <p className="mt-6 text-lg leading-8 text-neutral-600 max-w-2xl mx-auto">
-                Track your habits, capture daily notes, and get personalized AI-generated reflections 
-                with curated Reddit insights to fuel your personal growth journey.
+                Track your habits, capture daily notes, and get personalized AI-generated
+                reflections with curated Reddit insights to fuel your personal growth journey.
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
                 <Link
@@ -28,7 +39,10 @@ const Landing = () => {
                   Start Your Journey
                   <ArrowRight className="ml-2 w-4 h-4 inline" />
                 </Link>
-                <a href="#features" className="text-sm font-semibold leading-6 text-neutral-900 hover:text-blue-600 transition-colors">
+                <a
+                  href="#features"
+                  className="text-sm font-semibold leading-6 text-neutral-900 hover:text-blue-600 transition-colors"
+                >
                   Learn more <span aria-hidden="true">→</span>
                 </a>
               </div>
@@ -67,7 +81,7 @@ const Landing = () => {
                       <span className="font-medium text-sm">AI Reflection</span>
                     </div>
                     <p className="text-xs text-neutral-600 leading-relaxed">
-                      "Your consistency with morning exercise this week shows strong commitment. 
+                      "Your consistency with morning exercise this week shows strong commitment.
                       Consider adding a short meditation practice..."
                     </p>
                     <div className="mt-2 text-xs text-blue-600">Generated from your habits</div>
@@ -96,21 +110,18 @@ const Landing = () => {
       <div id="features" className="py-24 sm:py-32 bg-neutral-50">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl lg:text-center">
-            <h2 className="text-base font-semibold leading-7 text-blue-600">
-              Powerful Features
-            </h2>
+            <h2 className="text-base font-semibold leading-7 text-blue-600">Powerful Features</h2>
             <p className="mt-2 text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
               Everything you need for meaningful habit transformation
             </p>
             <p className="mt-6 text-lg leading-8 text-neutral-600">
-              Our platform combines habit tracking, AI insights, and community wisdom to create 
-              a comprehensive personal growth experience.
+              Our platform combines habit tracking, AI insights, and community wisdom to create a
+              comprehensive personal growth experience.
             </p>
           </div>
 
           <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
             <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
-              
               {/* Smart Habit Tracking */}
               <div className="flex flex-col bg-white rounded-xl p-6 shadow-sm border">
                 <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-neutral-900">
@@ -121,8 +132,8 @@ const Landing = () => {
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-neutral-600">
                   <p className="flex-auto">
-                    Track your daily habits with an intuitive interface. Build streaks, 
-                    visualize progress, and stay motivated with smart notifications.
+                    Track your daily habits with an intuitive interface. Build streaks, visualize
+                    progress, and stay motivated with smart notifications.
                   </p>
                   <div className="mt-6 space-y-2">
                     <div className="flex items-center">
@@ -151,8 +162,8 @@ const Landing = () => {
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-neutral-600">
                   <p className="flex-auto">
-                    Get personalized daily reflections generated from your habit data, 
-                    notes, and patterns. Discover insights you might have missed.
+                    Get personalized daily reflections generated from your habit data, notes, and
+                    patterns. Discover insights you might have missed.
                   </p>
                   <div className="mt-6 space-y-2">
                     <div className="flex items-center">
@@ -181,8 +192,8 @@ const Landing = () => {
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-neutral-600">
                   <p className="flex-auto">
-                    Your AI reflections include curated Reddit posts and community insights 
-                    related to your habits and goals for extra motivation and tips.
+                    Your AI reflections include curated Reddit posts and community insights related
+                    to your habits and goals for extra motivation and tips.
                   </p>
                   <div className="mt-6 space-y-2">
                     <div className="flex items-center">
@@ -200,7 +211,6 @@ const Landing = () => {
                   </div>
                 </dd>
               </div>
-
             </dl>
           </div>
         </div>
@@ -214,8 +224,8 @@ const Landing = () => {
               Ready to transform your habits?
             </h2>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-neutral-600">
-              Join thousands of people using AI-powered insights to build better habits 
-              and create lasting positive change in their lives.
+              Join thousands of people using AI-powered insights to build better habits and create
+              lasting positive change in their lives.
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link
@@ -229,7 +239,7 @@ const Landing = () => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Landing;
+export default Landing

@@ -1,4 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -9,16 +9,16 @@ const redditClientId = Deno.env.get('REDDIT_CLIENT_ID')
 const redditClientSecret = Deno.env.get('REDDIT_CLIENT_SECRET')
 
 interface ReflectionRequest {
-  userId: string;
-  date?: string;
+  userId: string
+  date?: string
 }
 
 interface RedditPost {
-  title: string;
-  url: string;
-  subreddit: string;
-  upvotes: number;
-  comments: number;
+  title: string
+  url: string
+  subreddit: string
+  upvotes: number
+  comments: number
 }
 
 async function getRedditAccessToken(): Promise<string | null> {
@@ -29,17 +29,17 @@ async function getRedditAccessToken(): Promise<string | null> {
 
   try {
     console.log('DEBUG - Getting Reddit OAuth token...')
-    
+
     const credentials = btoa(`${redditClientId}:${redditClientSecret}`)
-    
+
     const response = await fetch('https://www.reddit.com/api/v1/access_token', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${credentials}`,
+        Authorization: `Basic ${credentials}`,
         'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'HabitsApp/1.0 by /u/habits_user'
+        'User-Agent': 'HabitsApp/1.0 by /u/habits_user',
       },
-      body: 'grant_type=client_credentials'
+      body: 'grant_type=client_credentials',
     })
 
     if (!response.ok) {
@@ -56,15 +56,20 @@ async function getRedditAccessToken(): Promise<string | null> {
   }
 }
 
-async function fetchRedditPostsWithOpenAI(recentHabits: any[], recentNotes: any[], currentHabits: any[], openAIApiKey: string): Promise<RedditPost[]> {
+async function fetchRedditPostsWithOpenAI(
+  recentHabits: any[],
+  recentNotes: any[],
+  currentHabits: any[],
+  openAIApiKey: string
+): Promise<RedditPost[]> {
   try {
     console.log('DEBUG - Step 1: Getting search terms from OpenAI...')
-    
+
     // Step 1: Get search terms from OpenAI
     const searchTermsResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        Authorization: `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -72,25 +77,34 @@ async function fetchRedditPostsWithOpenAI(recentHabits: any[], recentNotes: any[
         messages: [
           {
             role: 'system',
-            content: 'Generate 2-3 specific search terms to find relevant Reddit posts for someone working on habits. Return only the search terms, one per line, no quotes or explanations.'
+            content:
+              'Generate 2-3 specific search terms to find relevant Reddit posts for someone working on habits. Return only the search terms, one per line, no quotes or explanations.',
           },
           {
             role: 'user',
             content: `Based on these habits and notes, what search terms would find relevant posts?
 
 Recent habits: ${recentHabits?.map(h => h.habits?.name).join(', ') || 'Morning routines, building consistency'}
-Recent notes: ${recentNotes?.slice(0, 1).map(n => n.content.substring(0, 200)).join('. ') || 'Working on building better habits'}
+Recent notes: ${
+              recentNotes
+                ?.slice(0, 1)
+                .map(n => n.content.substring(0, 200))
+                .join('. ') || 'Working on building better habits'
+            }
 
-Focus on finding posts from people who are 1-2 steps ahead in their habit journey.`
-          }
+Focus on finding posts from people who are 1-2 steps ahead in their habit journey.`,
+          },
         ],
         temperature: 0.5,
-        max_tokens: 100
-      })
+        max_tokens: 100,
+      }),
     })
 
     const searchData = await searchTermsResponse.json()
-    const searchTerms = searchData.choices[0]?.message?.content?.split('\n').filter(Boolean) || ['morning routine habits', 'habit building consistency']
+    const searchTerms = searchData.choices[0]?.message?.content?.split('\n').filter(Boolean) || [
+      'morning routine habits',
+      'habit building consistency',
+    ]
     console.log('DEBUG - Search terms:', searchTerms)
 
     // Step 2: Get Reddit OAuth token and search all of Reddit
@@ -109,12 +123,12 @@ Focus on finding posts from people who are 1-2 steps ahead in their habit journe
           const cleanTerm = term.replace(/['"]/g, '').trim()
           const searchUrl = `https://oauth.reddit.com/search.json?q=${encodeURIComponent(cleanTerm)}`
           console.log(`DEBUG - General Reddit search: ${searchUrl}`)
-          
+
           const response = await fetch(searchUrl, {
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'User-Agent': 'HabitsApp/1.0 by /u/habits_user'
-            }
+              Authorization: `Bearer ${accessToken}`,
+              'User-Agent': 'HabitsApp/1.0 by /u/habits_user',
+            },
           })
 
           console.log(`DEBUG - General search response status: ${response.status}`)
@@ -123,20 +137,23 @@ Focus on finding posts from people who are 1-2 steps ahead in their habit journe
             console.log(`DEBUG - Raw Reddit response:`, JSON.stringify(data, null, 2))
             const posts = data.data?.children || []
             console.log(`DEBUG - Found ${posts.length} posts across Reddit for "${cleanTerm}"`)
-            
+
             for (const postData of posts) {
               const post = postData.data
-              console.log(`DEBUG - Post: ${post.title} in r/${post.subreddit} (${post.ups} ups, selftext: ${post.selftext ? 'yes' : 'no'})`)
-              
+              console.log(
+                `DEBUG - Post: ${post.title} in r/${post.subreddit} (${post.ups} ups, selftext: ${post.selftext ? 'yes' : 'no'})`
+              )
+
               // Filter for quality posts - let OpenAI handle relevance filtering
-              if (post.ups > 10 && !post.stickied && !post.over_18) { // Basic quality filter
+              if (post.ups > 10 && !post.stickied && !post.over_18) {
+                // Basic quality filter
                 allPosts.push({
                   title: post.title,
                   url: `https://reddit.com${post.permalink}`,
                   subreddit: post.subreddit,
                   upvotes: post.ups,
                   comments: post.num_comments,
-                  selftext: post.selftext ? post.selftext.substring(0, 500) : '' // For relevance checking
+                  selftext: post.selftext ? post.selftext.substring(0, 500) : '', // For relevance checking
                 })
                 console.log(`DEBUG - Added post: ${post.title}`)
               }
@@ -144,7 +161,9 @@ Focus on finding posts from people who are 1-2 steps ahead in their habit journe
           } else {
             console.log(`DEBUG - General search failed: ${response.status} ${response.statusText}`)
           }
-          console.log(`DEBUG - Completed processing search term: "${term}", allPosts.length now: ${allPosts.length}`)
+          console.log(
+            `DEBUG - Completed processing search term: "${term}", allPosts.length now: ${allPosts.length}`
+          )
         } catch (error) {
           console.error(`DEBUG - Error in general Reddit search for term "${term}":`, error)
         }
@@ -164,14 +183,20 @@ Focus on finding posts from people who are 1-2 steps ahead in their habit journe
 
     // Build context about the user's current habits
     const currentHabitsContext = currentHabits?.length
-      ? currentHabits.map(habit => {
-          const benefits = habit.benefits?.length ? ` - Benefits: ${habit.benefits.join(', ')}` : ''
-          const consequences = habit.consequences?.length ? ` - Consequences when skipped: ${habit.consequences.join(', ')}` : ''
-          return `${habit.name}${benefits}${consequences}`
-        }).join(' | ')
+      ? currentHabits
+          .map(habit => {
+            const benefits = habit.benefits?.length
+              ? ` - Benefits: ${habit.benefits.join(', ')}`
+              : ''
+            const consequences = habit.consequences?.length
+              ? ` - Consequences when skipped: ${habit.consequences.join(', ')}`
+              : ''
+            return `${habit.name}${benefits}${consequences}`
+          })
+          .join(' | ')
       : 'No current habits available.'
 
-    const recentNotesContext = recentNotes?.length 
+    const recentNotesContext = recentNotes?.length
       ? recentNotes.map(note => note.content).join(' | ')
       : 'No recent notes.'
 
@@ -211,16 +236,19 @@ EXCLUDE these types of posts:
 Posts should pertain to the specific current habits previously listed; to challenges, frustrations or wins (in budding areas) in the notes.
 Don't include "why habits, habits formation, and routines in general are good" posts. Have it pertain primarily around the user's current habits.
 
-${allPosts.map((post, i) => 
-  `${i+1}. Title: "${post.title}"
+${allPosts
+  .map(
+    (post, i) =>
+      `${i + 1}. Title: "${post.title}"
      URL: ${post.url}
      Subreddit: r/${post.subreddit}
      Upvotes: ${post.upvotes}
      Comments: ${post.comments}`
-).join('\n\n')}
+  )
+  .join('\n\n')}
 
 Return JSON array of the ${numMatches} best matches that would provide valuable insights for my specific habit challenges:
-[{"title": "exact title from above", "url": "exact url from above", "subreddit": "exact subreddit", "upvotes": number, "comments": number, "reasoning": "relevant because it addresses [specific connection to my habits, timing struggles, or challenges]"}]`;
+[{"title": "exact title from above", "url": "exact url from above", "subreddit": "exact subreddit", "upvotes": number, "comments": number, "reasoning": "relevant because it addresses [specific connection to my habits, timing struggles, or challenges]"}]`
 
     console.log('DEBUG - About to send prompt to OpenAI:', prompt.substring(0, 500) + '...')
     console.log('DEBUG - Full prompt length:', prompt.length)
@@ -228,7 +256,7 @@ Return JSON array of the ${numMatches} best matches that would provide valuable 
     const relevanceResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        Authorization: `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -236,10 +264,10 @@ Return JSON array of the ${numMatches} best matches that would provide valuable 
         messages: [
           {
             role: 'user',
-            content: prompt
-          }
-        ]
-      })
+            content: prompt,
+          },
+        ],
+      }),
     })
 
     const relevanceData = await relevanceResponse.json()
@@ -250,7 +278,7 @@ Return JSON array of the ${numMatches} best matches that would provide valuable 
 
     if (!content) {
       console.log('DEBUG - No relevance filtering response')
-      return [];
+      return []
     }
 
     console.log('DEBUG - OpenAI relevance response:', content)
@@ -259,37 +287,37 @@ Return JSON array of the ${numMatches} best matches that would provide valuable 
     try {
       // Strip markdown code blocks and explanatory text
       let cleanContent = content.trim()
-      
+
       // Remove markdown code blocks
       if (cleanContent.startsWith('```json')) {
         cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/\s*```.*$/s, '')
       } else if (cleanContent.startsWith('```')) {
         cleanContent = cleanContent.replace(/^```\s*/, '').replace(/\s*```.*$/s, '')
       }
-      
+
       // Clean up any JavaScript template literal syntax that might interfere with JSON parsing
       cleanContent = cleanContent.replace(/`/g, '"').replace(/\$\{[^}]*\}/g, '')
-      
+
       console.log('DEBUG - Cleaned content for parsing:', cleanContent.substring(0, 1000))
-      
+
       // Extract just the JSON array - use a more robust approach
       // Find the first [ and then count brackets to find the matching ]
-      const startIndex = cleanContent.indexOf('[');
+      const startIndex = cleanContent.indexOf('[')
       if (startIndex !== -1) {
-        let bracketCount = 0;
-        let endIndex = -1;
-        
+        let bracketCount = 0
+        let endIndex = -1
+
         for (let i = startIndex; i < cleanContent.length; i++) {
-          if (cleanContent[i] === '[') bracketCount++;
-          if (cleanContent[i] === ']') bracketCount--;
+          if (cleanContent[i] === '[') bracketCount++
+          if (cleanContent[i] === ']') bracketCount--
           if (bracketCount === 0) {
-            endIndex = i;
-            break;
+            endIndex = i
+            break
           }
         }
-        
+
         if (endIndex !== -1) {
-          cleanContent = cleanContent.substring(startIndex, endIndex + 1);
+          cleanContent = cleanContent.substring(startIndex, endIndex + 1)
           console.log('DEBUG - Extracted JSON array:', cleanContent.substring(0, 500) + '...')
         } else {
           console.log('DEBUG - Could not find matching closing bracket')
@@ -297,17 +325,19 @@ Return JSON array of the ${numMatches} best matches that would provide valuable 
       } else {
         console.log('DEBUG - No JSON array found in content')
       }
-      
+
       console.log('DEBUG - Final content to parse:', JSON.stringify(cleanContent))
       const filteredPosts = JSON.parse(cleanContent)
       if (Array.isArray(filteredPosts)) {
         console.log('DEBUG - OpenAI selected', filteredPosts.length, 'relevant posts')
-        
+
         // Log the reasoning for each selection
         filteredPosts.forEach((post, i) => {
-          console.log(`DEBUG - Selection ${i + 1}: "${post.title}" - Reasoning: ${post.reasoning || 'No reasoning provided'}`)
+          console.log(
+            `DEBUG - Selection ${i + 1}: "${post.title}" - Reasoning: ${post.reasoning || 'No reasoning provided'}`
+          )
         })
-        
+
         return filteredPosts.slice(0, numMatches)
       }
     } catch (parseError) {
@@ -318,7 +348,6 @@ Return JSON array of the ${numMatches} best matches that would provide valuable 
     }
 
     return []
-
   } catch (error) {
     console.error('Error in Reddit search pipeline:', error)
     return []
@@ -332,69 +361,66 @@ Deno.serve(async (req: Request) => {
   }
 
   const url = new URL(req.url)
-  
+
   // Handle Reddit OAuth callback if code parameter is present
   if (url.searchParams.get('code')) {
     const code = url.searchParams.get('code')
     const error = url.searchParams.get('error')
-    
+
     if (error) {
-      return new Response(
-        JSON.stringify({ error: `Reddit OAuth error: ${error}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: `Reddit OAuth error: ${error}` }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
-    
+
     if (code) {
       // Exchange code for access token
       const tokenResponse = await fetch('https://www.reddit.com/api/v1/access_token', {
         method: 'POST',
         headers: {
-          'Authorization': `Basic ${btoa(`${redditClientId}:${redditClientSecret}`)}`,
+          Authorization: `Basic ${btoa(`${redditClientId}:${redditClientSecret}`)}`,
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'HabitsApp/1.0'
+          'User-Agent': 'HabitsApp/1.0',
         },
-        body: `grant_type=authorization_code&code=${code}`
+        body: `grant_type=authorization_code&code=${code}`,
       })
-      
+
       const tokenData = await tokenResponse.json()
-      
+
       if (tokenData.access_token) {
-        return new Response(
-          JSON.stringify({ access_token: tokenData.access_token }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        return new Response(JSON.stringify({ access_token: tokenData.access_token }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
     }
-    
-    return new Response(
-      JSON.stringify({ error: 'Failed to get Reddit access token' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+
+    return new Response(JSON.stringify({ error: 'Failed to get Reddit access token' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
   // Handle reflection generation (existing logic)
   try {
-    const { userId, date = new Date().toISOString().split('T')[0] }: ReflectionRequest = await req.json()
-    
+    const { userId, date = new Date().toISOString().split('T')[0] }: ReflectionRequest =
+      await req.json()
+
     if (!userId) {
-      return new Response(
-        JSON.stringify({ error: 'User ID is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      return new Response(JSON.stringify({ error: 'User ID is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // Create Supabase client with service role key for admin access
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-
     // Get recent habit notes (last 3 days)
     const threeDaysAgo = new Date(date)
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
-    
+
     const { data: recentNotes } = await supabase
       .from('habits_notes')
       .select('created_at, content')
@@ -406,12 +432,14 @@ Deno.serve(async (req: Request) => {
     // Get recent completed habits (last 3 days)
     const { data: recentHabits } = await supabase
       .from('habits_daily_logs')
-      .select(`
+      .select(
+        `
         log_date,
         is_completed,
         notes,
         habits!inner(name)
-      `)
+      `
+      )
       .eq('user_id', userId)
       .eq('is_completed', true)
       .gte('log_date', threeDaysAgo.toISOString().split('T')[0])
@@ -427,14 +455,17 @@ Deno.serve(async (req: Request) => {
       .order('default_start_time')
 
     // Prepare context for OpenAI
-    const notesContext = recentNotes?.length 
+    const notesContext = recentNotes?.length
       ? recentNotes.map(note => `${note.created_at}: ${note.content}`).join('\n\n')
       : 'No recent habit notes available.'
 
     const habitsContext = recentHabits?.length
-      ? recentHabits.map(habit => 
-          `${habit.log_date}: Completed "${habit.habits.name}"${habit.notes ? ` - ${habit.notes}` : ''}`
-        ).join('\n')
+      ? recentHabits
+          .map(
+            habit =>
+              `${habit.log_date}: Completed "${habit.habits.name}"${habit.notes ? ` - ${habit.notes}` : ''}`
+          )
+          .join('\n')
       : 'No recent completed habits available.'
 
     // Debug logging to see what data we're working with
@@ -445,25 +476,27 @@ Deno.serve(async (req: Request) => {
 
     // Fetch relevant Reddit posts using OpenAI
     console.log('DEBUG - Starting Reddit post fetch...')
-    const redditPosts = await fetchRedditPostsWithOpenAI(recentHabits, recentNotes, currentHabits, openAIApiKey)
+    const redditPosts = await fetchRedditPostsWithOpenAI(
+      recentHabits,
+      recentNotes,
+      currentHabits,
+      openAIApiKey
+    )
     console.log('DEBUG - Reddit posts found:', redditPosts.length)
     console.log('DEBUG - Reddit posts:', JSON.stringify(redditPosts, null, 2))
 
     // Generate reflection using OpenAI
     if (!openAIApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        Authorization: `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -487,7 +520,7 @@ STRUCTURE:
 Paragraph 1: Recent habit achievements and note observations (what they've accomplished, specific progress)
 Paragraph 2: Next steps and momentum building (what to focus on next, gentle challenge)
 
-Keep it concise: 100-150 words total, exactly 2 paragraphs.`
+Keep it concise: 100-150 words total, exactly 2 paragraphs.`,
           },
           {
             role: 'user',
@@ -499,67 +532,63 @@ ${notesContext}
 RECENT COMPLETED HABITS (last 3 days):
 ${habitsContext}
 
-Focus on what they've accomplished recently, any progress from previous notes, and what to build on next. Reference specific things they mentioned. Keep it concise and forward-focused.`
-          }
+Focus on what they've accomplished recently, any progress from previous notes, and what to build on next. Reference specific things they mentioned. Keep it concise and forward-focused.`,
+          },
         ],
         temperature: 0.7,
-        max_tokens: 250
-      })
+        max_tokens: 250,
+      }),
     })
 
     if (!openAIResponse.ok) {
       const error = await openAIResponse.text()
       console.error('OpenAI API error:', error)
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate reflection' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      return new Response(JSON.stringify({ error: 'Failed to generate reflection' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const openAIData = await openAIResponse.json()
     const reflection = openAIData.choices[0]?.message?.content
 
     if (!reflection) {
-      return new Response(
-        JSON.stringify({ error: 'No reflection generated' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      return new Response(JSON.stringify({ error: 'No reflection generated' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // Save reflection to database (upsert to update existing or create new)
     // Try with reddit_links first, fallback without if column doesn't exist
-    let saveError;
+    let saveError
     try {
-      const { error } = await supabase
-        .from('daily_reflections')
-        .upsert({
+      const { error } = await supabase.from('daily_reflections').upsert(
+        {
           user_id: userId,
           reflection_date: date,
           content: reflection,
-          reddit_links: JSON.stringify(redditPosts)
-        }, {
-          onConflict: 'user_id,reflection_date'
-        })
-      saveError = error;
+          reddit_links: JSON.stringify(redditPosts),
+        },
+        {
+          onConflict: 'user_id,reflection_date',
+        }
+      )
+      saveError = error
     } catch (error) {
       console.log('Failed to save with reddit_links, trying without:', error)
       // Fallback: save without reddit_links column
-      const { error: fallbackError } = await supabase
-        .from('daily_reflections')
-        .upsert({
+      const { error: fallbackError } = await supabase.from('daily_reflections').upsert(
+        {
           user_id: userId,
           reflection_date: date,
-          content: reflection
-        }, {
-          onConflict: 'user_id,reflection_date'
-        })
-      saveError = fallbackError;
+          content: reflection,
+        },
+        {
+          onConflict: 'user_id,reflection_date',
+        }
+      )
+      saveError = fallbackError
     }
 
     if (saveError) {
@@ -568,7 +597,7 @@ Focus on what they've accomplished recently, any progress from previous notes, a
         code: saveError.code,
         message: saveError.message,
         details: saveError.details,
-        hint: saveError.hint
+        hint: saveError.hint,
       })
       // Still return the reflection even if saving fails
     } else {
@@ -576,26 +605,22 @@ Focus on what they've accomplished recently, any progress from previous notes, a
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         reflection,
         reddit_links: redditPosts,
         cached: false,
-        generated_at: new Date().toISOString()
+        generated_at: new Date().toISOString(),
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
-
   } catch (error) {
     console.error('Error in generate-reflection function:', error)
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 })

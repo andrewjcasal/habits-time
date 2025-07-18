@@ -1,16 +1,19 @@
 # Dashboard Specification
 
 ## Overview
+
 The dashboard serves as the main landing page with a Medium-like interface featuring daily reflections and behavioral insights.
 
 ## Layout Structure
 
 ### Main Container
+
 - Clean, minimal design with ample white space
 - Maximum width: 1200px, centered
 - Responsive design for mobile and desktop
 
 ### Header Section
+
 - **Generate Reflection Button**
   - Prominent, styled button at top of page
   - Text: "Generate Today's Reflection"
@@ -21,6 +24,7 @@ The dashboard serves as the main landing page with a Medium-like interface featu
 ### Content Area (Two Column Layout)
 
 #### Left Column (Main Content - 2/3 width)
+
 - **Daily Reflection Section**
   - Generated via OpenAI edge function
   - 2-3 paragraphs in serif font (Georgia, Times, serif)
@@ -33,6 +37,7 @@ The dashboard serves as the main landing page with a Medium-like interface featu
   - Emphasizes habits as tools, imperfection as normal, resilience
 
 #### Right Column (Sidebar - 1/3 width)
+
 - **Behaviors List**
   - Title: "Behaviors to Consider"
   - Simple list format
@@ -46,11 +51,13 @@ The dashboard serves as the main landing page with a Medium-like interface featu
 ## Visual Design
 
 ### Typography
+
 - **Headings**: Inter, -apple-system, sans-serif
 - **Body/Reflection**: Georgia, Times, serif
 - **UI Elements**: Inter, -apple-system, sans-serif
 
 ### Color Palette
+
 - Background: #fefefe (off-white)
 - Text: #2c3e50 (dark gray)
 - Accent: #3498db (blue)
@@ -58,6 +65,7 @@ The dashboard serves as the main landing page with a Medium-like interface featu
 - Categories: Soft colors (#e8f5e8, #fff3cd, #f8d7da, etc.)
 
 ### Spacing
+
 - Page margins: 40px
 - Column gap: 60px
 - Section spacing: 48px
@@ -66,11 +74,13 @@ The dashboard serves as the main landing page with a Medium-like interface featu
 ## Data Requirements
 
 ### Reflection Generation Input
+
 - Last 3 days of `habits_notes` entries
 - Completed habits from last 2-3 days
 - User's current habit streak information
 
 ### Behaviors Display
+
 - Fetch from `behaviors` table
 - Order by category, then name
 - Show description and category
@@ -78,7 +88,8 @@ The dashboard serves as the main landing page with a Medium-like interface featu
 ## Edge Function Specification
 
 ### Function: `generate-daily-reflection`
-- **Input**: 
+
+- **Input**:
   - User ID
   - Date range for habit data
 - **Process**:
@@ -86,11 +97,12 @@ The dashboard serves as the main landing page with a Medium-like interface featu
   2. Query completed habits
   3. Generate reflection via OpenAI
   4. Store reflection (optional caching)
-- **Output**: 
+- **Output**:
   - Generated reflection text
   - Metadata (generation timestamp)
 
 ### OpenAI Prompt Template
+
 ```
 Based on the following habit tracking data from the last few days, write a thoughtful 2-3 paragraph daily reflection. The tone should be encouraging and compassionate, emphasizing that:
 - Habits are tools for growth, not rigid rules
@@ -132,14 +144,17 @@ Dashboard
 ## Responsive Design
 
 ### Desktop (>1024px)
+
 - Two column layout as described
 - Full typography scale
 
 ### Tablet (768-1024px)
+
 - Maintain two columns but reduce gaps
 - Slightly smaller typography
 
 ### Mobile (<768px)
+
 - Stack columns vertically
 - Reflection first, then behaviors below
 - Adjust typography for readability

@@ -1,7 +1,9 @@
 # Todoist Priority System
 
 ## Problem Statement
+
 When hyperfixated on work, Todoist becomes overwhelming. Need to identify:
+
 - **Easy wins** - Quick tasks that can be knocked out
 - **High priority** - Tasks with repercussions or high opportunity cost
 - **Context-aware** - AI-powered categorization based on title/description
@@ -9,6 +11,7 @@ When hyperfixated on work, Todoist becomes overwhelming. Need to identify:
 ## Proposed Solution
 
 ### Database Schema
+
 Add a `todoist_tasks` table to store AI-generated context:
 
 ```sql
@@ -27,15 +30,18 @@ CREATE TABLE todoist_tasks (
 ```
 
 ### AI Categorization Logic
+
 Use OpenAI to analyze tasks and categorize them:
 
 #### Easy Tasks
+
 - Can be completed in < 15 minutes
 - No dependencies or complex thinking required
 - Administrative/maintenance tasks
 - Examples: "Reply to email", "Update address", "Schedule appointment"
 
 #### High Priority Tasks
+
 - Have deadlines with consequences
 - Block other important work
 - High opportunity cost if delayed
@@ -43,6 +49,7 @@ Use OpenAI to analyze tasks and categorize them:
 - Examples: "Submit tax documents", "Respond to client proposal", "Fix production bug"
 
 #### Normal Tasks
+
 - Everything else that doesn't fit easy or high priority
 
 ### Implementation Plan
@@ -56,17 +63,20 @@ Use OpenAI to analyze tasks and categorize them:
 ### API Integration Strategy
 
 #### Initial Sync
+
 - Fetch all Todoist tasks
 - Check which tasks don't exist in our database
 - Send new tasks to AI for analysis
 - Store results in todoist_tasks table
 
 #### Incremental Updates
+
 - Compare task title/description with stored version
 - If changed, re-analyze only that task
 - Update database with new AI categorization
 
 #### AI Prompt Template
+
 ```
 Analyze this task and categorize it as "easy", "high_priority", or "normal".
 
@@ -88,12 +98,14 @@ Respond with JSON:
 ### UI Enhancements
 
 #### New Todoist Page Layout
+
 - Add "Priority" column showing AI category
 - Filter tabs: All | Easy Wins | High Priority | Normal
 - Visual indicators: 🟢 Easy, 🔴 High Priority, ⚪ Normal
 - Show AI reasoning on hover/expand
 
 #### Smart Notifications
+
 - Badge counts for easy wins and high priority items
 - Quick access to "5 Easy Wins" or "Critical Items"
 

@@ -1,16 +1,16 @@
 interface ProgressRingProps {
-  progress: number;
-  size: number;
-  strokeWidth: number;
-  color: string;
+  progress: number
+  size: number
+  strokeWidth: number
+  color: string
 }
 
 export const ProgressRing = ({ progress, size, strokeWidth, color }: ProgressRingProps) => {
   // Calculate the radius and circumference
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
-  
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const strokeDashoffset = circumference - (progress / 100) * circumference
+
   return (
     <svg height={size} width={size} className="transform -rotate-90">
       {/* Background circle */}
@@ -22,7 +22,7 @@ export const ProgressRing = ({ progress, size, strokeWidth, color }: ProgressRin
         cx={size / 2}
         cy={size / 2}
       />
-      
+
       {/* Progress circle */}
       <circle
         stroke={color}
@@ -34,10 +34,10 @@ export const ProgressRing = ({ progress, size, strokeWidth, color }: ProgressRin
         cx={size / 2}
         cy={size / 2}
         style={{
-          transition: 'stroke-dashoffset 0.5s ease'
+          transition: 'stroke-dashoffset 0.5s ease',
         }}
       />
-      
+
       {/* Text in the center */}
       <text
         x="50%"
@@ -52,5 +52,5 @@ export const ProgressRing = ({ progress, size, strokeWidth, color }: ProgressRin
         {progress}%
       </text>
     </svg>
-  );
-};
+  )
+}

@@ -1,53 +1,54 @@
-import { useState, useEffect, useRef } from "react";
-import { Plus, Search } from "lucide-react";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../hooks/useAuth";
+import { useState, useEffect, useRef } from 'react'
+import { Search } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
+import AddButton from '../components/AddButton'
 
 interface Note {
-  id: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  start_time: string;
-  end_time: string;
+  id: string
+  content: string
+  created_at: string
+  updated_at: string
+  start_time: string
+  end_time: string
 }
 
 const Notes = () => {
-  const { user } = useAuth();
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { user } = useAuth()
+  const [notes, setNotes] = useState<Note[]>([])
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Fetch notes from database
   const fetchNotes = async () => {
-    if (!user) return;
+    if (!user) return
 
     try {
-      setLoading(true);
+      setLoading(true)
       const { data, error } = await supabase
         .from('habits_notes')
         .select('*')
         .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false })
 
-      if (error) throw error;
-      setNotes(data || []);
+      if (error) throw error
+      setNotes(data || [])
     } catch (err) {
-      console.error('Error fetching notes:', err);
+      console.error('Error fetching notes:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   // Create new note
   const createNewNote = async () => {
-    if (!user) return;
+    if (!user) return
 
     try {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString()
       const { data, error } = await supabase
         .from('habits_notes')
         .insert({
@@ -56,113 +57,112 @@ const Notes = () => {
           created_at: now,
           updated_at: now,
           start_time: now,
-          end_time: now
+          end_time: now,
         })
         .select()
-        .single();
+        .single()
 
-      if (error) throw error;
+      if (error) throw error
 
-      const newNote = data as Note;
-      setNotes(prev => [newNote, ...prev]);
-      setSelectedNote(newNote);
+      const newNote = data as Note
+      setNotes(prev => [newNote, ...prev])
+      setSelectedNote(newNote)
     } catch (err) {
-      console.error('Error creating note:', err);
+      console.error('Error creating note:', err)
     }
-  };
+  }
 
   // Save note with debounced autosave
   const saveNote = async (noteId: string, content: string) => {
     try {
-      setSaving(true);
+      setSaving(true)
       const { error } = await supabase
-        .from("habits_notes")
+        .from('habits_notes')
         .update({
           content,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", noteId);
+        .eq('id', noteId)
 
-      if (error) throw error;
+      if (error) throw error
 
       // Update local state without affecting selectedNote to preserve cursor
-      setNotes((prev) =>
-        prev.map((note) =>
-          note.id === noteId
-            ? { ...note, content, updated_at: new Date().toISOString() }
-            : note
+      setNotes(prev =>
+        prev.map(note =>
+          note.id === noteId ? { ...note, content, updated_at: new Date().toISOString() } : note
         )
-      );
+      )
 
       // Extract wins from the note content (async, non-blocking)
-      if (user && content.trim().length > 20) { // Only extract if substantial content
-        supabase.functions.invoke('extract-wins', {
-          body: {
-            noteId,
-            noteContent: content,
-            userId: user.id
-          }
-        }).catch(err => 
-          console.error('Win extraction failed:', err)
-        );
+      if (user && content.trim().length > 20) {
+        // Only extract if substantial content
+        supabase.functions
+          .invoke('extract-wins', {
+            body: {
+              noteId,
+              noteContent: content,
+              userId: user.id,
+            },
+          })
+          .catch(err => console.error('Win extraction failed:', err))
       }
 
       // Don't update selectedNote during autosave to preserve cursor position
     } catch (err) {
-      console.error('Error saving note:', err);
+      console.error('Error saving note:', err)
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   // Handle content change with autosave
   const handleContentChange = (content: string) => {
-    if (!selectedNote) return;
+    if (!selectedNote) return
 
     // Update selected note immediately for UI responsiveness
-    setSelectedNote(prev => prev ? { ...prev, content } : null);
+    setSelectedNote(prev => (prev ? { ...prev, content } : null))
 
     // Clear existing timeout
     if (autosaveTimeoutRef.current) {
-      clearTimeout(autosaveTimeoutRef.current);
+      clearTimeout(autosaveTimeoutRef.current)
     }
 
     // Set new timeout for autosave
     autosaveTimeoutRef.current = setTimeout(() => {
-      saveNote(selectedNote.id, content);
-    }, 500); // 500ms delay
-  };
+      saveNote(selectedNote.id, content)
+    }, 500) // 500ms delay
+  }
 
   // Get note title from content (first line)
   const getNoteTitle = (content: string) => {
-    const firstLine = content.split('\n')[0].trim();
-    return firstLine || 'Untitled Note';
-  };
+    const firstLine = content.split('\n')[0].trim()
+    return firstLine || 'Untitled Note'
+  }
 
   // Get note preview (first few words)
   const getNotePreview = (content: string) => {
-    const text = content.replace(/[#*`]/g, '').trim();
-    const words = text.split(' ').slice(0, 10).join(' ');
-    return words || 'No additional text';
-  };
+    const text = content.replace(/[#*`]/g, '').trim()
+    const words = text.split(' ').slice(0, 10).join(' ')
+    return words || 'No additional text'
+  }
 
   // Filter notes based on search
-  const filteredNotes = notes.filter(note => 
+  const filteredNotes = notes.filter(note =>
     note.content.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  )
 
   useEffect(() => {
-    fetchNotes();
-  }, [user]);
+    fetchNotes()
+  }, [user])
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (autosaveTimeoutRef.current) {
-        clearTimeout(autosaveTimeoutRef.current);
+        clearTimeout(autosaveTimeoutRef.current)
       }
-    };
-  }, []);
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -174,7 +174,7 @@ const Notes = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -185,14 +185,9 @@ const Notes = () => {
         <div className="p-3 border-b border-neutral-200">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-lg font-semibold text-neutral-900">Notes</h1>
-            <button
-              onClick={createNewNote}
-              className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200 rounded-md transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+            <AddButton onClick={createNewNote} />
           </div>
-          
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-neutral-400 w-3.5 h-3.5" />
@@ -200,7 +195,7 @@ const Notes = () => {
               type="text"
               placeholder="Search notes..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-8 pr-2.5 py-1.5 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
@@ -213,7 +208,7 @@ const Notes = () => {
               {searchTerm ? 'No notes found' : 'No notes yet'}
             </div>
           ) : (
-            filteredNotes.map((note) => (
+            filteredNotes.map(note => (
               <div
                 key={note.id}
                 onClick={() => setSelectedNote(note)}
@@ -228,7 +223,7 @@ const Notes = () => {
                   {new Date(note.updated_at).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
-                    year: 'numeric'
+                    year: 'numeric',
                   })}
                 </div>
                 <div className="text-xs text-neutral-500 line-clamp-2">
@@ -252,12 +247,13 @@ const Notes = () => {
                     {getNoteTitle(selectedNote.content)}
                   </h2>
                   <p className="text-sm text-neutral-500">
-                    Last updated {new Date(selectedNote.updated_at).toLocaleDateString('en-US', {
+                    Last updated{' '}
+                    {new Date(selectedNote.updated_at).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',
                       hour: 'numeric',
-                      minute: '2-digit'
+                      minute: '2-digit',
                     })}
                   </p>
                 </div>
@@ -271,13 +267,13 @@ const Notes = () => {
             <div className="flex-1 p-4 overflow-auto min-h-0">
               <textarea
                 value={selectedNote.content}
-                onChange={(e) => handleContentChange(e.target.value)}
+                onChange={e => handleContentChange(e.target.value)}
                 placeholder="Start writing your note..."
                 className="w-full h-full resize-none border-none outline-none text-neutral-900 placeholder-neutral-400 text-base leading-relaxed block"
-                style={{ 
+                style={{
                   fontFamily: 'system-ui, -apple-system, sans-serif',
                   wordWrap: 'break-word',
-                  whiteSpace: 'pre-wrap'
+                  whiteSpace: 'pre-wrap',
                 }}
               />
             </div>
@@ -293,7 +289,7 @@ const Notes = () => {
         )}
       </main>
     </div>
-  );
-};
+  )
+}
 
-export default Notes;
+export default Notes

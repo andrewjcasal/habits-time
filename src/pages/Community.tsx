@@ -1,40 +1,35 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Phone, 
-  Mail, 
-  MessageSquare
-} from "lucide-react";
-import { usePeople } from "../hooks/usePeople";
-import { Person } from "../types";
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Users, Plus, Search, Phone, Mail, MessageSquare } from 'lucide-react'
+import { usePeople } from '../hooks/usePeople'
+import { Person } from '../types'
 
 const Community = () => {
-  const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const navigate = useNavigate()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
   const [newPerson, setNewPerson] = useState({
     name: '',
     email: '',
     phone: '',
     company: '',
-    role: ''
-  });
+    role: '',
+  })
 
-  const { people, loading, error, addPerson } = usePeople();
+  const { people, loading, error, addPerson } = usePeople()
 
   const filteredPeople = people.filter(person => {
-    const searchLower = searchTerm.toLowerCase();
-    return person.name.toLowerCase().includes(searchLower) ||
-           person.company?.toLowerCase().includes(searchLower) ||
-           person.role?.toLowerCase().includes(searchLower) ||
-           person.email?.toLowerCase().includes(searchLower);
-  });
+    const searchLower = searchTerm.toLowerCase()
+    return (
+      person.name.toLowerCase().includes(searchLower) ||
+      person.company?.toLowerCase().includes(searchLower) ||
+      person.role?.toLowerCase().includes(searchLower) ||
+      person.email?.toLowerCase().includes(searchLower)
+    )
+  })
 
   const handleAddPerson = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
       await addPerson({
         name: newPerson.name,
@@ -42,13 +37,13 @@ const Community = () => {
         phone: newPerson.phone || undefined,
         company: newPerson.company || undefined,
         role: newPerson.role || undefined,
-      });
-      setNewPerson({ name: '', email: '', phone: '', company: '', role: '' });
-      setShowAddForm(false);
+      })
+      setNewPerson({ name: '', email: '', phone: '', company: '', role: '' })
+      setShowAddForm(false)
     } catch (error) {
-      console.error('Error adding person:', error);
+      console.error('Error adding person:', error)
     }
-  };
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-4">
@@ -67,10 +62,10 @@ const Community = () => {
             placeholder="Search people, companies, or roles..."
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        <button 
+        <button
           onClick={() => setShowAddForm(true)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
         >
@@ -88,7 +83,7 @@ const Community = () => {
               type="text"
               placeholder="Name *"
               value={newPerson.name}
-              onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })}
+              onChange={e => setNewPerson({ ...newPerson, name: e.target.value })}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
@@ -96,28 +91,28 @@ const Community = () => {
               type="email"
               placeholder="Email"
               value={newPerson.email}
-              onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })}
+              onChange={e => setNewPerson({ ...newPerson, email: e.target.value })}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <input
               type="tel"
               placeholder="Phone"
               value={newPerson.phone}
-              onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })}
+              onChange={e => setNewPerson({ ...newPerson, phone: e.target.value })}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <input
               type="text"
               placeholder="Company"
               value={newPerson.company}
-              onChange={(e) => setNewPerson({ ...newPerson, company: e.target.value })}
+              onChange={e => setNewPerson({ ...newPerson, company: e.target.value })}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <input
               type="text"
               placeholder="Role"
               value={newPerson.role}
-              onChange={(e) => setNewPerson({ ...newPerson, role: e.target.value })}
+              onChange={e => setNewPerson({ ...newPerson, role: e.target.value })}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <div className="flex items-center gap-2">
@@ -160,15 +155,14 @@ const Community = () => {
               {people.length === 0 ? 'No people yet' : 'No people found'}
             </h3>
             <p className="text-gray-600">
-              {people.length === 0 
-                ? 'Add your first person to get started.' 
-                : 'Try adjusting your search or add a new person.'
-              }
+              {people.length === 0
+                ? 'Add your first person to get started.'
+                : 'Try adjusting your search or add a new person.'}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {filteredPeople.map((person) => (
+            {filteredPeople.map(person => (
               <div
                 key={person.id}
                 onClick={() => navigate(`/community/${person.id}`)}
@@ -178,13 +172,18 @@ const Community = () => {
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                       <span className="text-blue-600 font-medium">
-                        {person.name.split(' ').map(n => n[0]).join('')}
+                        {person.name
+                          .split(' ')
+                          .map(n => n[0])
+                          .join('')}
                       </span>
                     </div>
                     <div>
                       <h3 className="font-medium text-gray-900">{person.name}</h3>
                       {person.role && person.company && (
-                        <p className="text-sm text-gray-600">{person.role} at {person.company}</p>
+                        <p className="text-sm text-gray-600">
+                          {person.role} at {person.company}
+                        </p>
                       )}
                       {person.role && !person.company && (
                         <p className="text-sm text-gray-600">{person.role}</p>
@@ -195,12 +194,8 @@ const Community = () => {
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 text-gray-400">
-                    {person.email && (
-                      <Mail className="w-4 h-4" />
-                    )}
-                    {person.phone && (
-                      <Phone className="w-4 h-4" />
-                    )}
+                    {person.email && <Mail className="w-4 h-4" />}
+                    {person.phone && <Phone className="w-4 h-4" />}
                   </div>
                 </div>
               </div>
@@ -209,7 +204,7 @@ const Community = () => {
         )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Community;
+export default Community

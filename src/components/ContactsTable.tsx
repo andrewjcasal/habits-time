@@ -1,12 +1,12 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { Edit, Trash2, UsersIcon } from "lucide-react";
-import { Contact } from "../types";
+import { motion, AnimatePresence } from 'framer-motion'
+import { Edit, Trash2, UsersIcon } from 'lucide-react'
+import { Contact } from '../types'
 
 interface ContactsTableProps {
-  contacts: Contact[];
-  onContactClick: (contact: Contact) => void;
-  onEditContact: (contact: Contact) => void;
-  onDeleteContact: (contactId: string) => void;
+  contacts: Contact[]
+  onContactClick: (contact: Contact) => void
+  onEditContact: (contact: Contact) => void
+  onDeleteContact: (contactId: string) => void
 }
 
 export const ContactsTable = ({
@@ -20,21 +20,13 @@ export const ContactsTable = ({
       <table className="w-full">
         <thead>
           <tr className="border-b border-neutral-200">
-            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
-              Name
-            </th>
-            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
-              Company
-            </th>
-            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
-              Role
-            </th>
+            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Name</th>
+            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Company</th>
+            <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">Role</th>
             <th className="text-left py-1 px-2 text-xs font-medium text-neutral-500">
               Last Contact
             </th>
-            <th className="text-right py-1 px-2 text-xs font-medium text-neutral-500">
-              Actions
-            </th>
+            <th className="text-right py-1 px-2 text-xs font-medium text-neutral-500">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -53,39 +45,36 @@ export const ContactsTable = ({
                   <span className="text-sm font-medium">{contact.name}</span>
                 </td>
                 <td className="py-1 px-2">
-                  <span className="text-sm">{contact.company || "-"}</span>
+                  <span className="text-sm">{contact.company || '-'}</span>
                 </td>
                 <td className="py-1 px-2">
-                  <span className="text-sm">{contact.role || "-"}</span>
+                  <span className="text-sm">{contact.role || '-'}</span>
                 </td>
                 <td className="py-1 px-2">
                   <span className="text-sm text-neutral-600">
                     {contact.last_contact_date
-                      ? new Date(contact.last_contact_date).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "numeric",
-                            day: "numeric",
-                          }
-                        )
-                      : "-"}
+                      ? new Date(contact.last_contact_date).toLocaleDateString('en-US', {
+                          month: 'numeric',
+                          day: 'numeric',
+                        })
+                      : '-'}
                   </span>
                 </td>
                 <td className="py-1 px-2 text-right">
                   <div className="flex items-center justify-end space-x-1">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditContact(contact);
+                      onClick={e => {
+                        e.stopPropagation()
+                        onEditContact(contact)
                       }}
                       className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
                     >
                       <Edit className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteContact(contact.id);
+                      onClick={e => {
+                        e.stopPropagation()
+                        onDeleteContact(contact.id)
                       }}
                       className="p-1 text-neutral-500 hover:text-error-600 hover:bg-neutral-100 rounded"
                     >
@@ -110,5 +99,5 @@ export const ContactsTable = ({
         </div>
       )}
     </div>
-  );
-};
+  )
+}

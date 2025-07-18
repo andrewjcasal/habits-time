@@ -1,11 +1,13 @@
 # Wins Page Specification
 
 ## Overview
+
 The Wins page will track achievements and positive moments based on habit streaks and notes analysis. It uses OpenAI to extract wins from user notes and displays them in a celebratory interface.
 
 ## Database Schema
 
 ### Wins Table
+
 ```sql
 CREATE TABLE wins (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -17,7 +19,7 @@ CREATE TABLE wins (
   extracted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  
+
   -- Ensure uniqueness of wins per user based on content
   CONSTRAINT unique_user_win UNIQUE (user_id, title)
 );
@@ -26,6 +28,7 @@ CREATE TABLE wins (
 ## Page Features
 
 ### UI Components
+
 1. **Header Section**
    - Page title: "Wins & Achievements"
    - Celebration emoji or icon
@@ -48,23 +51,26 @@ CREATE TABLE wins (
 ### Win Types
 
 #### From Notes
+
 - Extracted using OpenAI when notes are saved
 - Examples: "Completed first 5K run", "Got promoted at work", "Successfully meditated for 30 days"
 
 #### From Habit Streaks
+
 - Generated when hitting streak milestones
 - Examples: "7-day morning routine streak", "30-day meditation streak"
 
 ## OpenAI Integration
 
 ### Prompt for Win Extraction
+
 ```
-Analyze this note and extract any wins, achievements, accomplishments, or positive moments. 
+Analyze this note and extract any wins, achievements, accomplishments, or positive moments.
 Return a JSON array of wins, each with a "title" (short, celebratory) and optional "description".
 
 Focus on:
 - Completed goals or milestones
-- Personal achievements 
+- Personal achievements
 - Positive life events
 - Habit successes
 - Work/career wins
@@ -89,6 +95,7 @@ Return format:
 ```
 
 ### Duplicate Prevention
+
 - Use the `unique_user_win` constraint on `(user_id, title)`
 - Before inserting, check if similar win already exists
 - Use fuzzy matching on titles to prevent near-duplicates
@@ -110,10 +117,12 @@ Return format:
    - Link back to source note/habit
 
 ## Navigation Integration
+
 - Add "Wins" to left navigation with Trophy icon
 - Position between "Habits" and "Notes"
 
 ## Future Enhancements
+
 - Win categories/tags
 - Achievement badges
 - Sharing wins
