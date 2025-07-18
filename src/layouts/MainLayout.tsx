@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
+import FeedbackButton from '../components/FeedbackButton'
 
 const MainLayout = () => {
   const location = useLocation()
@@ -200,17 +201,17 @@ const MainLayout = () => {
               )}
             </AnimatePresence>
           </div>
-          
+
           <div className="flex items-center">
             <div className="relative flex-1">
-            <NavLink
-              to="/settings"
-              className="flex items-center justify-center w-6 h-6 rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-200"
-              onMouseEnter={() => setHoveredItem(settingsItem.path)}
-              onMouseLeave={() => setHoveredItem(null)}
-            >
-              <Settings className="h-3 w-3" />
-            </NavLink>
+              <NavLink
+                to="/settings"
+                className="flex items-center justify-center w-6 h-6 rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-200"
+                onMouseEnter={() => setHoveredItem(settingsItem.path)}
+                onMouseLeave={() => setHoveredItem(null)}
+              >
+                <Settings className="h-3 w-3" />
+              </NavLink>
 
               {/* Settings Popover */}
               <AnimatePresence>
@@ -232,7 +233,7 @@ const MainLayout = () => {
                 )}
               </AnimatePresence>
             </div>
-            
+
             <div className="relative ml-1">
               <button
                 onClick={signOut}
@@ -264,7 +265,6 @@ const MainLayout = () => {
               </AnimatePresence>
             </div>
           </div>
-
         </div>
       </aside>
 
@@ -272,6 +272,9 @@ const MainLayout = () => {
       <main className="flex-1 md:ml-56 ml-18">
         <Outlet />
       </main>
+
+      {/* Feedback Button */}
+      <FeedbackButton />
     </div>
   )
 }

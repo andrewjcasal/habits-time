@@ -1,10 +1,19 @@
 import { useState, useEffect } from 'react'
-import { Clock, CheckCircle2, Circle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  Clock,
+  CheckCircle2,
+  Circle,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+} from 'lucide-react'
 import { useHabits } from '../hooks/useHabits'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import HabitContext from '../components/HabitContext'
+import HabitDetailTabs from '../components/HabitDetailTabs'
 import LoadingSpinner from '../components/LoadingSpinner'
+import CreateHabitModal from '../components/CreateHabitModal'
 
 const Habits = () => {
   const { user } = useAuth()
@@ -16,6 +25,7 @@ const Habits = () => {
     logHabitCompletion,
     updateHabitStartTime,
     updateHabitStartTimes,
+    createHabit,
     getNextHabit,
   } = useHabits(selectedDate)
 
@@ -25,6 +35,7 @@ const Habits = () => {
   const [tempCompletedTime, setTempCompletedTime] = useState('')
   const [routineLogs, setRoutineLogs] = useState<any[]>([])
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   const toggleCompletion = async (habitId: string) => {
     const habit = habits.find(h => h.id === habitId)
@@ -220,10 +231,13 @@ const Habits = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-0">
+    <div className="min-h-screen flex flex-col">
+      <div
+        className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-0"
+        style={{ minHeight: 'calc(100vh - 200px)' }}
+      >
         {/* Habits List - Outlook style */}
-        <div className="border-r border-gray-200">
+        <div className="border-r border-gray-200 flex flex-col">
           <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <button
@@ -235,202 +249,232 @@ const Habits = () => {
               <h2 className="text-sm font-semibold text-gray-900">
                 {formatDateDisplay(selectedDate)}
               </h2>
-              <button
-                onClick={() => navigateDate('next')}
-                className="p-0.5 hover:bg-gray-200 rounded transition-colors"
-              >
-                <ChevronRight className="w-3 h-3" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => navigateDate('next')}
+                  className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+                >
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="p-1 hover:bg-gray-200 rounded transition-colors"
+                  title="Add new habit"
+                >
+                  <Plus className="w-3 h-3 text-gray-600" />
+                </button>
+              </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            {habits.map((habit, index) => {
-              const dailyLog = habit.habits_daily_logs?.[0]
-              const isCompleted = dailyLog?.actual_start_time || false
-              const isSelected = selectedHabitId === habit.id
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {habits.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                <p className="text-sm">No habits for this date.</p>
+                <p className="text-xs mt-1">Navigate to other dates or add new habits.</p>
+              </div>
+            ) : (
+              habits.map((habit, index) => {
+                const dailyLog = habit.habits_daily_logs?.[0]
+                const isCompleted = dailyLog?.actual_start_time || false
+                const isSelected = selectedHabitId === habit.id
 
-              return (
-                <div
-                  key={habit.id}
-                  onClick={() => setSelectedHabitId(habit.id)}
-                  className={`border-b border-gray-200 p-2 cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'bg-yellow-100'
-                      : isCompleted
-                      ? 'bg-green-50 hover:bg-green-100'
-                      : 'bg-white hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-1.5">
-                      <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          toggleCompletion(habit.id)
-                        }}
-                        className="flex-shrink-0"
-                      >
-                        {isCompleted ? (
-                          <CheckCircle2 className="w-3 h-3 text-green-600" />
-                        ) : (
-                          <Circle className="w-3 h-3 text-neutral-400 hover:text-neutral-600" />
-                        )}
-                      </button>
-
-                      <div className="min-w-0 flex-1">
-                        <h3
-                          className={`font-medium text-sm ${
-                            isCompleted ? 'text-green-800' : 'text-neutral-900'
-                          }`}
+                return (
+                  <div
+                    key={habit.id}
+                    onClick={() => setSelectedHabitId(habit.id)}
+                    className={`border-b border-gray-200 px-2 py-1 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-yellow-100'
+                        : isCompleted
+                        ? 'bg-green-50 hover:bg-green-100'
+                        : 'bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            toggleCompletion(habit.id)
+                          }}
+                          className="flex-shrink-0"
                         >
-                          {habit.name}
-                        </h3>
-                        <div className="flex items-center space-x-1 text-xs text-neutral-600">
-                          <Clock className="w-3 h-3" />
-                          <span>{habit.duration}m</span>
-                          {dailyLog?.actual_start_time &&
-                            dailyLog?.actual_end_time &&
-                            (editingCompletedTime === habit.id ? (
-                              <div
-                                className="flex items-center space-x-1"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                <span className="text-green-600">•</span>
-                                <input
-                                  type="time"
-                                  value={tempCompletedTime}
-                                  onChange={e => setTempCompletedTime(e.target.value)}
-                                  className="px-1 py-0.5 border border-primary-500 rounded text-xs w-16 bg-white"
-                                  autoFocus
-                                  onBlur={() => updateCompletedTime(habit.id, tempCompletedTime)}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') {
-                                      updateCompletedTime(habit.id, tempCompletedTime)
-                                    } else if (e.key === 'Escape') {
-                                      setEditingCompletedTime(null)
-                                    }
+                          {isCompleted ? (
+                            <CheckCircle2 className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <Circle className="w-3 h-3 text-neutral-400 hover:text-neutral-600" />
+                          )}
+                        </button>
+
+                        <div className="min-w-0 flex-1">
+                          <h3
+                            className={`font-medium text-sm ${
+                              isCompleted ? 'text-green-800' : 'text-neutral-900'
+                            }`}
+                          >
+                            {habit.name}
+                          </h3>
+                          <div className="flex items-center space-x-1 text-xs text-neutral-600">
+                            <Clock className="w-2 h-2" />
+                            <span>{habit.duration}m</span>
+                            {dailyLog?.actual_start_time &&
+                              dailyLog?.actual_end_time &&
+                              (editingCompletedTime === habit.id ? (
+                                <div
+                                  className="flex items-center space-x-1"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <span className="text-green-600">•</span>
+                                  <input
+                                    type="time"
+                                    value={tempCompletedTime}
+                                    onChange={e => setTempCompletedTime(e.target.value)}
+                                    className="px-1 py-0.5 border border-primary-500 rounded text-xs w-16 bg-white"
+                                    autoFocus
+                                    onBlur={() => updateCompletedTime(habit.id, tempCompletedTime)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        updateCompletedTime(habit.id, tempCompletedTime)
+                                      } else if (e.key === 'Escape') {
+                                        setEditingCompletedTime(null)
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <span
+                                  className="text-green-600 cursor-pointer hover:bg-green-100 px-1 py-0.5 rounded transition-colors"
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    setEditingCompletedTime(habit.id)
+                                    setTempCompletedTime(dailyLog.actual_start_time)
                                   }}
-                                />
-                              </div>
-                            ) : (
-                              <span
-                                className="text-green-600 cursor-pointer hover:bg-green-100 px-1 py-0.5 rounded transition-colors"
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  setEditingCompletedTime(habit.id)
-                                  setTempCompletedTime(dailyLog.actual_start_time)
-                                }}
-                                title="Click to edit completed time"
-                              >
-                                • {formatTime(dailyLog.actual_start_time)}
-                              </span>
-                            ))}
+                                  title="Click to edit completed time"
+                                >
+                                  • {formatTime(dailyLog.actual_start_time)}
+                                </span>
+                              ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center">
-                      {editingHabit === habit.id ? (
-                        <div
-                          className="flex items-center space-x-1"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <input
-                            type="time"
-                            value={tempTime}
-                            onChange={e => setTempTime(e.target.value)}
-                            className="px-1 py-0.5 border border-neutral-300 rounded text-xs w-16"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => updateTime(habit.id, tempTime)}
-                            className="px-1.5 py-0.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
+                      <div className="flex items-center">
+                        {editingHabit === habit.id ? (
+                          <div
+                            className="flex items-center space-x-1"
+                            onClick={e => e.stopPropagation()}
                           >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingHabit(null)}
-                            className="px-1.5 py-0.5 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="font-mono text-xs text-neutral-600">
-                          Next: {formatTime(habit.current_start_time)}
-                        </span>
-                      )}
+                            <input
+                              type="time"
+                              value={tempTime}
+                              onChange={e => setTempTime(e.target.value)}
+                              className="px-1 py-0.5 border border-neutral-300 rounded text-xs w-16"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => updateTime(habit.id, tempTime)}
+                              className="px-1.5 py-0.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingHabit(null)}
+                              className="px-1.5 py-0.5 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="font-mono text-xs text-neutral-600">
+                            Next: {formatTime(habit.current_start_time)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         </div>
-        {/* Context Panel - Show only selected habit */}
+        {/* Detail Panel - Show only selected habit */}
         <div className="bg-white col-span-2">
           {selectedHabitId &&
             (() => {
               const selectedHabit = habits.find(h => h.id === selectedHabitId)
               return selectedHabit ? (
-                <HabitContext
-                  key={`context-${selectedHabit.id}`}
+                <HabitDetailTabs
+                  key={`detail-${selectedHabit.id}`}
                   habitId={selectedHabit.id}
                   habitName={selectedHabit.name}
-                  initialContext={selectedHabit.context}
+                  initialContext={{
+                    background: selectedHabit.background || '',
+                    benefits: selectedHabit.benefits || '',
+                    consequences: selectedHabit.consequences || '',
+                  }}
                 />
               ) : null
             })()}
         </div>
       </div>
 
-      <div className="mt-4 mx-3">
-        <h3 className="text-base font-semibold text-neutral-900 mb-2">
-          Last 7 Days - Morning & Shutdown Routines
-        </h3>
-        <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-neutral-50">
-                <tr>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">Date</th>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">
-                    Morning Routine
-                  </th>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">
-                    Shutdown
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {routineLogs.map((dayGroup, i) => {
-                  const displayDate = dayGroup.displayDate.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })
+      {habits.length > 0 && (
+        <div className="mt-4 mx-3">
+          <h3 className="text-base font-semibold text-neutral-900 mb-2">
+            Last 7 Days - Morning & Shutdown Routines
+          </h3>
+          <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-neutral-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">
+                      Date
+                    </th>
+                    <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">
+                      Morning Routine
+                    </th>
+                    <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">
+                      Shutdown
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {routineLogs.map((dayGroup, i) => {
+                    const displayDate = dayGroup.displayDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })
 
-                  const morningLog = dayGroup.logs.find(
-                    log => log.habits.name === 'Morning Routine'
-                  )
-                  const shutdownLog = dayGroup.logs.find(log => log.habits.name === 'Shutdown')
+                    const morningLog = dayGroup.logs.find(
+                      log => log.habits.name === 'Morning Routine'
+                    )
+                    const shutdownLog = dayGroup.logs.find(log => log.habits.name === 'Shutdown')
 
-                  return (
-                    <tr key={dayGroup.sleepDate} className="hover:bg-neutral-50">
-                      <td className="px-3 py-2 text-sm text-neutral-900">{displayDate}</td>
-                      <td className="px-3 py-2 text-sm text-neutral-600">
-                        {morningLog ? formatTime(morningLog.actual_start_time) : '-'}
-                      </td>
-                      <td className="px-3 py-2 text-sm text-neutral-600">
-                        {shutdownLog ? formatTime(shutdownLog.actual_start_time) : '-'}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                    return (
+                      <tr key={dayGroup.sleepDate} className="hover:bg-neutral-50">
+                        <td className="px-3 py-2 text-sm text-neutral-900">{displayDate}</td>
+                        <td className="px-3 py-2 text-sm text-neutral-600">
+                          {morningLog ? formatTime(morningLog.actual_start_time) : '-'}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-neutral-600">
+                          {shutdownLog ? formatTime(shutdownLog.actual_start_time) : '-'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      <CreateHabitModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreateHabit={createHabit}
+      />
     </div>
   )
 }

@@ -20,7 +20,7 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
       const dateKey = format(selectedDate, 'yyyy-MM-dd')
       const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateKey)
       const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
-      
+
       // Set initial time to effective habit time (daily log override or default)
       setNewTime(effectiveStartTime || '')
     }
@@ -49,10 +49,7 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
       <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Edit Habit Time</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -67,9 +64,7 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
               Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </p>
             {habit.duration && (
-              <p className="text-sm text-gray-600">
-                Duration: {habit.duration} minutes
-              </p>
+              <p className="text-sm text-gray-600">Duration: {habit.duration} minutes</p>
             )}
           </div>
 
@@ -81,7 +76,7 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
               type="time"
               id="time"
               value={newTime}
-              onChange={(e) => setNewTime(e.target.value)}
+              onChange={e => setNewTime(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />

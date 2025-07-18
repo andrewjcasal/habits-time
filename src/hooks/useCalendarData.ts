@@ -61,16 +61,16 @@ export const useCalendarData = (windowWidth: number) => {
     const currentHour = currentTime.getHours()
     const currentMinute = currentTime.getMinutes()
     const { end } = getWorkHoursRange()
-    
+
     if (currentHour < 7 || currentHour >= end) return null
-    
+
     const isToday = format(date, 'yyyy-MM-dd') === format(currentTime, 'yyyy-MM-dd')
     if (!isToday) return null
-    
+
     const hourIndex = currentHour - 7
     const minutePercentage = currentMinute / 60
     const totalPosition = (hourIndex + minutePercentage) * 64
-    
+
     return totalPosition
   }
 
@@ -93,7 +93,9 @@ export const useCalendarData = (windowWidth: number) => {
         const allTasksPromises = projectsWithoutSessions.map(async project => {
           try {
             const { supabase } = await import('../lib/supabase')
-            const { data: { user } } = await supabase.auth.getUser()
+            const {
+              data: { user },
+            } = await supabase.auth.getUser()
             if (!user) return []
 
             const { data, error } = await supabase
@@ -141,16 +143,17 @@ export const useCalendarData = (windowWidth: number) => {
       for (let halfHour = 0; halfHour < 2; halfHour++) {
         const minutes = halfHour * 30
         const timeInHours = hour + minutes / 60
-        const timeSlot = hour.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0')
+        const timeSlot =
+          hour.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0')
 
         // Check conflicts with habits, sessions, meetings, and already scheduled tasks
         const habitConflicts = habits.filter(habit => {
           // Check if there's a daily log with a scheduled start time for this date
           const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateStr)
           const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
-          
+
           if (!effectiveStartTime) return false
-          
+
           let habitStartHour = parseInt(effectiveStartTime.split(':')[0])
           let habitStartMinute = parseInt(effectiveStartTime.split(':')[1])
           const habitDuration = habit.duration || 0
@@ -174,7 +177,8 @@ export const useCalendarData = (windowWidth: number) => {
           if (conflictingMeeting) {
             const meetingEnd = new Date(conflictingMeeting.end_time)
             habitStartHour = meetingEnd.getHours()
-            habitStartMinute = meetingEnd.getMinutes() === 0 ? 0 : meetingEnd.getMinutes() <= 30 ? 30 : 0
+            habitStartMinute =
+              meetingEnd.getMinutes() === 0 ? 0 : meetingEnd.getMinutes() <= 30 ? 30 : 0
             if (meetingEnd.getMinutes() > 30) {
               habitStartHour += 1
               habitStartMinute = 0
@@ -189,11 +193,11 @@ export const useCalendarData = (windowWidth: number) => {
 
         const sessionConflicts = sessions.filter(session => {
           if (!session.actual_start_time || session.scheduled_date !== dateStr) return false
-          
+
           const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
           const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
           const sessionDuration = (session.scheduled_hours || 1) * 60
-          
+
           const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
           const sessionEndInHours = sessionStartInHours + sessionDuration / 60
 
@@ -214,13 +218,17 @@ export const useCalendarData = (windowWidth: number) => {
         })
 
         const scheduledTasksInSlot = alreadyScheduledTasks.filter(
-          task => format(task.date, 'yyyy-MM-dd') === dateStr &&
+          task =>
+            format(task.date, 'yyyy-MM-dd') === dateStr &&
             task.startTime <= timeInHours &&
             timeInHours < task.startTime + task.estimated_hours
         )
 
-        const available = habitConflicts.length === 0 && sessionConflicts.length === 0 && 
-                         meetingConflicts.length === 0 && scheduledTasksInSlot.length === 0
+        const available =
+          habitConflicts.length === 0 &&
+          sessionConflicts.length === 0 &&
+          meetingConflicts.length === 0 &&
+          scheduledTasksInSlot.length === 0
 
         blocks.push({ timeInHours, timeSlot, available })
       }
@@ -230,7 +238,12 @@ export const useCalendarData = (windowWidth: number) => {
   }
 
   // Schedule task in available slots
-  const scheduleTaskInAvailableSlots = (taskHours: number, date: Date, taskInfo: any, alreadyScheduledTasks: any[] = []) => {
+  const scheduleTaskInAvailableSlots = (
+    taskHours: number,
+    date: Date,
+    taskInfo: any,
+    alreadyScheduledTasks: any[] = []
+  ) => {
     const availableBlocks = getAvailableTimeBlocks(date, alreadyScheduledTasks)
     const scheduledChunks = []
     let remainingHours = taskHours
@@ -286,8 +299,11 @@ export const useCalendarData = (windowWidth: number) => {
   useEffect(() => {
     if (!allTasksLoading && allTasks.length > 0 && !tasksScheduled && !habitsLoading) {
       const unscheduledTasks = allTasks.filter(
-        task => !task.parent_task_id && task.status !== 'completed' && 
-                task.estimated_hours && task.estimated_hours > 0
+        task =>
+          !task.parent_task_id &&
+          task.status !== 'completed' &&
+          task.estimated_hours &&
+          task.estimated_hours > 0
       )
 
       if (unscheduledTasks.length === 0) {
@@ -297,7 +313,10 @@ export const useCalendarData = (windowWidth: number) => {
 
       const allDays = getDayColumns()
       let allScheduledChunks: any[] = []
-      let remainingTasks = unscheduledTasks.map(task => ({ ...task, remainingHours: task.estimated_hours }))
+      let remainingTasks = unscheduledTasks.map(task => ({
+        ...task,
+        remainingHours: task.estimated_hours,
+      }))
 
       for (const dayColumn of allDays) {
         if (remainingTasks.length === 0) break
@@ -316,10 +335,16 @@ export const useCalendarData = (windowWidth: number) => {
             )
 
             if (scheduledChunks.length > 0) {
-              const chunksWithDate = scheduledChunks.map(chunk => ({ ...chunk, date: dayColumn.date }))
+              const chunksWithDate = scheduledChunks.map(chunk => ({
+                ...chunk,
+                date: dayColumn.date,
+              }))
               allScheduledChunks.push(...chunksWithDate)
 
-              const totalScheduledHours = scheduledChunks.reduce((sum, chunk) => sum + chunk.estimated_hours, 0)
+              const totalScheduledHours = scheduledChunks.reduce(
+                (sum, chunk) => sum + chunk.estimated_hours,
+                0
+              )
               task.remainingHours -= totalScheduledHours
 
               if (task.remainingHours <= 0) {
@@ -354,11 +379,15 @@ export const useCalendarData = (windowWidth: number) => {
 
   // Reset task scheduling when habits with daily logs change
   const habitsWithLogsHash = useMemo(() => {
-    return habits.map(h => {
-      const dailyLogs = h.habits_daily_logs || []
-      const logsHash = dailyLogs.map(log => `${log.log_date}-${log.scheduled_start_time}`).join('|')
-      return `${h.id}-${h.current_start_time}-${logsHash}`
-    }).join(',')
+    return habits
+      .map(h => {
+        const dailyLogs = h.habits_daily_logs || []
+        const logsHash = dailyLogs
+          .map(log => `${log.log_date}-${log.scheduled_start_time}`)
+          .join('|')
+        return `${h.id}-${h.current_start_time}-${logsHash}`
+      })
+      .join(',')
   }, [habits])
 
   useEffect(() => {
@@ -369,7 +398,7 @@ export const useCalendarData = (windowWidth: number) => {
   // Get tasks for a specific time slot
   const getTasksForTimeSlot = (timeSlot: string, date: Date) => {
     if (!tasksScheduled) return []
-    
+
     const dateKey = format(date, 'yyyy-MM-dd')
     const cachedTasks = scheduledTasksCache.get(dateKey) || []
     const currentHour = parseInt(timeSlot.split(':')[0])

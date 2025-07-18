@@ -56,14 +56,14 @@ const Projects = () => {
   const handleProjectSelect = useCallback(
     (project: Project | null) => {
       setShowProjectDropdown(false)
-      
+
       if (project) {
         // Update URL query param first
         setSearchParams({ project: project.name })
-        
+
         // Save to localStorage
         localStorage.setItem('selectedProject', JSON.stringify(project))
-        
+
         // Set selected project last to prevent race condition
         setSelectedProject(project)
       } else {

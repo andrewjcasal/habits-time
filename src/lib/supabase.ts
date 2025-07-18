@@ -64,8 +64,9 @@ export type Habit = {
   id: string
   created_at: string
   name: string
-  benefits: string[]
-  consequences: string[]
+  background: string
+  benefits: string
+  consequences: string
   conversation_id: string | null
   user_id: string | null
   duration: number

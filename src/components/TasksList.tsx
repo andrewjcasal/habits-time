@@ -18,7 +18,7 @@ const TasksList = ({
   onShowNewTaskForm,
   onTaskClick,
   onToggleTaskStatus,
-  onUpdateTask
+  onUpdateTask,
 }: TasksListProps) => {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
 
@@ -56,9 +56,9 @@ const TasksList = ({
 
   return (
     <div className="w-1/2 flex flex-col">
-      <SectionHeader 
-        title="Tasks" 
-        onAddClick={onShowNewTaskForm} 
+      <SectionHeader
+        title="Tasks"
+        onAddClick={onShowNewTaskForm}
         className="border-b border-neutral-200 bg-white"
       />
       <div className="flex-1 overflow-y-auto">
@@ -168,32 +168,30 @@ const TasksList = ({
                     </div>
 
                     {/* Subtasks list */}
-                    {task.subtasks &&
-                      task.subtasks.length > 0 &&
-                      expandedTasks.has(task.id) && (
-                        <div className="mt-1 pl-2 border-l border-neutral-200 space-y-0">
-                          {task.subtasks.map(subtask => (
-                            <div key={subtask.id} className="flex items-center gap-1 py-0.5">
-                              <div className="flex-1 min-w-0">
-                                <span
-                                  className={`text-xs ${
-                                    subtask.status === 'completed'
-                                      ? 'line-through text-neutral-500'
-                                      : 'text-neutral-700'
-                                  }`}
-                                >
-                                  {subtask.title}
-                                </span>
-                              </div>
-                              {subtask.estimated_hours && (
-                                <span className="text-xs text-neutral-500 flex-shrink-0">
-                                  {subtask.estimated_hours}h
-                                </span>
-                              )}
+                    {task.subtasks && task.subtasks.length > 0 && expandedTasks.has(task.id) && (
+                      <div className="mt-1 pl-2 border-l border-neutral-200 space-y-0">
+                        {task.subtasks.map(subtask => (
+                          <div key={subtask.id} className="flex items-center gap-1 py-0.5">
+                            <div className="flex-1 min-w-0">
+                              <span
+                                className={`text-xs ${
+                                  subtask.status === 'completed'
+                                    ? 'line-through text-neutral-500'
+                                    : 'text-neutral-700'
+                                }`}
+                              >
+                                {subtask.title}
+                              </span>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            {subtask.estimated_hours && (
+                              <span className="text-xs text-neutral-500 flex-shrink-0">
+                                {subtask.estimated_hours}h
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

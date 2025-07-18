@@ -192,6 +192,60 @@ export function useHabits(selectedDate?: string) {
     }
   }
 
+  const updateHabitType = async (habitId: string, habitTypeId: string) => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({ habit_type_id: habitTypeId })
+        .eq('id', habitId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      // Refresh habits to get updated type information
+      await fetchHabits()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update habit type')
+    }
+  }
+
+  const createHabit = async (habitData: {
+    name: string
+    duration: number
+    habit_type_id: string
+    default_start_time: string
+    background: string
+    benefits: string
+    consequences: string
+  }) => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase.from('habits').insert({
+        name: habitData.name,
+        user_id: user.id,
+        duration: habitData.duration,
+        habit_type_id: habitData.habit_type_id,
+        default_start_time: habitData.default_start_time,
+        current_start_time: habitData.default_start_time,
+        background: habitData.background,
+        benefits: habitData.benefits,
+        consequences: habitData.consequences,
+        is_visible: true,
+      })
+
+      if (error) throw error
+
+      // Refresh habits to show the new habit
+      await fetchHabits()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create habit')
+      throw err
+    }
+  }
+
   const updateHabitStartTimes = async () => {
     if (!user) return
 
@@ -308,6 +362,8 @@ export function useHabits(selectedDate?: string) {
     error,
     logHabitCompletion,
     updateHabitStartTime,
+    updateHabitType,
+    createHabit,
     updateHabitStartTimes,
     refetch: fetchHabits,
     getNextHabit,

@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom'
 import { Bot } from 'lucide-react'
 
 const AuthLayout = () => {
@@ -10,6 +10,14 @@ const AuthLayout = () => {
             <div className="flex items-center">
               <Bot className="h-8 w-8 text-primary-600" />
               <span className="ml-2 text-xl font-semibold text-neutral-900">Reflectify</span>
+            </div>
+            <div>
+              <Link
+                to="/login"
+                className="text-sm font-semibold leading-6 text-neutral-900 hover:text-blue-600 transition-colors"
+              >
+                Sign in <span aria-hidden="true">&rarr;</span>
+              </Link>
             </div>
           </div>
         </div>

@@ -13,15 +13,18 @@ interface ProjectDropdownProps {
 }
 
 const ProjectDropdown = forwardRef<HTMLDivElement, ProjectDropdownProps>(
-  ({ 
-    selectedProject, 
-    projects, 
-    projectsLoading, 
-    showDropdown, 
-    onToggleDropdown,
-    onProjectSelect,
-    onShowNewProjectForm
-  }, ref) => {
+  (
+    {
+      selectedProject,
+      projects,
+      projectsLoading,
+      showDropdown,
+      onToggleDropdown,
+      onProjectSelect,
+      onShowNewProjectForm,
+    },
+    ref
+  ) => {
     return (
       <div className="relative" ref={ref}>
         <button

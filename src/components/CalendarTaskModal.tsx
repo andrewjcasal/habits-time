@@ -8,7 +8,13 @@ interface CalendarTaskModalProps {
   onDelete: () => void
 }
 
-const CalendarTaskModal = ({ isOpen, onClose, task, onComplete, onDelete }: CalendarTaskModalProps) => {
+const CalendarTaskModal = ({
+  isOpen,
+  onClose,
+  task,
+  onComplete,
+  onDelete,
+}: CalendarTaskModalProps) => {
   if (!isOpen || !task) return null
 
   return (
@@ -23,9 +29,7 @@ const CalendarTaskModal = ({ isOpen, onClose, task, onComplete, onDelete }: Cale
 
         <div className="mb-3">
           <h3 className="font-medium text-neutral-900 mb-1">{task.title}</h3>
-          <p className="text-sm text-neutral-600">
-            Project: {task.project?.name || 'Unknown'}
-          </p>
+          <p className="text-sm text-neutral-600">Project: {task.project?.name || 'Unknown'}</p>
           <p className="text-sm text-neutral-600">Estimated: {task.estimated_hours}h</p>
         </div>
 

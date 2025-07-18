@@ -49,7 +49,8 @@ export function useExperiences(personId?: string) {
       // Then, get the experiences with attendees
       const { data, error: fetchError } = await supabase
         .from('experiences')
-        .select(`
+        .select(
+          `
           *,
           attendees:experience_attendees(
             id,
@@ -57,7 +58,8 @@ export function useExperiences(personId?: string) {
             created_at,
             person:people(*)
           )
-        `)
+        `
+        )
         .eq('user_id', user.id)
         .in('id', experienceIdList)
         .order('experience_date', { ascending: false })
@@ -98,7 +100,7 @@ export function useExperiences(personId?: string) {
       if (attendeeIds && attendeeIds.length > 0) {
         const attendeeRecords = attendeeIds.map(personId => ({
           experience_id: experienceData.id,
-          person_id: personId
+          person_id: personId,
         }))
 
         const { error: attendeeError } = await supabase
@@ -111,7 +113,8 @@ export function useExperiences(personId?: string) {
       // Fetch the complete experience with attendees
       const { data: completeExperience, error: fetchError } = await supabase
         .from('experiences')
-        .select(`
+        .select(
+          `
           *,
           attendees:experience_attendees(
             id,
@@ -119,7 +122,8 @@ export function useExperiences(personId?: string) {
             created_at,
             person:people(*)
           )
-        `)
+        `
+        )
         .eq('id', experienceData.id)
         .single()
 

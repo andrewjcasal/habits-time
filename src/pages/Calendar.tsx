@@ -551,21 +551,21 @@ const Calendar = () => {
   // Calculate planned vs actual work hours up to configured week ending time
   const calculateWorkHours = () => {
     const now = new Date()
-    
+
     // Get week ending configuration from settings
     const weekEndingDay = settings?.week_ending_day || 'sunday'
     const weekEndingTime = settings?.week_ending_time || '20:30'
     const weekEndingTimezone = settings?.week_ending_timezone || 'America/New_York'
-    
+
     // Calculate days until week ending day
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
     const targetDayIndex = dayNames.indexOf(weekEndingDay)
     const currentDayIndex = now.getDay()
     const daysUntilTarget = (targetDayIndex - currentDayIndex + 7) % 7
-    
+
     const weekEndDate = new Date(now)
     weekEndDate.setDate(now.getDate() + daysUntilTarget)
-    
+
     // Set to configured time
     const [hours, minutes] = weekEndingTime.split(':').map(Number)
     weekEndDate.setHours(hours, minutes, 0, 0)
@@ -641,11 +641,18 @@ const Calendar = () => {
       {/* Top Bar with Work Hours */}
       <div className="bg-neutral-100 border-b border-neutral-200 px-4 py-1 flex items-center justify-between">
         <div className="text-sm text-neutral-700">
-          Work Hours (until {settings?.week_ending_day?.charAt(0).toUpperCase() + settings?.week_ending_day?.slice(1) || 'Sunday'} {new Date(`1970-01-01T${settings?.week_ending_time || '20:30'}`).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          })} {settings?.week_ending_timezone?.split('/')[1]?.replace('_', ' ') || 'ET'})
+          Work Hours (until{' '}
+          {settings?.week_ending_day?.charAt(0).toUpperCase() +
+            settings?.week_ending_day?.slice(1) || 'Sunday'}{' '}
+          {new Date(`1970-01-01T${settings?.week_ending_time || '20:30'}`).toLocaleTimeString(
+            'en-US',
+            {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            }
+          )}{' '}
+          {settings?.week_ending_timezone?.split('/')[1]?.replace('_', ' ') || 'ET'})
         </div>
         <div className="flex items-center gap-6">
           <div className="text-sm relative planned-hours-tooltip">

@@ -27,7 +27,7 @@ const MeetingModal = ({
   onMeetingChange,
   onSubmit,
   selectedTimeSlot,
-  editingMeeting
+  editingMeeting,
 }: MeetingModalProps) => {
   if (!isOpen) return null
 
@@ -90,7 +90,12 @@ const MeetingModal = ({
               <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
               <select
                 value={meeting.meeting_type}
-                onChange={e => onMeetingChange({ ...meeting, meeting_type: e.target.value as Meeting['meeting_type'] })}
+                onChange={e =>
+                  onMeetingChange({
+                    ...meeting,
+                    meeting_type: e.target.value as Meeting['meeting_type'],
+                  })
+                }
                 className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
               >
                 <option value="general">General</option>
@@ -104,7 +109,9 @@ const MeetingModal = ({
               <label className="block text-sm font-medium text-neutral-700 mb-1">Priority</label>
               <select
                 value={meeting.priority}
-                onChange={e => onMeetingChange({ ...meeting, priority: e.target.value as Meeting['priority'] })}
+                onChange={e =>
+                  onMeetingChange({ ...meeting, priority: e.target.value as Meeting['priority'] })
+                }
                 className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
               >
                 <option value="low">Low</option>

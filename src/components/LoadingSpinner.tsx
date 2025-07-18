@@ -4,7 +4,7 @@ interface LoadingSpinnerProps {
 }
 
 const LoadingSpinner = ({ message = 'Loading...', fullScreen = true }: LoadingSpinnerProps) => {
-  const containerClasses = fullScreen 
+  const containerClasses = fullScreen
     ? 'h-screen flex items-center justify-center bg-white'
     : 'flex items-center justify-center py-8'
 

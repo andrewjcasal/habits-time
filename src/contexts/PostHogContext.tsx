@@ -57,14 +57,10 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
   const value = {
     track,
     identify,
-    reset
+    reset,
   }
 
-  return (
-    <PostHogContext.Provider value={value}>
-      {children}
-    </PostHogContext.Provider>
-  )
+  return <PostHogContext.Provider value={value}>{children}</PostHogContext.Provider>
 }
 
 export function usePostHog() {

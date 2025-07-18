@@ -22,10 +22,13 @@ const EditableSessionRow = ({
   const [editingField, setEditingField] = useState<'date' | 'start_time' | 'end_time' | null>(null)
   const [tempEditValue, setTempEditValue] = useState('')
 
-  const handleSessionFieldEdit = async (field: 'date' | 'start_time' | 'end_time', value: string) => {
+  const handleSessionFieldEdit = async (
+    field: 'date' | 'start_time' | 'end_time',
+    value: string
+  ) => {
     try {
       let updateData: any = {}
-      
+
       if (field === 'date') {
         updateData.scheduled_date = value
       } else if (field === 'start_time') {
@@ -33,7 +36,7 @@ const EditableSessionRow = ({
       } else if (field === 'end_time') {
         updateData.actual_end_time = value
       }
-      
+
       await onUpdateSession(session.id, updateData)
       setEditingField(null)
       setTempEditValue('')
@@ -72,21 +75,19 @@ const EditableSessionRow = ({
               autoFocus
             />
           ) : (
-            <div 
+            <div
               className="text-sm text-neutral-900 cursor-pointer hover:bg-neutral-200 px-1 py-0.5 rounded transition-colors"
               onClick={() => handleFieldClick('date', session.scheduled_date)}
               title="Click to edit date"
             >
-              {new Date(
-                session.scheduled_date + 'T00:00:00'
-              ).toLocaleDateString('en-US', {
+              {new Date(session.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', {
                 weekday: 'long',
                 month: 'short',
                 day: 'numeric',
               })}
             </div>
           )}
-          
+
           {/* Editable Start/End Times */}
           {session.actual_start_time && session.actual_end_time && (
             <div className="flex items-center gap-1 text-xs text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -102,7 +103,7 @@ const EditableSessionRow = ({
                   autoFocus
                 />
               ) : (
-                <span 
+                <span
                   className="cursor-pointer hover:bg-neutral-300 px-1 py-0.5 rounded transition-colors"
                   onClick={() => handleFieldClick('start_time', session.actual_start_time)}
                   title="Click to edit start time"
@@ -115,9 +116,9 @@ const EditableSessionRow = ({
                   })()}
                 </span>
               )}
-              
+
               <span>-</span>
-              
+
               {/* End Time */}
               {editingField === 'end_time' ? (
                 <input
@@ -130,7 +131,7 @@ const EditableSessionRow = ({
                   autoFocus
                 />
               ) : (
-                <span 
+                <span
                   className="cursor-pointer hover:bg-neutral-300 px-1 py-0.5 rounded transition-colors"
                   onClick={() => handleFieldClick('end_time', session.actual_end_time)}
                   title="Click to edit end time"
@@ -147,9 +148,7 @@ const EditableSessionRow = ({
           )}
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-xs text-neutral-500">
-            {session.scheduled_hours}h
-          </span>
+          <span className="text-xs text-neutral-500">{session.scheduled_hours}h</span>
           {activeSessionTab === 'upcoming' && (
             <button
               onClick={e => {
@@ -165,9 +164,7 @@ const EditableSessionRow = ({
         </div>
       </div>
       {taskDescription && (
-        <div className="text-xs text-neutral-600 mt-0.5 line-clamp-2 pl-1">
-          {taskDescription}
-        </div>
+        <div className="text-xs text-neutral-600 mt-0.5 line-clamp-2 pl-1">{taskDescription}</div>
       )}
     </div>
   )

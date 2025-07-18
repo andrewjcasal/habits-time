@@ -7,12 +7,12 @@ export const initPostHog = () => {
       person_profiles: 'identified_only',
       capture_pageview: false, // We'll handle this manually for better control
       capture_pageleave: true,
-      loaded: (posthog) => {
+      loaded: posthog => {
         if (import.meta.env.DEV) {
           console.log('PostHog loaded')
           posthog.debug()
         }
-      }
+      },
     })
   }
 }

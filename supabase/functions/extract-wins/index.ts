@@ -175,26 +175,31 @@ Return ONLY valid JSON array format, no markdown or extra text:`,
     // Helper function to check semantic similarity
     const isSimilarWin = (newWin: ExtractedWin, existingWins: any[]): boolean => {
       const newText = `${newWin.title} ${newWin.description || ''}`.toLowerCase()
-      
+
       for (const existing of existingWins) {
         const existingText = `${existing.title} ${existing.description || ''}`.toLowerCase()
-        
+
         // Check for key phrase overlap
         const newWords = newText.split(/\s+/).filter(w => w.length > 3) // Filter out short words
         const existingWords = existingText.split(/\s+/).filter(w => w.length > 3)
-        
+
         // Calculate word overlap percentage
         const overlap = newWords.filter(word => existingWords.includes(word))
         const overlapPercentage = overlap.length / Math.max(newWords.length, existingWords.length)
-        
+
         // Check for similar titles (more strict)
-        const titleSimilarity = calculateSimilarity(newWin.title.toLowerCase(), existing.title.toLowerCase())
-        
+        const titleSimilarity = calculateSimilarity(
+          newWin.title.toLowerCase(),
+          existing.title.toLowerCase()
+        )
+
         // Consider it similar if:
         // 1. Title similarity > 60% AND word overlap > 30%, OR
         // 2. Word overlap > 50% (high content overlap)
         if ((titleSimilarity > 0.6 && overlapPercentage > 0.3) || overlapPercentage > 0.5) {
-          console.log(`DEBUG - Similar win detected. New: "${newWin.title}" vs Existing: "${existing.title}" (title sim: ${Math.round(titleSimilarity * 100)}%, word overlap: ${Math.round(overlapPercentage * 100)}%)`)
+          console.log(
+            `DEBUG - Similar win detected. New: "${newWin.title}" vs Existing: "${existing.title}" (title sim: ${Math.round(titleSimilarity * 100)}%, word overlap: ${Math.round(overlapPercentage * 100)}%)`
+          )
           return true
         }
       }
@@ -242,7 +247,9 @@ Return ONLY valid JSON array format, no markdown or extra text:`,
       return true
     })
 
-    console.log(`DEBUG - After similarity filtering: ${filteredWins.length}/${extractedWins.length} wins remaining`)
+    console.log(
+      `DEBUG - After similarity filtering: ${filteredWins.length}/${extractedWins.length} wins remaining`
+    )
 
     // Insert wins into database (duplicate prevention handled by unique constraint)
     let successCount = 0

@@ -9,9 +9,14 @@ interface NewSessionModalProps {
   onCreateSessions: (contractName: string, projectId: string, sessionData: any[]) => Promise<void>
 }
 
-const NewSessionModal = ({ isOpen, onClose, selectedProject, onCreateSessions }: NewSessionModalProps) => {
+const NewSessionModal = ({
+  isOpen,
+  onClose,
+  selectedProject,
+  onCreateSessions,
+}: NewSessionModalProps) => {
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
-  const [sessionHours, setSessionHours] = useState<{[key: string]: number}>({})
+  const [sessionHours, setSessionHours] = useState<{ [key: string]: number }>({})
   const [contractName, setContractName] = useState('')
   const [modalStep, setModalStep] = useState<'contract' | 'dates' | 'preview'>('contract')
 
@@ -20,19 +25,19 @@ const NewSessionModal = ({ isOpen, onClose, selectedProject, onCreateSessions }:
     const lastDay = new Date(year, month + 1, 0)
     const firstDayOfWeek = firstDay.getDay()
     const daysInMonth = lastDay.getDate()
-    
+
     const days = []
-    
+
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDayOfWeek; i++) {
       days.push(null)
     }
-    
+
     // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day))
     }
-    
+
     return days
   }, [])
 
@@ -105,10 +110,7 @@ const NewSessionModal = ({ isOpen, onClose, selectedProject, onCreateSessions }:
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-neutral-900">Schedule Sessions</h2>
-          <button
-            onClick={resetAndClose}
-            className="text-neutral-500 hover:text-neutral-700"
-          >
+          <button onClick={resetAndClose} className="text-neutral-500 hover:text-neutral-700">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -163,8 +165,18 @@ const NewSessionModal = ({ isOpen, onClose, selectedProject, onCreateSessions }:
                   const currentYear = today.getFullYear()
                   const days = generateCalendarDays(currentMonth, currentYear)
                   const monthNames = [
-                    'January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December',
+                    'January',
+                    'February',
+                    'March',
+                    'April',
+                    'May',
+                    'June',
+                    'July',
+                    'August',
+                    'September',
+                    'October',
+                    'November',
+                    'December',
                   ]
 
                   return (
@@ -218,8 +230,18 @@ const NewSessionModal = ({ isOpen, onClose, selectedProject, onCreateSessions }:
                   const adjustedMonth = nextMonth > 11 ? 0 : nextMonth
                   const days = generateCalendarDays(adjustedMonth, nextYear)
                   const monthNames = [
-                    'January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December',
+                    'January',
+                    'February',
+                    'March',
+                    'April',
+                    'May',
+                    'June',
+                    'July',
+                    'August',
+                    'September',
+                    'October',
+                    'November',
+                    'December',
                   ]
 
                   return (
@@ -302,9 +324,7 @@ const NewSessionModal = ({ isOpen, onClose, selectedProject, onCreateSessions }:
             <div className="text-sm text-neutral-600 mb-4">Review sessions to be created</div>
 
             <div className="bg-neutral-50 p-3 rounded-lg mb-4">
-              <div className="text-sm font-medium text-neutral-900">
-                Contract: {contractName}
-              </div>
+              <div className="text-sm font-medium text-neutral-900">Contract: {contractName}</div>
             </div>
 
             <div className="max-h-64 overflow-y-auto">
@@ -327,7 +347,9 @@ const NewSessionModal = ({ isOpen, onClose, selectedProject, onCreateSessions }:
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
-                              value={sessionHours[dateStr] !== undefined ? sessionHours[dateStr] : 2}
+                              value={
+                                sessionHours[dateStr] !== undefined ? sessionHours[dateStr] : 2
+                              }
                               onChange={e => {
                                 const inputValue = e.target.value
                                 setSessionHours(prev => ({

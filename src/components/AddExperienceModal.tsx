@@ -31,7 +31,7 @@ export function AddExperienceModal({
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [attendeeSearch, setAttendeeSearch] = useState('')
-  const [selectedAttendees, setSelectedAttendees] = useState<{id: string, name: string}[]>([])
+  const [selectedAttendees, setSelectedAttendees] = useState<{ id: string; name: string }[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -51,15 +51,18 @@ export function AddExperienceModal({
     setIsSubmitting(true)
 
     try {
-      await onSubmit({
-        title: formData.title,
-        description: formData.description || undefined,
-        experience_date: formData.experience_date,
-        type: formData.type,
-        location: formData.location || undefined,
-        follow_up_needed: false,
-        connection_strength: 'neutral',
-      }, [personId, ...selectedAttendees.map(a => a.id)])
+      await onSubmit(
+        {
+          title: formData.title,
+          description: formData.description || undefined,
+          experience_date: formData.experience_date,
+          type: formData.type,
+          location: formData.location || undefined,
+          follow_up_needed: false,
+          connection_strength: 'neutral',
+        },
+        [personId, ...selectedAttendees.map(a => a.id)]
+      )
 
       // Reset form
       setFormData({
@@ -197,7 +200,10 @@ export function AddExperienceModal({
                       key={person.id}
                       type="button"
                       onClick={() => {
-                        setSelectedAttendees(prev => [...prev, { id: person.id, name: person.name }])
+                        setSelectedAttendees(prev => [
+                          ...prev,
+                          { id: person.id, name: person.name },
+                        ])
                         setAttendeeSearch('')
                         setShowDropdown(false)
                       }}

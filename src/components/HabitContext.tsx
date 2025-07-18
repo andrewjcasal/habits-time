@@ -7,23 +7,23 @@ interface HabitContextProps {
   habitName: string
   initialContext?: {
     background: string
-    wins: string
+    benefits: string
     consequences: string
   }
 }
 
 interface HabitContextData {
   background: string
-  wins: string
+  benefits: string
   consequences: string
 }
 
 const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initialContext }) => {
   const [context, setContext] = useState<HabitContextData>(
-    initialContext || { background: '', wins: '', consequences: '' }
+    initialContext || { background: '', benefits: '', consequences: '' }
   )
   const [saving, setSaving] = useState(false)
-  const [activeSection, setActiveSection] = useState<'background' | 'wins' | 'consequences'>(
+  const [activeSection, setActiveSection] = useState<'background' | 'benefits' | 'consequences'>(
     'background'
   )
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -35,7 +35,9 @@ const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initial
       const { error } = await supabase
         .from('habits')
         .update({
-          context: newContext,
+          background: newContext.background,
+          benefits: newContext.benefits,
+          consequences: newContext.consequences,
         })
         .eq('id', habitId)
 
@@ -49,7 +51,7 @@ const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initial
 
   // Handle content change with autosave
   const handleContentChange = (
-    section: 'background' | 'wins' | 'consequences',
+    section: 'background' | 'benefits' | 'consequences',
     content: string
   ) => {
     const newContext = { ...context, [section]: content }
@@ -84,8 +86,8 @@ const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initial
         'Why is this habit important? What are the benefits and reasons for building this habit?',
     },
     {
-      key: 'wins' as const,
-      label: 'Wins & Outcomes',
+      key: 'benefits' as const,
+      label: 'Benefits',
       icon: Trophy,
       placeholder:
         'What positive outcomes and productivity gains have you experienced from this habit?',
@@ -101,17 +103,6 @@ const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initial
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gray-600" />
-            <h3 className="text-sm font-semibold text-gray-900">{habitName} Context</h3>
-          </div>
-          {saving && <div className="text-xs text-gray-500">Saving...</div>}
-        </div>
-      </div>
-
       {/* Section Tabs */}
       <div className="flex border-b border-gray-200 flex-shrink-0">
         {sections.map(section => {

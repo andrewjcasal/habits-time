@@ -181,10 +181,13 @@ const Todoist = () => {
 
       if (allCurrentTasks.length > 0) {
         // We have local state - do change detection
-        const currentTaskLookup = allCurrentTasks.reduce((acc, task) => {
-          acc[task.id] = task
-          return acc
-        }, {} as Record<string, TodoItem>)
+        const currentTaskLookup = allCurrentTasks.reduce(
+          (acc, task) => {
+            acc[task.id] = task
+            return acc
+          },
+          {} as Record<string, TodoItem>
+        )
 
         // Compare with ALL new tasks to find content changes
         newAllTodos.forEach(newTask => {
@@ -819,15 +822,15 @@ const Todoist = () => {
                 {activeTab === 'overdue'
                   ? 'No overdue tasks'
                   : activeTab === 'today'
-                  ? 'No tasks for today'
-                  : 'Inbox is empty'}
+                    ? 'No tasks for today'
+                    : 'Inbox is empty'}
               </h3>
               <p className="text-gray-600">
                 {activeTab === 'overdue'
                   ? "Great! You're all caught up with overdue tasks."
                   : activeTab === 'today'
-                  ? "You're all set for today, or add some tasks to get started."
-                  : 'Your inbox is clean! New tasks will appear here.'}
+                    ? "You're all set for today, or add some tasks to get started."
+                    : 'Your inbox is clean! New tasks will appear here.'}
               </p>
             </div>
           ) : (
@@ -842,10 +845,10 @@ const Todoist = () => {
                     selectedTaskId === todo.id
                       ? 'bg-blue-100 border-l-4 border-l-blue-500'
                       : todo.aiCategory === 'high_priority'
-                      ? 'bg-white hover:bg-gray-50 border-l-4 border-l-orange-500'
-                      : todo.aiCategory === 'easy'
-                      ? 'bg-white hover:bg-gray-50 border-l-4 border-l-green-500'
-                      : 'bg-white hover:bg-gray-50'
+                        ? 'bg-white hover:bg-gray-50 border-l-4 border-l-orange-500'
+                        : todo.aiCategory === 'easy'
+                          ? 'bg-white hover:bg-gray-50 border-l-4 border-l-green-500'
+                          : 'bg-white hover:bg-gray-50'
                   }`}
                 >
                   <div className="flex items-start justify-between">

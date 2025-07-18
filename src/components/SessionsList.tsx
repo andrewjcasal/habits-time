@@ -20,7 +20,7 @@ const SessionsList = ({
   sessionsLoading,
   sessionsToShow,
   onCopyToClipboard,
-  onUpdateSession
+  onUpdateSession,
 }: SessionsListProps) => {
   return (
     <div className="w-1/2 border-r border-neutral-200 flex flex-col">
@@ -79,7 +79,7 @@ const SessionsList = ({
                   index={index}
                   activeSessionTab={activeSessionTab}
                   taskDescription={taskDescription}
-                  onCopyToClipboard={(idx) => onCopyToClipboard(idx, sessionsToShow)}
+                  onCopyToClipboard={idx => onCopyToClipboard(idx, sessionsToShow)}
                   onUpdateSession={onUpdateSession}
                 />
               )

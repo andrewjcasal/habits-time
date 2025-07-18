@@ -13,15 +13,15 @@ interface TaskModalProps {
   onToggleTaskStatus: (task: Task) => Promise<void>
 }
 
-const TaskModal = ({ 
-  isOpen, 
-  onClose, 
-  selectedTask, 
-  selectedProject, 
+const TaskModal = ({
+  isOpen,
+  onClose,
+  selectedTask,
+  selectedProject,
   onAddTask,
   onUpdateTask,
   onRefetchTasks,
-  onToggleTaskStatus
+  onToggleTaskStatus,
 }: TaskModalProps) => {
   const [showAddSubtask, setShowAddSubtask] = useState(false)
   const [newSubtask, setNewSubtask] = useState({
@@ -67,10 +67,10 @@ const TaskModal = ({
       }
 
       await onAddTask(taskData)
-      
+
       // Refresh tasks to get updated subtasks
       await onRefetchTasks()
-      
+
       setNewSubtask({ title: '', description: '', priority: 'medium', estimated_hours: 1 })
       setShowAddSubtask(false)
     } catch (error) {
@@ -91,10 +91,7 @@ const TaskModal = ({
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-neutral-900">{selectedTask.title}</h2>
-          <button
-            onClick={handleClose}
-            className="text-neutral-500 hover:text-neutral-700"
-          >
+          <button onClick={handleClose} className="text-neutral-500 hover:text-neutral-700">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -106,15 +103,13 @@ const TaskModal = ({
                 selectedTask.status === 'todo'
                   ? 'bg-gray-100 text-gray-800'
                   : selectedTask.status === 'in_progress'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-green-100 text-green-800'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-green-100 text-green-800'
               }`}
             >
               {selectedTask.status.replace('_', ' ')}
             </span>
-            <span
-              className={`text-sm font-medium ${getPriorityColor(selectedTask.priority)}`}
-            >
+            <span className={`text-sm font-medium ${getPriorityColor(selectedTask.priority)}`}>
               {selectedTask.priority} priority
             </span>
             {selectedTask.estimated_hours && (
@@ -181,10 +176,7 @@ const TaskModal = ({
                         onChange={e =>
                           setNewSubtask({
                             ...newSubtask,
-                            estimated_hours: Math.max(
-                              0.5,
-                              parseFloat(e.target.value) || 0.5
-                            ),
+                            estimated_hours: Math.max(0.5, parseFloat(e.target.value) || 0.5),
                           })
                         }
                         min="0.5"
@@ -253,15 +245,11 @@ const TaskModal = ({
                           )}
                         </div>
                         {subtask.description && (
-                          <p className="text-xs text-neutral-600 mb-2">
-                            {subtask.description}
-                          </p>
+                          <p className="text-xs text-neutral-600 mb-2">{subtask.description}</p>
                         )}
                         <div className="flex items-center gap-2">
                           <span
-                            className={`text-xs font-medium ${getPriorityColor(
-                              subtask.priority
-                            )}`}
+                            className={`text-xs font-medium ${getPriorityColor(subtask.priority)}`}
                           >
                             {subtask.priority}
                           </span>
@@ -271,9 +259,7 @@ const TaskModal = ({
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-neutral-500 text-center py-4">
-                  No subtasks yet
-                </div>
+                <div className="text-sm text-neutral-500 text-center py-4">No subtasks yet</div>
               )}
             </div>
           </div>

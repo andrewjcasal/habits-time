@@ -14,7 +14,12 @@ interface NewProjectModalProps {
   onProjectSelect: (project: Project) => void
 }
 
-const NewProjectModal = ({ isOpen, onClose, onCreateProject, onProjectSelect }: NewProjectModalProps) => {
+const NewProjectModal = ({
+  isOpen,
+  onClose,
+  onCreateProject,
+  onProjectSelect,
+}: NewProjectModalProps) => {
   const [newProject, setNewProject] = useState({ name: '', description: '', color: '#3B82F6' })
 
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -41,10 +46,7 @@ const NewProjectModal = ({ isOpen, onClose, onCreateProject, onProjectSelect }: 
       <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-neutral-900">Create New Project</h2>
-          <button
-            onClick={onClose}
-            className="text-neutral-500 hover:text-neutral-700"
-          >
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-700">
             <X className="w-5 h-5" />
           </button>
         </div>
