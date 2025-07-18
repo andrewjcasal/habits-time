@@ -292,6 +292,27 @@ const Todoist = () => {
     fetchTodoist()
   }, [])
 
+  // Auto-sync when page becomes visible (user returns to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && connectionStatus === 'connected') {
+        fetchTodoist()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [connectionStatus])
+
+  // Auto-sync when connection status changes to connected
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      fetchTodoist()
+    }
+  }, [connectionStatus])
+
   const today = new Date().toISOString().split('T')[0]
 
   const getFilteredTodos = () => {

@@ -14,6 +14,8 @@ import { useAuth } from '../hooks/useAuth'
 import HabitDetailTabs from '../components/HabitDetailTabs'
 import LoadingSpinner from '../components/LoadingSpinner'
 import CreateHabitModal from '../components/CreateHabitModal'
+import HabitsTopbar from '../components/HabitsTopbar'
+import HabitsLast7Days from '../components/HabitsLast7Days'
 
 const Habits = () => {
   const { user } = useAuth()
@@ -36,6 +38,7 @@ const Habits = () => {
   const [routineLogs, setRoutineLogs] = useState<any[]>([])
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [activeTab, setActiveTab] = useState<'today' | 'last7days'>('today')
 
   const toggleCompletion = async (habitId: string) => {
     const habit = habits.find(h => h.id === habitId)
@@ -232,10 +235,13 @@ const Habits = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div
-        className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-0"
-        style={{ minHeight: 'calc(100vh - 200px)' }}
-      >
+      <HabitsTopbar activeTab={activeTab} onTabChange={setActiveTab} />
+      
+      {activeTab === 'today' ? (
+        <div
+          className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-0"
+          style={{ minHeight: 'calc(100vh - 200px)' }}
+        >
         {/* Habits List - Outlook style */}
         <div className="border-r border-gray-200 flex flex-col">
           <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
@@ -416,58 +422,9 @@ const Habits = () => {
               ) : null
             })()}
         </div>
-      </div>
-
-      {habits.length > 0 && (
-        <div className="mt-4 mx-3">
-          <h3 className="text-base font-semibold text-neutral-900 mb-2">
-            Last 7 Days - Morning & Shutdown Routines
-          </h3>
-          <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-neutral-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">
-                      Date
-                    </th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">
-                      Morning Routine
-                    </th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-neutral-900">
-                      Shutdown
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-200">
-                  {routineLogs.map((dayGroup, i) => {
-                    const displayDate = dayGroup.displayDate.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })
-
-                    const morningLog = dayGroup.logs.find(
-                      log => log.habits.name === 'Morning Routine'
-                    )
-                    const shutdownLog = dayGroup.logs.find(log => log.habits.name === 'Shutdown')
-
-                    return (
-                      <tr key={dayGroup.sleepDate} className="hover:bg-neutral-50">
-                        <td className="px-3 py-2 text-sm text-neutral-900">{displayDate}</td>
-                        <td className="px-3 py-2 text-sm text-neutral-600">
-                          {morningLog ? formatTime(morningLog.actual_start_time) : '-'}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-neutral-600">
-                          {shutdownLog ? formatTime(shutdownLog.actual_start_time) : '-'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
+      ) : (
+        <HabitsLast7Days />
       )}
 
       <CreateHabitModal
