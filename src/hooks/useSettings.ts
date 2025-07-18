@@ -6,6 +6,10 @@ interface UserSettings {
   user_id: string
   work_hours_start: string
   work_hours_end: string
+  week_ending_day: string // 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+  week_ending_time: string // HH:MM format
+  week_ending_timezone: string // e.g., 'America/New_York'
+  todoist_api_key?: string
   created_at?: string
   updated_at?: string
 }
@@ -53,6 +57,9 @@ export const useSettings = (): UseSettingsReturn => {
           user_id: user.id,
           work_hours_start: '07:00:00',
           work_hours_end: '23:00:00',
+          week_ending_day: 'sunday',
+          week_ending_time: '20:30',
+          week_ending_timezone: 'America/New_York',
         }
 
         const { data: newSettings, error: createError } = await supabase
@@ -77,6 +84,9 @@ export const useSettings = (): UseSettingsReturn => {
           user_id: user.id,
           work_hours_start: '07:00:00',
           work_hours_end: '23:00:00',
+          week_ending_day: 'sunday',
+          week_ending_time: '20:30',
+          week_ending_timezone: 'America/New_York',
         })
       }
     } finally {

@@ -630,12 +630,7 @@ const TimeTracker = () => {
   }
 
   return (
-    <div className="p-1 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-2">
-        <h1 className="text-2xl font-bold text-neutral-900 mb-2">Time Tracker</h1>
-      </div>
-
+    <div className="p-1 pt-4 max-w-4xl mx-auto">
       {/* Date Navigation */}
       <div className="bg-white rounded-lg border border-neutral-200 p-2 mb-2">
         <div className="flex items-center justify-between">

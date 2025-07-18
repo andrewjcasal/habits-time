@@ -20,7 +20,7 @@ const Login = () => {
                 },
               },
             }}
-            providers={['github', 'google']}
+            providers={[]}
             socialLayout="horizontal"
           />
         </div>

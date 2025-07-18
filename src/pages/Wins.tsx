@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Trophy, Calendar, FileText, Heart, Search, Filter } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface Win {
   id: string
@@ -76,11 +77,7 @@ const Wins = () => {
   }, [user])
 
   if (loading) {
-    return (
-      <div className="p-2 max-w-4xl mx-auto">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-      </div>
-    )
+    return <LoadingSpinner message="Loading wins..." />
   }
 
   return (
@@ -88,7 +85,6 @@ const Wins = () => {
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-center gap-3 mb-2">
-          <Trophy className="w-6 h-6 text-yellow-500" />
           <h1 className="text-3xl font-light text-gray-900">Wins & Achievements</h1>
         </div>
         <p className="text-gray-600">Celebrate your progress and accomplishments</p>
@@ -161,7 +157,7 @@ const Wins = () => {
 
                     {win.description && <p className="text-gray-700">{win.description}</p>}
                   </div>
-                  
+
                   <div className="flex flex-col items-end gap-1 text-xs text-gray-500 flex-shrink-0">
                     <div className="flex items-center gap-1">
                       <SourceIcon className="w-3 h-3" />

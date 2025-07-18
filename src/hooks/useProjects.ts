@@ -125,7 +125,10 @@ export function useTasks(projectId?: string) {
 
   useEffect(() => {
     if (projectId) {
+      setTasks([]) // Clear tasks immediately when project changes
       fetchTasks()
+    } else {
+      setTasks([]) // Clear tasks when no project is selected
     }
   }, [projectId])
 

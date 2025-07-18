@@ -13,8 +13,14 @@ import {
   MessageCircle,
   Send,
   X,
+  Key,
+  CheckCircle,
+  AlertCircle,
+  Link,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useSettings } from '../hooks/useSettings'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface TodoItem {
   id: string
@@ -32,6 +38,7 @@ interface TodoItem {
 }
 
 const Todoist = () => {
+  const { settings, updateSettings } = useSettings()
   const [activeTab, setActiveTab] = useState<'overdue' | 'today' | 'inbox'>('overdue')
   const [todayTodos, setTodayTodos] = useState<TodoItem[]>([])
   const [overdueTodos, setOverdueTodos] = useState<TodoItem[]>([])
@@ -49,7 +56,85 @@ const Todoist = () => {
   const [chatInput, setChatInput] = useState('')
   const [isChatLoading, setIsChatLoading] = useState(false)
 
+  // Todoist connection state
+  const [apiKey, setApiKey] = useState('')
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<
+    'checking' | 'connected' | 'disconnected' | 'error'
+  >('checking')
+
+  // Check connection status on load
+  useEffect(() => {
+    if (settings) {
+      if (settings.todoist_api_key) {
+        setConnectionStatus('connected')
+      } else {
+        setConnectionStatus('disconnected')
+      }
+    }
+  }, [settings])
+
+  const validateAndSaveApiKey = async (key: string) => {
+    setIsConnecting(true)
+    try {
+      // Test the API key by making a simple request to Todoist
+      const response = await fetch('https://api.todoist.com/rest/v2/projects', {
+        headers: {
+          Authorization: `Bearer ${key}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Invalid API key')
+      }
+
+      // Save the API key to settings
+      await updateSettings({ todoist_api_key: key })
+      setConnectionStatus('connected')
+      setApiKey('')
+
+      // Automatically fetch tasks after successful connection
+      fetchTodoist()
+    } catch (err) {
+      console.error('Error validating API key:', err)
+      setConnectionStatus('error')
+      throw new Error("Failed to validate API key. Please check that it's correct.")
+    } finally {
+      setIsConnecting(false)
+    }
+  }
+
+  const handleConnect = async () => {
+    if (!apiKey.trim()) return
+
+    try {
+      await validateAndSaveApiKey(apiKey.trim())
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to connect to Todoist')
+    }
+  }
+
+  const handleDisconnect = async () => {
+    try {
+      await updateSettings({ todoist_api_key: null })
+      setConnectionStatus('disconnected')
+      setTodayTodos([])
+      setOverdueTodos([])
+      setInboxTodos([])
+      setAllTodos([])
+      setLastFetch(null)
+    } catch (err) {
+      console.error('Error disconnecting:', err)
+      alert('Failed to disconnect from Todoist')
+    }
+  }
+
   const fetchTodoist = async () => {
+    // Don't fetch if not connected
+    if (connectionStatus !== 'connected' || !settings?.todoist_api_key) {
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -96,13 +181,10 @@ const Todoist = () => {
 
       if (allCurrentTasks.length > 0) {
         // We have local state - do change detection
-        const currentTaskLookup = allCurrentTasks.reduce(
-          (acc, task) => {
-            acc[task.id] = task
-            return acc
-          },
-          {} as Record<string, TodoItem>
-        )
+        const currentTaskLookup = allCurrentTasks.reduce((acc, task) => {
+          acc[task.id] = task
+          return acc
+        }, {} as Record<string, TodoItem>)
 
         // Compare with ALL new tasks to find content changes
         newAllTodos.forEach(newTask => {
@@ -185,7 +267,9 @@ const Todoist = () => {
         // Analyze tasks immediately without batching for now (we can add batching back later)
         allTasksToAnalyze.forEach((task, index) => {
           console.log(
-            `Attempting to analyze task ${index + 1}/${allTasksToAnalyze.length}: ${task.id} - ${task.title}`
+            `Attempting to analyze task ${index + 1}/${allTasksToAnalyze.length}: ${task.id} - ${
+              task.title
+            }`
           )
           // Small delay between tasks to avoid overwhelming
           setTimeout(() => {
@@ -249,7 +333,9 @@ const Todoist = () => {
     // Allow re-analysis if task is marked for it or has no category
     if ((task.aiCategory && !task.needsReanalysis) || analyzingTasks.has(task.id)) {
       console.log(
-        `Skipping analysis for task ${task.id}: aiCategory=${task.aiCategory}, needsReanalysis=${task.needsReanalysis}, isAnalyzing=${analyzingTasks.has(task.id)}`
+        `Skipping analysis for task ${task.id}: aiCategory=${task.aiCategory}, needsReanalysis=${
+          task.needsReanalysis
+        }, isAnalyzing=${analyzingTasks.has(task.id)}`
       )
       return
     }
@@ -369,7 +455,9 @@ const Todoist = () => {
         if (data.suggestedTitle) suggestions.push(`New title: "${data.suggestedTitle}"`)
         if (data.suggestedContext) suggestions.push(`Add context: "${data.suggestedContext}"`)
 
-        const suggestionMessage = `💡 I have some suggestions to improve this task:\n\n${suggestions.join('\n\n')}\n\nWould you like me to apply these changes to your Todoist task?`
+        const suggestionMessage = `💡 I have some suggestions to improve this task:\n\n${suggestions.join(
+          '\n\n'
+        )}\n\nWould you like me to apply these changes to your Todoist task?`
         setChatMessages([...assistantMessages, { role: 'assistant', content: suggestionMessage }])
       }
     } catch (err) {
@@ -571,15 +659,86 @@ const Todoist = () => {
     },
   ]
 
+  // Show loading while checking connection
+  if (connectionStatus === 'checking') {
+    return <LoadingSpinner message="Loading Todoist..." />
+  }
+
+  // If not connected, show connection screen
+  if (connectionStatus === 'disconnected') {
+    return (
+      <div className="h-screen flex flex-col">
+        {/* Connection Content */}
+        <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="max-w-4xl mx-auto p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+              {/* Main Content */}
+              <div className="text-center lg:text-left">
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">Connect to Todoist</h2>
+                <p className="text-gray-600 mb-4 text-lg">
+                  Enter your Todoist API key to get started.
+                </p>
+
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={e => setApiKey(e.target.value)}
+                      placeholder="Enter your Todoist API key"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      onKeyPress={e => e.key === 'Enter' && handleConnect()}
+                    />
+                    <button
+                      onClick={handleConnect}
+                      disabled={!apiKey.trim() || isConnecting}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 justify-center"
+                    >
+                      {isConnecting ? (
+                        <>
+                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                          Connecting...
+                        </>
+                      ) : (
+                        <>Connect</>
+                      )}
+                    </button>
+                  </div>
+
+                  {connectionStatus === 'error' && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm text-red-700">
+                        Failed to connect. Please check your API key and try again.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-white p-3 rounded-lg border shadow-sm">
+                <p className="text-gray-700 mb-2">How to find your API key:</p>
+                <a
+                  href="https://app.todoist.com/app/settings/integrations/developer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-700 underline"
+                >
+                  Open Todoist Settings
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
       <div className="p-2 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-neutral-900">Todoist</h1>
-          </div>
           <div className="flex items-center gap-3">
             {lastFetch && (
               <span className="text-xs text-gray-500">
@@ -594,16 +753,10 @@ const Todoist = () => {
               {loading ? 'Syncing...' : 'Sync'}
             </button>
             <button
-              onClick={() => {
-                const testTask = allTodos.find(t => t.id === '9284835213')
-                if (testTask) {
-                  console.log('Manual test analysis for task:', testTask)
-                  analyzeTask({ ...testTask, needsReanalysis: true })
-                }
-              }}
-              className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+              onClick={handleDisconnect}
+              className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
             >
-              Test
+              Disconnect
             </button>
           </div>
         </div>
@@ -658,9 +811,7 @@ const Todoist = () => {
               </button>
             </div>
           ) : loading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
+            <LoadingSpinner message="Syncing tasks..." fullScreen={false} />
           ) : filteredTodos.length === 0 ? (
             <div className="text-center py-12 px-4">
               <CheckSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -668,15 +819,15 @@ const Todoist = () => {
                 {activeTab === 'overdue'
                   ? 'No overdue tasks'
                   : activeTab === 'today'
-                    ? 'No tasks for today'
-                    : 'Inbox is empty'}
+                  ? 'No tasks for today'
+                  : 'Inbox is empty'}
               </h3>
               <p className="text-gray-600">
                 {activeTab === 'overdue'
                   ? "Great! You're all caught up with overdue tasks."
                   : activeTab === 'today'
-                    ? "You're all set for today, or add some tasks to get started."
-                    : 'Your inbox is clean! New tasks will appear here.'}
+                  ? "You're all set for today, or add some tasks to get started."
+                  : 'Your inbox is clean! New tasks will appear here.'}
               </p>
             </div>
           ) : (
@@ -691,10 +842,10 @@ const Todoist = () => {
                     selectedTaskId === todo.id
                       ? 'bg-blue-100 border-l-4 border-l-blue-500'
                       : todo.aiCategory === 'high_priority'
-                        ? 'bg-white hover:bg-gray-50 border-l-4 border-l-orange-500'
-                        : todo.aiCategory === 'easy'
-                          ? 'bg-white hover:bg-gray-50 border-l-4 border-l-green-500'
-                          : 'bg-white hover:bg-gray-50'
+                      ? 'bg-white hover:bg-gray-50 border-l-4 border-l-orange-500'
+                      : todo.aiCategory === 'easy'
+                      ? 'bg-white hover:bg-gray-50 border-l-4 border-l-green-500'
+                      : 'bg-white hover:bg-gray-50'
                   }`}
                 >
                   <div className="flex items-start justify-between">
@@ -735,7 +886,9 @@ const Todoist = () => {
                       )}
                     </div>
                     <span
-                      className={`px-1 py-0.5 text-xs rounded border ${getPriorityColor(todo.priority)}`}
+                      className={`px-1 py-0.5 text-xs rounded border ${getPriorityColor(
+                        todo.priority
+                      )}`}
                     >
                       {todo.priority}
                     </span>
@@ -827,7 +980,9 @@ const Todoist = () => {
                         </span>
                       )}
                       <span
-                        className={`px-2 py-1 text-xs rounded border ${getPriorityColor(selectedTask.priority)}`}
+                        className={`px-2 py-1 text-xs rounded border ${getPriorityColor(
+                          selectedTask.priority
+                        )}`}
                       >
                         {selectedTask.priority}
                       </span>

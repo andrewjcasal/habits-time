@@ -145,10 +145,14 @@ export const useCalendarData = (windowWidth: number) => {
 
         // Check conflicts with habits, sessions, meetings, and already scheduled tasks
         const habitConflicts = habits.filter(habit => {
-          if (!habit.current_start_time) return false
+          // Check if there's a daily log with a scheduled start time for this date
+          const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateStr)
+          const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
           
-          let habitStartHour = parseInt(habit.current_start_time.split(':')[0])
-          let habitStartMinute = parseInt(habit.current_start_time.split(':')[1])
+          if (!effectiveStartTime) return false
+          
+          let habitStartHour = parseInt(effectiveStartTime.split(':')[0])
+          let habitStartMinute = parseInt(effectiveStartTime.split(':')[1])
           const habitDuration = habit.duration || 0
 
           // Check for meeting conflicts and rescheduling
@@ -348,10 +352,19 @@ export const useCalendarData = (windowWidth: number) => {
     return allTasks.map(t => `${t.id}-${t.estimated_hours}-${t.status}`).join(',')
   }, [allTasks])
 
+  // Reset task scheduling when habits with daily logs change
+  const habitsWithLogsHash = useMemo(() => {
+    return habits.map(h => {
+      const dailyLogs = h.habits_daily_logs || []
+      const logsHash = dailyLogs.map(log => `${log.log_date}-${log.scheduled_start_time}`).join('|')
+      return `${h.id}-${h.current_start_time}-${logsHash}`
+    }).join(',')
+  }, [habits])
+
   useEffect(() => {
     setTasksScheduled(false)
     setScheduledTasksCache(new Map())
-  }, [tasksContentHash])
+  }, [tasksContentHash, habitsWithLogsHash])
 
   // Get tasks for a specific time slot
   const getTasksForTimeSlot = (timeSlot: string, date: Date) => {

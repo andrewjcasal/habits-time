@@ -81,20 +81,31 @@ const MainLayout = () => {
         </nav>
 
         <div className="mt-auto p-1 border-t border-neutral-200 space-y-1">
-          <NavLink
-            to="/settings"
-            className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+          <a
+            href="https://ko-fi.com/andrewjcasal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600"
           >
-            <Settings className="mr-2 h-3.5 w-3.5" />
-            Settings
-          </NavLink>
-          <button
-            onClick={signOut}
-            className="w-full flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
-          >
-            <LogOut className="mr-2 h-3.5 w-3.5" />
-            Logout
-          </button>
+            <Heart className="mr-2 h-3.5 w-3.5" />
+            Support
+          </a>
+          <div className="flex items-center gap-1">
+            <NavLink
+              to="/settings"
+              className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 flex-1"
+            >
+              <Settings className="mr-2 h-3.5 w-3.5" />
+              Settings
+            </NavLink>
+            <button
+              onClick={signOut}
+              className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+              title="Logout"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -155,9 +166,43 @@ const MainLayout = () => {
           </ul>
         </nav>
 
-        {/* Settings & Logout Icons */}
+        {/* Support, Settings & Logout Icons */}
         <div className="mt-auto p-1 border-t border-neutral-100 space-y-1">
           <div className="relative">
+            <a
+              href="https://ko-fi.com/andrewjcasal"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-6 h-6 rounded-full text-red-500 hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+              onMouseEnter={() => setHoveredItem('/support')}
+              onMouseLeave={() => setHoveredItem(null)}
+            >
+              <Heart className="h-3 w-3" />
+            </a>
+
+            {/* Support Popover */}
+            <AnimatePresence>
+              {hoveredItem === '/support' && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
+                  style={{ zIndex: 1000 }}
+                >
+                  <div className="text-sm font-medium text-neutral-900">Support</div>
+                  {/* Arrow */}
+                  <div className="absolute right-full top-1/2 transform -translate-y-1/2">
+                    <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          
+          <div className="flex items-center">
+            <div className="relative flex-1">
             <NavLink
               to="/settings"
               className="flex items-center justify-center w-6 h-6 rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-200"
@@ -167,57 +212,59 @@ const MainLayout = () => {
               <Settings className="h-3 w-3" />
             </NavLink>
 
-            {/* Settings Popover */}
-            <AnimatePresence>
-              {hoveredItem === settingsItem.path && (
-                <motion.div
-                  initial={{ opacity: 0, x: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
-                  style={{ zIndex: 1000 }}
-                >
-                  <div className="text-sm font-medium text-neutral-900">{settingsItem.label}</div>
-                  {/* Arrow */}
-                  <div className="absolute right-full top-1/2 transform -translate-y-1/2">
-                    <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+              {/* Settings Popover */}
+              <AnimatePresence>
+                {hoveredItem === settingsItem.path && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
+                    style={{ zIndex: 1000 }}
+                  >
+                    <div className="text-sm font-medium text-neutral-900">{settingsItem.label}</div>
+                    {/* Arrow */}
+                    <div className="absolute right-full top-1/2 transform -translate-y-1/2">
+                      <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            
+            <div className="relative ml-1">
+              <button
+                onClick={signOut}
+                className="flex items-center justify-center w-6 h-6 rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-200"
+                onMouseEnter={() => setHoveredItem('/logout')}
+                onMouseLeave={() => setHoveredItem(null)}
+              >
+                <LogOut className="h-3 w-3" />
+              </button>
+
+              {/* Logout Popover */}
+              <AnimatePresence>
+                {hoveredItem === '/logout' && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
+                    style={{ zIndex: 1000 }}
+                  >
+                    <div className="text-sm font-medium text-neutral-900">Logout</div>
+                    {/* Arrow */}
+                    <div className="absolute right-full top-1/2 transform -translate-y-1/2">
+                      <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
-          <div className="relative">
-            <button
-              onClick={signOut}
-              className="flex items-center justify-center w-6 h-6 rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-200"
-              onMouseEnter={() => setHoveredItem('logout')}
-              onMouseLeave={() => setHoveredItem(null)}
-            >
-              <LogOut className="h-3 w-3" />
-            </button>
-
-            {/* Logout Popover */}
-            <AnimatePresence>
-              {hoveredItem === 'logout' && (
-                <motion.div
-                  initial={{ opacity: 0, x: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute left-full top-0 transform -translate-y-1/2 ml-2 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 px-3 py-2 whitespace-nowrap"
-                  style={{ zIndex: 1000 }}
-                >
-                  <div className="text-sm font-medium text-neutral-900">Logout</div>
-                  {/* Arrow */}
-                  <div className="absolute right-full top-1/2 transform -translate-y-1/2">
-                    <div className="w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-white"></div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
         </div>
       </aside>
 

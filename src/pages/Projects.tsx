@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Settings } from 'lucide-react'
+import { Settings, Folder } from 'lucide-react'
 import { useProjects, useTasks } from '../hooks/useProjects'
 import { useSessions } from '../hooks/useContracts'
 import { Project, Task } from '../types'
@@ -55,19 +55,22 @@ const Projects = () => {
 
   const handleProjectSelect = useCallback(
     (project: Project | null) => {
-      setSelectedProject(project)
       setShowProjectDropdown(false)
-
+      
       if (project) {
-        // Update URL query param
+        // Update URL query param first
         setSearchParams({ project: project.name })
-
+        
         // Save to localStorage
         localStorage.setItem('selectedProject', JSON.stringify(project))
+        
+        // Set selected project last to prevent race condition
+        setSelectedProject(project)
       } else {
         // Clear URL query param and localStorage
         setSearchParams({})
         localStorage.removeItem('selectedProject')
+        setSelectedProject(null)
       }
     },
     [setSearchParams]
@@ -107,7 +110,9 @@ const Projects = () => {
     let projectToSelect: Project | null = null
 
     if (projectParam) {
-      projectToSelect = projects.find(p => p.name === projectParam) || null
+      // Decode the URL parameter to handle spaces and special characters
+      const decodedProjectName = decodeURIComponent(projectParam.replace(/\+/g, ' '))
+      projectToSelect = projects.find(p => p.name === decodedProjectName) || null
     }
 
     if (!projectToSelect) {
@@ -122,16 +127,16 @@ const Projects = () => {
       }
     }
 
-    if (projectToSelect) {
+    if (projectToSelect && (!selectedProject || selectedProject.id !== projectToSelect.id)) {
       setSelectedProject(projectToSelect)
-      setSearchParams({ project: projectToSelect.name })
+      // Don't update URL here - it's already set
     } else if (selectedProject && !projects.find(p => p.id === selectedProject.id)) {
       // If selected project is no longer in the active projects list (e.g., archived), clear it
       setSelectedProject(null)
       setSearchParams({})
       localStorage.removeItem('selectedProject')
     }
-  }, [projects, projectsLoading, searchParams, setSearchParams, selectedProject])
+  }, [projects, projectsLoading, searchParams])
 
   // Sessions logic
   const upcomingSessions = useMemo(() => {
@@ -356,7 +361,9 @@ const Projects = () => {
         ) : (
           <div className="flex-1 flex items-center justify-center text-neutral-500">
             <div className="text-center">
-              <div className="text-6xl mb-4">📁</div>
+              <div className="mb-4">
+                <Folder className="w-16 h-16 mx-auto text-neutral-300" />
+              </div>
               <h3 className="text-lg font-medium mb-2">Select a project to start working</h3>
               <p className="text-sm">
                 Choose a project from the dropdown above or create a new one

@@ -3,15 +3,25 @@ import { format } from 'date-fns'
 import { Plus, Clock } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
 import { useMeetings } from '../hooks/useMeetings'
+import { useTasks } from '../hooks/useProjects'
+import { useSettings } from '../hooks/useSettings'
 import { Meeting } from '../types'
 import MeetingModal from '../components/MeetingModal'
 import CalendarTaskModal from '../components/CalendarTaskModal'
+import HabitModal from '../components/HabitModal'
 
 const Calendar = () => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [showMeetingModal, setShowMeetingModal] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ time: string; date: Date } | null>(null)
+  const [showActualHoursTooltip, setShowActualHoursTooltip] = useState(false)
+  const [showPlannedHoursTooltip, setShowPlannedHoursTooltip] = useState(false)
+  const [showHabitModal, setShowHabitModal] = useState(false)
+  const [selectedHabit, setSelectedHabit] = useState<any>(null)
+  const [selectedHabitDate, setSelectedHabitDate] = useState<Date | null>(null)
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ time: string; date: Date } | null>(
+    null
+  )
   const [selectedTask, setSelectedTask] = useState<any>(null)
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null)
   const [newMeeting, setNewMeeting] = useState({
@@ -25,6 +35,8 @@ const Calendar = () => {
   })
 
   const { addMeeting, updateMeeting } = useMeetings()
+  const { settings } = useSettings()
+  const [tasks, setTasks] = useState<any[]>([]) // Tasks with project data
   const {
     dayColumns,
     hourSlots,
@@ -35,6 +47,8 @@ const Calendar = () => {
     currentTime,
     getTasksForTimeSlot,
     tasksScheduled,
+    setTasksScheduled,
+    setScheduledTasksCache,
   } = useCalendarData(windowWidth)
 
   const gridCols = windowWidth > 850 ? '80px 1fr 1fr 1fr 1fr 1fr' : '80px 1fr 1fr 1fr'
@@ -44,6 +58,41 @@ const Calendar = () => {
     const handleResize = () => setWindowWidth(window.innerWidth)
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Fetch all tasks with project data
+  useEffect(() => {
+    const fetchAllTasks = async () => {
+      try {
+        const { supabase } = await import('../lib/supabase')
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data, error } = await supabase
+          .from('tasks')
+          .select(
+            `
+            *,
+            projects (
+              id,
+              name,
+              hourly_rate
+            )
+          `
+          )
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        setTasks(data || [])
+      } catch (error) {
+        console.error('Error fetching tasks:', error)
+      }
+    }
+
+    fetchAllTasks()
   }, [])
 
   const handleTimeSlotClick = (timeSlot: string, date: Date) => {
@@ -100,12 +149,26 @@ const Calendar = () => {
   const handleCreateMeeting = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const baseDate = selectedTimeSlot?.date || (editingMeeting ? new Date(editingMeeting.start_time) : new Date())
+      const baseDate =
+        selectedTimeSlot?.date ||
+        (editingMeeting ? new Date(editingMeeting.start_time) : new Date())
       const [startHour, startMinute] = newMeeting.start_time.split(':').map(Number)
       const [endHour, endMinute] = newMeeting.end_time.split(':').map(Number)
 
-      const startTime = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), startHour, startMinute)
-      const endTime = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), endHour, endMinute)
+      const startTime = new Date(
+        baseDate.getFullYear(),
+        baseDate.getMonth(),
+        baseDate.getDate(),
+        startHour,
+        startMinute
+      )
+      const endTime = new Date(
+        baseDate.getFullYear(),
+        baseDate.getMonth(),
+        baseDate.getDate(),
+        endHour,
+        endMinute
+      )
 
       const meetingData = {
         title: newMeeting.title,
@@ -146,14 +209,52 @@ const Calendar = () => {
     setShowTaskModal(true)
   }
 
+  const handleHabitClick = (habit: any, date: Date) => {
+    setSelectedHabit(habit)
+    setSelectedHabitDate(date)
+    setShowHabitModal(true)
+  }
+
+  const handleHabitTimeChange = async (habitId: string, date: string, newTime: string) => {
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      // Insert or update the daily log with the new scheduled start time
+      const { error } = await supabase.from('habits_daily_logs').upsert(
+        {
+          habit_id: habitId,
+          user_id: user.id,
+          log_date: date,
+          scheduled_start_time: newTime,
+        },
+        {
+          onConflict: 'habit_id,user_id,log_date',
+        }
+      )
+
+      if (error) throw error
+
+      // Reset task scheduling to recalculate available slots with new habit time
+      setTasksScheduled(false)
+      setScheduledTasksCache(new Map())
+    } catch (error) {
+      console.error('Error updating habit time:', error)
+      throw error
+    }
+  }
+
   const handleCompleteTask = async () => {
     if (!selectedTask) return
     try {
       const { supabase } = await import('../lib/supabase')
-      const originalTaskId = selectedTask.id.includes('-chunk-') 
+      const originalTaskId = selectedTask.id.includes('-chunk-')
         ? selectedTask.id.split('-chunk-')[0]
         : selectedTask.id
-      
+
       const { error } = await supabase
         .from('tasks')
         .update({ is_complete: true })
@@ -170,10 +271,10 @@ const Calendar = () => {
     if (!selectedTask) return
     try {
       const { supabase } = await import('../lib/supabase')
-      const originalTaskId = selectedTask.id.includes('-chunk-') 
+      const originalTaskId = selectedTask.id.includes('-chunk-')
         ? selectedTask.id.split('-chunk-')[0]
         : selectedTask.id
-      
+
       const { error } = await supabase.from('tasks').delete().eq('id', originalTaskId)
       if (error) throw error
       window.location.reload()
@@ -185,17 +286,35 @@ const Calendar = () => {
   const closeModal = () => {
     setShowMeetingModal(false)
     setShowTaskModal(false)
+    setShowHabitModal(false)
     setSelectedTimeSlot(null)
     setEditingMeeting(null)
     setSelectedTask(null)
+    setSelectedHabit(null)
+    setSelectedHabitDate(null)
   }
+
+  // Close tooltips when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showActualHoursTooltip && !(event.target as Element).closest('.actual-hours-tooltip')) {
+        setShowActualHoursTooltip(false)
+      }
+      if (showPlannedHoursTooltip && !(event.target as Element).closest('.planned-hours-tooltip')) {
+        setShowPlannedHoursTooltip(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showActualHoursTooltip, showPlannedHoursTooltip])
 
   // Common styles for all calendar events
   const getEventStyle = (topPosition: number, height: number, zIndex: number = 5) => ({
     left: '0',
-    width: '90%',
+    width: '93%',
     top: `${topPosition}%`,
-    height: `${height}px`,
+    height: `${height - 2}px`, // Reduce height by 2px for separation
     zIndex,
   })
 
@@ -218,73 +337,84 @@ const Calendar = () => {
     const currentHour = parseInt(timeSlot.split(':')[0])
     const dateKey = format(date, 'yyyy-MM-dd')
 
-    return habits.filter(habit => {
-      if (!habit.current_start_time) return false
-      
-      const habitStartHour = parseInt(habit.current_start_time.split(':')[0])
-      const habitStartMinute = parseInt(habit.current_start_time.split(':')[1])
-      
-      // Check for meeting conflicts and rescheduling
-      const conflictingMeeting = meetings.find(meeting => {
-        const meetingStart = new Date(meeting.start_time)
-        const meetingEnd = new Date(meeting.end_time)
-        const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
+    return habits
+      .filter(habit => {
+        // Check if there's a daily log with a scheduled start time for this date
+        const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
+        const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
 
-        if (meetingDateStr !== dateKey) return false
+        if (!effectiveStartTime) return false
 
-        const habitDuration = habit.duration || 0
-        const habitStartInHours = habitStartHour + habitStartMinute / 60
-        const habitEndInHours = habitStartInHours + habitDuration / 60
-        const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
-        const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
+        const habitStartHour = parseInt(effectiveStartTime.split(':')[0])
+        const habitStartMinute = parseInt(effectiveStartTime.split(':')[1])
 
-        return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
+        // Check for meeting conflicts and rescheduling
+        const conflictingMeeting = meetings.find(meeting => {
+          const meetingStart = new Date(meeting.start_time)
+          const meetingEnd = new Date(meeting.end_time)
+          const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
+
+          if (meetingDateStr !== dateKey) return false
+
+          const habitDuration = habit.duration || 0
+          const habitStartInHours = habitStartHour + habitStartMinute / 60
+          const habitEndInHours = habitStartInHours + habitDuration / 60
+          const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
+          const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
+
+          return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
+        })
+
+        if (conflictingMeeting) {
+          const meetingEnd = new Date(conflictingMeeting.end_time)
+          const newStartHour = meetingEnd.getHours() + (meetingEnd.getMinutes() > 30 ? 1 : 0)
+          return newStartHour === currentHour
+        }
+
+        return habitStartHour === currentHour
       })
+      .map(habit => {
+        // Use the same effective start time logic as in the filter
+        const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
+        const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
 
-      if (conflictingMeeting) {
-        const meetingEnd = new Date(conflictingMeeting.end_time)
-        const newStartHour = meetingEnd.getHours() + (meetingEnd.getMinutes() > 30 ? 1 : 0)
-        return newStartHour === currentHour
-      }
+        const habitStartHour = parseInt(effectiveStartTime!.split(':')[0])
+        const habitStartMinute = parseInt(effectiveStartTime!.split(':')[1])
 
-      return habitStartHour === currentHour
-    }).map(habit => {
-      const habitStartHour = parseInt(habit.current_start_time!.split(':')[0])
-      const habitStartMinute = parseInt(habit.current_start_time!.split(':')[1])
-      
-      // Check for rescheduling
-      const conflictingMeeting = meetings.find(meeting => {
-        const meetingStart = new Date(meeting.start_time)
-        const meetingEnd = new Date(meeting.end_time)
-        const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
+        // Check for rescheduling
+        const conflictingMeeting = meetings.find(meeting => {
+          const meetingStart = new Date(meeting.start_time)
+          const meetingEnd = new Date(meeting.end_time)
+          const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
 
-        if (meetingDateStr !== dateKey) return false
+          if (meetingDateStr !== dateKey) return false
 
-        const habitDuration = habit.duration || 0
-        const habitStartInHours = habitStartHour + habitStartMinute / 60
-        const habitEndInHours = habitStartInHours + habitDuration / 60
-        const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
-        const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
+          const habitDuration = habit.duration || 0
+          const habitStartInHours = habitStartHour + habitStartMinute / 60
+          const habitEndInHours = habitStartInHours + habitDuration / 60
+          const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
+          const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
 
-        return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
-      })
+          return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
+        })
 
-      if (conflictingMeeting) {
-        const meetingEnd = new Date(conflictingMeeting.end_time)
-        const newStartMinute = meetingEnd.getMinutes() === 0 ? 0 : meetingEnd.getMinutes() <= 30 ? 30 : 0
+        if (conflictingMeeting) {
+          const meetingEnd = new Date(conflictingMeeting.end_time)
+          const newStartMinute =
+            meetingEnd.getMinutes() === 0 ? 0 : meetingEnd.getMinutes() <= 30 ? 30 : 0
+          return {
+            ...habit,
+            topPosition: (newStartMinute / 60) * 100,
+            isRescheduled: true,
+          }
+        }
+
         return {
           ...habit,
-          topPosition: (newStartMinute / 60) * 100,
-          isRescheduled: true,
+          topPosition: (habitStartMinute / 60) * 100,
+          isRescheduled: false,
         }
-      }
-
-      return {
-        ...habit,
-        topPosition: (habitStartMinute / 60) * 100,
-        isRescheduled: false,
-      }
-    })
+      })
   }
 
   // Get sessions for a specific time slot
@@ -292,17 +422,19 @@ const Calendar = () => {
     const dateStr = format(date, 'yyyy-MM-dd')
     const currentHour = parseInt(timeSlot.split(':')[0])
 
-    return sessions.filter(session => {
-      if (!session.actual_start_time || session.scheduled_date !== dateStr) return false
-      const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
-      return sessionStartHour === currentHour
-    }).map(session => {
-      const minutes = parseInt(session.actual_start_time!.split(':')[1])
-      return {
-        ...session,
-        topPosition: (minutes / 60) * 100,
-      }
-    })
+    return sessions
+      .filter(session => {
+        if (!session.actual_start_time || session.scheduled_date !== dateStr) return false
+        const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
+        return sessionStartHour === currentHour
+      })
+      .map(session => {
+        const minutes = parseInt(session.actual_start_time!.split(':')[1])
+        return {
+          ...session,
+          topPosition: (minutes / 60) * 100,
+        }
+      })
   }
 
   // Render all calendar events for a time slot
@@ -322,17 +454,19 @@ const Calendar = () => {
           return (
             <div
               key={`habit-${habit.id}`}
-              className={`absolute text-xs p-0.5 rounded border-l-2 flex items-start justify-between bg-blue-50 border-blue-400 text-blue-800`}
+              className={`absolute text-xs p-0.5 rounded border-l-2 flex items-start justify-between bg-blue-50 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors`}
               style={getEventStyle(habit.topPosition, habitHeight)}
+              onClick={e => {
+                e.stopPropagation()
+                handleHabitClick(habit, date)
+              }}
             >
               <div className="font-medium truncate flex-1 flex items-center">
                 {isRescheduled && <Clock className="w-2.5 h-2.5 mr-1 flex-shrink-0" />}
                 {habit.name}
               </div>
               {habit.duration && (
-                <div className="text-xs opacity-75 ml-1 flex-shrink-0">
-                  {habit.duration}min
-                </div>
+                <div className="text-xs opacity-75 ml-1 flex-shrink-0">{habit.duration}min</div>
               )}
             </div>
           )
@@ -379,9 +513,7 @@ const Calendar = () => {
               }}
             >
               <div className="font-medium truncate flex-1">{task.title}</div>
-              <div className="text-xs opacity-75 ml-1 flex-shrink-0">
-                {task.estimated_hours}h
-              </div>
+              <div className="text-xs opacity-75 ml-1 flex-shrink-0">{task.estimated_hours}h</div>
             </div>
           )
         })}
@@ -416,8 +548,247 @@ const Calendar = () => {
     )
   }
 
+  // Calculate planned vs actual work hours up to configured week ending time
+  const calculateWorkHours = () => {
+    const now = new Date()
+    
+    // Get week ending configuration from settings
+    const weekEndingDay = settings?.week_ending_day || 'sunday'
+    const weekEndingTime = settings?.week_ending_time || '20:30'
+    const weekEndingTimezone = settings?.week_ending_timezone || 'America/New_York'
+    
+    // Calculate days until week ending day
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const targetDayIndex = dayNames.indexOf(weekEndingDay)
+    const currentDayIndex = now.getDay()
+    const daysUntilTarget = (targetDayIndex - currentDayIndex + 7) % 7
+    
+    const weekEndDate = new Date(now)
+    weekEndDate.setDate(now.getDate() + daysUntilTarget)
+    
+    // Set to configured time
+    const [hours, minutes] = weekEndingTime.split(':').map(Number)
+    weekEndDate.setHours(hours, minutes, 0, 0)
+
+    let plannedHours = 0
+    let actualHours = 0
+    const actualHoursBreakdown: Array<{
+      sessionName: string
+      projectName: string
+      hours: number
+      date: string
+      hourlyRate?: number
+    }> = []
+    const plannedHoursBreakdown: Array<{
+      sessionName: string
+      projectName: string
+      hours: number
+      dueDate: string
+      hourlyRate?: number
+      isCompleted: boolean
+    }> = []
+
+    // Calculate from billable tasks up to the cutoff time
+    tasks.forEach(task => {
+      // Check if task is due or needs to be completed by the cutoff
+      const dueDate = task.due_date ? new Date(task.due_date) : null
+      const taskCreatedDate = new Date(task.created_at)
+
+      // Include billable tasks that are:
+      // 1. Due by configured week ending time, OR
+      // 2. Not completed and are billable (upcoming work)
+      const isUpcomingWork =
+        (dueDate && dueDate <= weekEndDate) || (!task.is_complete && task.is_billable)
+
+      if (isUpcomingWork && task.is_billable && task.estimated_hours) {
+        // Only include tasks with hourly rates > 0 in planned hours
+        if (task.projects?.hourly_rate && Number(task.projects.hourly_rate) > 0) {
+          plannedHours += task.estimated_hours
+        }
+
+        // Add to planned breakdown
+        plannedHoursBreakdown.push({
+          sessionName: task.title,
+          projectName: task.projects?.name || 'Project',
+          hours: task.estimated_hours,
+          dueDate: (dueDate || taskCreatedDate).toISOString().split('T')[0],
+          hourlyRate: task.projects?.hourly_rate || 0,
+          isCompleted: task.is_complete,
+        })
+
+        // Only count actual hours for completed work
+        if (task.is_complete) {
+          actualHours += task.estimated_hours
+          actualHoursBreakdown.push({
+            sessionName: task.title,
+            projectName: task.projects?.name || 'Project',
+            hours: task.estimated_hours,
+            date: taskCreatedDate.toISOString().split('T')[0],
+            hourlyRate: task.projects?.hourly_rate || 0,
+          })
+        }
+      }
+    })
+
+    return { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown }
+  }
+
+  const { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown } =
+    calculateWorkHours()
+
   return (
     <div className="flex flex-col h-screen bg-white">
+      {/* Top Bar with Work Hours */}
+      <div className="bg-neutral-100 border-b border-neutral-200 px-4 py-1 flex items-center justify-between">
+        <div className="text-sm text-neutral-700">
+          Work Hours (until {settings?.week_ending_day?.charAt(0).toUpperCase() + settings?.week_ending_day?.slice(1) || 'Sunday'} {new Date(`1970-01-01T${settings?.week_ending_time || '20:30'}`).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          })} {settings?.week_ending_timezone?.split('/')[1]?.replace('_', ' ') || 'ET'})
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="text-sm relative planned-hours-tooltip">
+            <span className="text-neutral-600">Planned:</span>
+            <span
+              className="font-medium text-neutral-900 ml-1 cursor-pointer hover:underline"
+              onClick={() => setShowPlannedHoursTooltip(!showPlannedHoursTooltip)}
+            >
+              {plannedHours.toFixed(1)}h ($
+              {plannedHoursBreakdown
+                .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
+                .reduce((sum, item) => sum + item.hours * Number(item.hourlyRate), 0)
+                .toFixed(0)}
+              )
+            </span>
+            {showPlannedHoursTooltip && (
+              <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-neutral-200 shadow-lg rounded-md p-3 z-50">
+                <div className="text-sm font-medium text-neutral-900 mb-2">
+                  Planned Hours Breakdown
+                </div>
+                {plannedHoursBreakdown.filter(
+                  item => item.hourlyRate && Number(item.hourlyRate) > 0
+                ).length > 0 ? (
+                  <div className="space-y-1">
+                    {plannedHoursBreakdown
+                      .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
+                      .map((item, index) => (
+                        <div key={index} className="flex justify-between items-center text-xs">
+                          <div className="flex-1">
+                            <div className="font-medium text-neutral-900 flex items-center">
+                              {item.projectName}
+                              {item.isCompleted && (
+                                <span className="ml-2 text-green-600 text-xs">✓</span>
+                              )}
+                            </div>
+                            <div className="text-neutral-600 truncate">{item.sessionName}</div>
+                            <div className="text-neutral-600">
+                              Due: {format(new Date(item.dueDate), 'MMM d')}
+                            </div>
+                            {item.hourlyRate && Number(item.hourlyRate) > 0 && (
+                              <div className="text-neutral-500">${Number(item.hourlyRate)}/hr</div>
+                            )}
+                          </div>
+                          <div className="text-neutral-900 font-medium">
+                            {item.hours.toFixed(1)}h
+                            {item.hourlyRate && Number(item.hourlyRate) > 0 && (
+                              <div className="text-blue-600 text-xs">
+                                ${(item.hours * Number(item.hourlyRate)).toFixed(0)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    <div className="border-t border-neutral-200 pt-1 mt-2">
+                      <div className="flex justify-between items-center text-sm font-medium">
+                        <span>Total</span>
+                        <span>
+                          {plannedHoursBreakdown
+                            .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
+                            .reduce((sum, item) => sum + item.hours, 0)
+                            .toFixed(1)}
+                          h
+                        </span>
+                      </div>
+                      {plannedHoursBreakdown.some(
+                        item => item.hourlyRate && Number(item.hourlyRate) > 0
+                      ) && (
+                        <div className="flex justify-between items-center text-sm text-blue-600">
+                          <span>Est. Value</span>
+                          <span>
+                            $
+                            {plannedHoursBreakdown
+                              .reduce(
+                                (sum, item) =>
+                                  sum +
+                                  item.hours *
+                                    (Number(item.hourlyRate) > 0 ? Number(item.hourlyRate) : 0),
+                                0
+                              )
+                              .toFixed(0)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-neutral-500">No planned work found</div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="text-sm relative actual-hours-tooltip">
+            <span className="text-neutral-600">Actual:</span>
+            <span
+              className="font-medium text-neutral-900 ml-1 cursor-pointer hover:underline"
+              onClick={() => setShowActualHoursTooltip(!showActualHoursTooltip)}
+            >
+              {actualHours.toFixed(1)}h
+            </span>
+            {showActualHoursTooltip && (
+              <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-neutral-200 shadow-lg rounded-md p-3 z-50">
+                <div className="text-sm font-medium text-neutral-900 mb-2">
+                  Actual Hours Breakdown
+                </div>
+                {actualHoursBreakdown.length > 0 ? (
+                  <div className="space-y-1">
+                    {actualHoursBreakdown.map((item, index) => (
+                      <div key={index} className="flex justify-between items-center text-xs">
+                        <div className="flex-1">
+                          <div className="font-medium text-neutral-900">{item.projectName}</div>
+                          <div className="text-neutral-600">
+                            {format(new Date(item.date), 'MMM d')}
+                          </div>
+                          {item.hourlyRate && Number(item.hourlyRate) > 0 && (
+                            <div className="text-neutral-500">${Number(item.hourlyRate)}/hr</div>
+                          )}
+                        </div>
+                        <div className="text-neutral-900 font-medium">
+                          {item.hours.toFixed(1)}h
+                          {item.hourlyRate && item.hourlyRate > 0 && (
+                            <div className="text-green-600 text-xs">
+                              ${(item.hours * item.hourlyRate).toFixed(0)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="border-t border-neutral-200 pt-1 mt-2">
+                      <div className="flex justify-between items-center text-sm font-medium">
+                        <span>Total</span>
+                        <span>{actualHours.toFixed(1)}h</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-neutral-500">No completed sessions yet</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Headers */}
       <div className="grid border-b border-neutral-200" style={{ gridTemplateColumns: gridCols }}>
         <div className="p-1.5 bg-neutral-100 border-r border-neutral-200 flex items-center justify-center">
@@ -426,13 +797,15 @@ const Calendar = () => {
             title="Add meeting"
             onClick={handleAddMeeting}
           >
-            <Plus className="w-4 h-4 text-neutral-600" />
+            <Plus className="w-3 h-3 text-neutral-600" />
           </button>
         </div>
         {dayColumns.map((column, columnIndex) => (
-          <div key={columnIndex} className="p-1.5 bg-neutral-50 border-r border-neutral-200 last:border-r-0">
+          <div
+            key={columnIndex}
+            className="p-1.5 bg-neutral-50 border-r border-neutral-200 last:border-r-0"
+          >
             <h2 className="text-sm font-medium text-neutral-900">{column.label}</h2>
-            <p className="text-xs text-neutral-600">{format(column.date, 'MMM d, yyyy')}</p>
           </div>
         ))}
       </div>
@@ -440,7 +813,11 @@ const Calendar = () => {
       {/* Calendar Grid */}
       <div className="flex-1 overflow-y-auto relative">
         {hourSlots.map((hour, hourIndex) => (
-          <div key={hourIndex} className="grid border-b border-neutral-100" style={{ gridTemplateColumns: gridCols }}>
+          <div
+            key={hourIndex}
+            className="grid border-b border-neutral-100"
+            style={{ gridTemplateColumns: gridCols }}
+          >
             <div className="border-r border-neutral-200 p-1 h-16 bg-neutral-50 flex items-start">
               <div className="font-mono text-neutral-600 text-xs">{hour.display}</div>
             </div>
@@ -456,13 +833,13 @@ const Calendar = () => {
             ))}
           </div>
         ))}
-        
+
         {/* Current Time Line */}
         <div className="absolute inset-0 pointer-events-none">
           {dayColumns.map((column, columnIndex) => {
             const timeLinePosition = getCurrentTimeLinePosition(column.date)
             if (!timeLinePosition) return null
-            
+
             return (
               <div
                 key={`timeline-${columnIndex}`}
@@ -479,10 +856,13 @@ const Calendar = () => {
                 {dayColumns.map((_, dayIndex) => (
                   <div
                     key={dayIndex}
-                    className={`relative ${dayIndex === columnIndex ? 'bg-red-500' : 'bg-transparent'}`}
+                    className={`relative ${
+                      dayIndex === columnIndex ? 'bg-red-500' : 'bg-transparent'
+                    }`}
                     style={{
                       height: '2px',
-                      boxShadow: dayIndex === columnIndex ? '0 0 4px rgba(239, 68, 68, 0.5)' : 'none'
+                      boxShadow:
+                        dayIndex === columnIndex ? '0 0 4px rgba(239, 68, 68, 0.5)' : 'none',
                     }}
                   />
                 ))}
@@ -508,6 +888,14 @@ const Calendar = () => {
         task={selectedTask}
         onComplete={handleCompleteTask}
         onDelete={handleDeleteTask}
+      />
+
+      <HabitModal
+        isOpen={showHabitModal}
+        onClose={closeModal}
+        habit={selectedHabit}
+        selectedDate={selectedHabitDate}
+        onTimeChange={handleHabitTimeChange}
       />
     </div>
   )

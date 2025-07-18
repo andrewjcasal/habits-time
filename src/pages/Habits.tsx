@@ -4,6 +4,7 @@ import { useHabits } from '../hooks/useHabits'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import HabitContext from '../components/HabitContext'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 const Habits = () => {
   const { user } = useAuth()
@@ -205,11 +206,7 @@ const Habits = () => {
   }, [habits, selectedHabitId])
 
   if (loading) {
-    return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-      </div>
-    )
+    return <LoadingSpinner message="Loading habits..." />
   }
 
   if (error) {
@@ -224,10 +221,6 @@ const Habits = () => {
 
   return (
     <div className="h-screen flex flex-col">
-      <div className="px-3 py-2 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-neutral-900">Habits</h1>
-      </div>
-
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-0">
         {/* Habits List - Outlook style */}
         <div className="border-r border-gray-200">

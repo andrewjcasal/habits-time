@@ -158,6 +158,7 @@ export function useSessions(projectId?: string) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    setSessions([]) // Clear sessions immediately when project changes
     fetchSessions()
   }, [projectId])
 

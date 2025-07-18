@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search } from 'lucide-react'
+import { Search, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import AddButton from '../components/AddButton'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface Note {
   id: string
@@ -165,16 +166,7 @@ const Notes = () => {
   }, [])
 
   if (loading) {
-    return (
-      <div className="flex h-screen">
-        <div className="w-80 border-r border-neutral-200 bg-neutral-50">
-          <div className="animate-pulse p-4">Loading notes...</div>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner message="Loading notes..." />
   }
 
   return (
@@ -281,7 +273,9 @@ const Notes = () => {
         ) : (
           <div className="flex-1 flex items-center justify-center text-neutral-500">
             <div className="text-center">
-              <div className="text-6xl mb-4">📝</div>
+              <div className="mb-4">
+                <FileText className="w-16 h-16 mx-auto text-neutral-300" />
+              </div>
               <h3 className="text-lg font-medium mb-2">Select a note to start editing</h3>
               <p className="text-sm">Choose a note from the sidebar or create a new one</p>
             </div>
