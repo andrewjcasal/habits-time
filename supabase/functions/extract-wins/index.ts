@@ -104,14 +104,24 @@ Ignore:
 - Mundane updates
 - Complaints or problems
 
-IMPORTANT: Avoid extracting wins that are similar or duplicate to these recent wins:
+CRITICAL: These wins have already been recorded recently:
 ${recentWinsText}
 
-Only extract wins that are genuinely NEW and different from what's already been recorded. If a win is too similar to an existing one, skip it.
+DO NOT extract any wins that are:
+- The same event or achievement as above
+- Minor variations of the above wins
+- Similar accomplishments in the same area
+- Repetitive daily habit completions already recorded
 
-Keep titles under 60 characters and celebratory in tone. Only return wins that are clearly positive achievements.
+Be extremely strict about avoiding duplicates. When in doubt, do NOT extract the win. Only extract wins that are completely new, unique accomplishments that haven't been captured before.
 
-Return ONLY valid JSON array format, no markdown or extra text:`,
+Each win must be:
+- A distinct, one-time achievement
+- Clearly different from recent wins
+- Worth celebrating independently
+- Under 60 characters for the title
+
+Return ONLY valid JSON array format, no markdown or extra text. If no new wins are found, return an empty array []:`,
           },
           {
             role: 'user',
@@ -172,89 +182,28 @@ Return ONLY valid JSON array format, no markdown or extra text:`,
 
     console.log('DEBUG - Extracted wins:', extractedWins)
 
-    // Helper function to check semantic similarity
-    const isSimilarWin = (newWin: ExtractedWin, existingWins: any[]): boolean => {
-      const newText = `${newWin.title} ${newWin.description || ''}`.toLowerCase()
-
-      for (const existing of existingWins) {
-        const existingText = `${existing.title} ${existing.description || ''}`.toLowerCase()
-
-        // Check for key phrase overlap
-        const newWords = newText.split(/\s+/).filter(w => w.length > 3) // Filter out short words
-        const existingWords = existingText.split(/\s+/).filter(w => w.length > 3)
-
-        // Calculate word overlap percentage
-        const overlap = newWords.filter(word => existingWords.includes(word))
-        const overlapPercentage = overlap.length / Math.max(newWords.length, existingWords.length)
-
-        // Check for similar titles (more strict)
-        const titleSimilarity = calculateSimilarity(
-          newWin.title.toLowerCase(),
-          existing.title.toLowerCase()
-        )
-
-        // Consider it similar if:
-        // 1. Title similarity > 60% AND word overlap > 30%, OR
-        // 2. Word overlap > 50% (high content overlap)
-        if ((titleSimilarity > 0.6 && overlapPercentage > 0.3) || overlapPercentage > 0.5) {
-          console.log(
-            `DEBUG - Similar win detected. New: "${newWin.title}" vs Existing: "${existing.title}" (title sim: ${Math.round(titleSimilarity * 100)}%, word overlap: ${Math.round(overlapPercentage * 100)}%)`
-          )
-          return true
-        }
-      }
-      return false
-    }
-
-    // Simple string similarity function (Levenshtein-based)
-    const calculateSimilarity = (str1: string, str2: string): number => {
-      const longer = str1.length > str2.length ? str1 : str2
-      const shorter = str1.length > str2.length ? str2 : str1
-      const editDistance = levenshteinDistance(longer, shorter)
-      return (longer.length - editDistance) / longer.length
-    }
-
-    const levenshteinDistance = (str1: string, str2: string): number => {
-      const matrix = []
-      for (let i = 0; i <= str2.length; i++) {
-        matrix[i] = [i]
-      }
-      for (let j = 0; j <= str1.length; j++) {
-        matrix[0][j] = j
-      }
-      for (let i = 1; i <= str2.length; i++) {
-        for (let j = 1; j <= str1.length; j++) {
-          if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-            matrix[i][j] = matrix[i - 1][j - 1]
-          } else {
-            matrix[i][j] = Math.min(
-              matrix[i - 1][j - 1] + 1,
-              matrix[i][j - 1] + 1,
-              matrix[i - 1][j] + 1
-            )
-          }
-        }
-      }
-      return matrix[str2.length][str1.length]
-    }
-
-    // Filter out similar wins before inserting
+    // Simple duplicate check - rely more on OpenAI to avoid duplicates
     const filteredWins = extractedWins.filter(win => {
-      if (isSimilarWin(win, recentWins || [])) {
-        console.log('DEBUG - Semantic duplicate detected, skipping:', win.title)
+      // Basic exact title match check
+      const isDuplicate = recentWins?.some(existing => 
+        existing.title.toLowerCase().trim() === win.title.toLowerCase().trim()
+      )
+      
+      if (isDuplicate) {
+        console.log('DEBUG - Exact duplicate detected, skipping:', win.title)
         return false
       }
       return true
     })
 
     console.log(
-      `DEBUG - After similarity filtering: ${filteredWins.length}/${extractedWins.length} wins remaining`
+      `DEBUG - After duplicate filtering: ${filteredWins.length}/${extractedWins.length} wins remaining`
     )
 
     // Insert wins into database (duplicate prevention handled by unique constraint)
     let successCount = 0
     let duplicateCount = 0
-    let similaritySkippedCount = extractedWins.length - filteredWins.length
+    let duplicateSkippedCount = extractedWins.length - filteredWins.length
 
     for (const win of filteredWins) {
       if (!win.title || win.title.trim().length === 0) {
@@ -293,7 +242,7 @@ Return ONLY valid JSON array format, no markdown or extra text:`,
         message: 'Win extraction completed',
         winsExtracted: successCount,
         duplicatesSkipped: duplicateCount,
-        similaritySkipped: similaritySkippedCount,
+        duplicateSkippedCount: duplicateSkippedCount,
         totalProcessed: extractedWins.length,
       }),
       {

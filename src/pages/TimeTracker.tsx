@@ -23,7 +23,7 @@ import TimeLogRow from '../components/TimeLogRow'
 
 interface TimeLog {
   id: string
-  activity_types: {
+  habits_activity_types: {
     id: string
     name: string
     is_favorite?: boolean
@@ -122,18 +122,18 @@ const TimeTracker = () => {
 
     // Add favorite activity types
     timeLogs.forEach(log => {
-      if (log.end_time && log.activity_types?.is_favorite) {
+      if (log.end_time && log.habits_activity_types?.is_favorite) {
         const duration = new Date(log.end_time).getTime() - new Date(log.start_time).getTime()
         const existing = summaries.find(
-          s => s.id === log.activity_types.id && s.type === 'activity'
+          s => s.id === log.habits_activity_types.id && s.type === 'activity'
         )
 
         if (existing) {
           existing.totalTime += duration
         } else {
           summaries.push({
-            id: log.activity_types.id,
-            name: log.activity_types.name,
+            id: log.habits_activity_types.id,
+            name: log.habits_activity_types.name,
             type: 'activity',
             totalTime: duration,
           })
@@ -218,7 +218,7 @@ const TimeTracker = () => {
     if (timeLogs.length > 0) {
       content += `## Individual Logs\n`
       timeLogs.forEach((log, index) => {
-        content += `${index + 1}. **${log.activity_types?.name}**\n`
+        content += `${index + 1}. **${log.habits_activity_types?.name}**\n`
         content += `   - Time: ${formatTime(log.start_time)}`
         if (log.end_time) {
           content += ` → ${formatTime(log.end_time)}`
@@ -520,7 +520,7 @@ const TimeTracker = () => {
 
       // Create a new log for the second part
       const newLogData = {
-        activity_type_id: splitModalLog.activity_types.id,
+        activity_type_id: splitModalLog.habits_activity_types.id,
         user_id: user.id,
         start_time: splitDateTime.toISOString(),
         // Only set end_time if the original log was completed
@@ -578,6 +578,7 @@ const TimeTracker = () => {
         .lte('start_time', endOfSelectedDay.toISOString())
         .order('start_time', { ascending: false })
 
+        console.log('data', data)
       if (error) {
         throw error
       }
@@ -590,8 +591,8 @@ const TimeTracker = () => {
             ? new Date(log.end_time).getTime() - new Date(log.start_time).getTime()
             : null,
           categories:
-            log.activity_types?.activity_type_categories
-              ?.map((atc: any) => atc.categories)
+            log.habits_activity_types?.habits_activity_type_categories
+              ?.map((atc: any) => atc.habits_categories)
               .filter(Boolean) || [],
         })) || []
 
@@ -764,7 +765,7 @@ const TimeTracker = () => {
                                       className="p-1.5 bg-neutral-50 rounded text-xs hover:bg-neutral-100 transition-colors"
                                     >
                                       <div className="font-medium text-neutral-900">
-                                        {log.activity_types?.name}
+                                        {log.habits_activity_types?.name}
                                       </div>
                                       <div className="flex items-center justify-between text-neutral-600 mt-0.5">
                                         <div className="flex items-center gap-0.5">
