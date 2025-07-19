@@ -365,9 +365,38 @@ const Calendar = () => {
           return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
         })
 
+        // Check for session conflicts and rescheduling
+        const conflictingSession = sessions.find(session => {
+          if (!session.actual_start_time || session.scheduled_date !== dateKey) return false
+
+          const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
+          const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
+          const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
+
+          const habitDuration = habit.duration || 0
+          const habitStartInHours = habitStartHour + habitStartMinute / 60
+          const habitEndInHours = habitStartInHours + habitDuration / 60
+          const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
+          const sessionEndInHours = sessionStartInHours + sessionDuration / 60
+
+          return habitStartInHours < sessionEndInHours && habitEndInHours > sessionStartInHours
+        })
+
         if (conflictingMeeting) {
           const meetingEnd = new Date(conflictingMeeting.end_time)
           const newStartHour = meetingEnd.getHours() + (meetingEnd.getMinutes() > 30 ? 1 : 0)
+          return newStartHour === currentHour
+        }
+
+        if (conflictingSession) {
+          const sessionStartHour = parseInt(conflictingSession.actual_start_time!.split(':')[0])
+          const sessionStartMinute = parseInt(conflictingSession.actual_start_time!.split(':')[1])
+          const sessionDuration = (conflictingSession.scheduled_hours || 1) * 60 // Duration in minutes
+          const sessionEndMinute = sessionStartMinute + sessionDuration
+          const sessionEndHour = sessionStartHour + Math.floor(sessionEndMinute / 60)
+          const finalEndMinute = sessionEndMinute % 60
+
+          const newStartHour = sessionEndHour + (finalEndMinute > 30 ? 1 : 0)
           return newStartHour === currentHour
         }
 
@@ -381,7 +410,7 @@ const Calendar = () => {
         const habitStartHour = parseInt(effectiveStartTime!.split(':')[0])
         const habitStartMinute = parseInt(effectiveStartTime!.split(':')[1])
 
-        // Check for rescheduling
+        // Check for rescheduling (meetings first, then sessions)
         const conflictingMeeting = meetings.find(meeting => {
           const meetingStart = new Date(meeting.start_time)
           const meetingEnd = new Date(meeting.end_time)
@@ -398,10 +427,41 @@ const Calendar = () => {
           return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
         })
 
+        const conflictingSession = sessions.find(session => {
+          if (!session.actual_start_time || session.scheduled_date !== dateKey) return false
+
+          const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
+          const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
+          const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
+
+          const habitDuration = habit.duration || 0
+          const habitStartInHours = habitStartHour + habitStartMinute / 60
+          const habitEndInHours = habitStartInHours + habitDuration / 60
+          const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
+          const sessionEndInHours = sessionStartInHours + sessionDuration / 60
+
+          return habitStartInHours < sessionEndInHours && habitEndInHours > sessionStartInHours
+        })
+
         if (conflictingMeeting) {
           const meetingEnd = new Date(conflictingMeeting.end_time)
           const newStartMinute =
             meetingEnd.getMinutes() === 0 ? 0 : meetingEnd.getMinutes() <= 30 ? 30 : 0
+          return {
+            ...habit,
+            topPosition: (newStartMinute / 60) * 100,
+            isRescheduled: true,
+          }
+        }
+
+        if (conflictingSession) {
+          const sessionStartHour = parseInt(conflictingSession.actual_start_time!.split(':')[0])
+          const sessionStartMinute = parseInt(conflictingSession.actual_start_time!.split(':')[1])
+          const sessionDuration = (conflictingSession.scheduled_hours || 1) * 60 // Duration in minutes
+          const sessionEndMinute = sessionStartMinute + sessionDuration
+          const finalEndMinute = sessionEndMinute % 60
+
+          const newStartMinute = finalEndMinute === 0 ? 0 : finalEndMinute <= 30 ? 30 : 0
           return {
             ...habit,
             topPosition: (newStartMinute / 60) * 100,
