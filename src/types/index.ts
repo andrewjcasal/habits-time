@@ -187,6 +187,8 @@ export interface Project {
   description?: string
   status: 'active' | 'completed' | 'archived'
   color?: string
+  hourly_rate?: number
+  has_sessions?: boolean
   created_at: string
   updated_at: string
 }

@@ -339,19 +339,23 @@ const Projects = () => {
       <main className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
         {selectedProject ? (
           <div className="flex-1 flex overflow-hidden">
-            <SessionsList
-              activeSessionTab={activeSessionTab}
-              onSetActiveSessionTab={setActiveSessionTab}
-              onShowNewSessionForm={() => setShowNewSessionForm(true)}
-              sessionsLoading={sessionsLoading}
-              sessionsToShow={sessionsToShow}
-              onCopyToClipboard={handleCopyToClipboard}
-              onUpdateSession={updateSession}
-            />
+            {/* Conditionally show SessionsList only if project has sessions */}
+            {selectedProject.has_sessions && (
+              <SessionsList
+                activeSessionTab={activeSessionTab}
+                onSetActiveSessionTab={setActiveSessionTab}
+                onShowNewSessionForm={() => setShowNewSessionForm(true)}
+                sessionsLoading={sessionsLoading}
+                sessionsToShow={sessionsToShow}
+                onCopyToClipboard={handleCopyToClipboard}
+                onUpdateSession={updateSession}
+              />
+            )}
 
             <TasksList
               tasks={tasks}
               tasksLoading={tasksLoading}
+              fullWidth={!selectedProject.has_sessions}
               onShowNewTaskForm={() => setShowNewTaskForm(true)}
               onTaskClick={handleTaskClick}
               onToggleTaskStatus={handleToggleTaskStatus}

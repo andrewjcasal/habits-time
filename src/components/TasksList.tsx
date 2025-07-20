@@ -6,6 +6,7 @@ import SectionHeader from './SectionHeader'
 interface TasksListProps {
   tasks: Task[]
   tasksLoading: boolean
+  fullWidth?: boolean
   onShowNewTaskForm: () => void
   onTaskClick: (task: Task) => void
   onToggleTaskStatus: (task: Task) => void
@@ -15,6 +16,7 @@ interface TasksListProps {
 const TasksList = ({
   tasks,
   tasksLoading,
+  fullWidth = false,
   onShowNewTaskForm,
   onTaskClick,
   onToggleTaskStatus,
@@ -55,7 +57,7 @@ const TasksList = ({
   }
 
   return (
-    <div className="w-1/2 flex flex-col">
+    <div className={`${fullWidth ? 'w-full' : 'w-1/2'} flex flex-col`}>
       <SectionHeader
         title="Tasks"
         onAddClick={onShowNewTaskForm}

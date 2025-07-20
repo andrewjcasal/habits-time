@@ -10,6 +10,7 @@ interface MeetingModalProps {
     description: string
     start_time: string
     end_time: string
+    date: string
     location: string
     meeting_type: Meeting['meeting_type']
     priority: Meeting['priority']
@@ -33,92 +34,78 @@ const MeetingModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-4 w-full max-w-md mx-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-neutral-900">
+      <div className="bg-white rounded-lg p-2 w-full max-w-sm mx-4">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-neutral-900">
             {editingMeeting ? 'Edit Meeting' : 'Add Meeting'}
           </h2>
           <button onClick={onClose} className="text-neutral-500 hover:text-neutral-700">
-            <X className="w-5 h-5" />
+            <X className="w-3 h-3" />
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={onSubmit} className="space-y-1">
           <input
             type="text"
             placeholder="Meeting title"
             value={meeting.title}
             onChange={e => onMeetingChange({ ...meeting, title: e.target.value })}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
+            className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
             required
           />
 
-          <textarea
-            placeholder="Description (optional)"
-            value={meeting.description}
-            onChange={e => onMeetingChange({ ...meeting, description: e.target.value })}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm resize-none"
-            rows={2}
-          />
-
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Start Time</label>
-              <input
-                type="time"
-                value={meeting.start_time}
-                onChange={e => onMeetingChange({ ...meeting, start_time: e.target.value })}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
-                required
-              />
-            </div>
-
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">End Time</label>
-              <input
-                type="time"
-                value={meeting.end_time}
-                onChange={e => onMeetingChange({ ...meeting, end_time: e.target.value })}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
-                required
-              />
-            </div>
+          <div className="flex gap-1">
+            <input
+              type="date"
+              value={meeting.date}
+              onChange={e => onMeetingChange({ ...meeting, date: e.target.value })}
+              className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
+              required
+            />
+            <input
+              type="time"
+              value={meeting.start_time}
+              onChange={e => onMeetingChange({ ...meeting, start_time: e.target.value })}
+              className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
+              required
+            />
+            <input
+              type="time"
+              value={meeting.end_time}
+              onChange={e => onMeetingChange({ ...meeting, end_time: e.target.value })}
+              className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
+              required
+            />
           </div>
 
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
-              <select
-                value={meeting.meeting_type}
-                onChange={e =>
-                  onMeetingChange({
-                    ...meeting,
-                    meeting_type: e.target.value as Meeting['meeting_type'],
-                  })
-                }
-                className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
-              >
-                <option value="general">General</option>
-                <option value="work">Work</option>
-                <option value="personal">Personal</option>
-                <option value="appointment">Appointment</option>
-              </select>
-            </div>
+          <div className="flex gap-1">
+            <select
+              value={meeting.meeting_type}
+              onChange={e =>
+                onMeetingChange({
+                  ...meeting,
+                  meeting_type: e.target.value as Meeting['meeting_type'],
+                })
+              }
+              className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
+            >
+              <option value="general">General</option>
+              <option value="work">Work</option>
+              <option value="personal">Personal</option>
+              <option value="appointment">Appointment</option>
+            </select>
 
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Priority</label>
-              <select
-                value={meeting.priority}
-                onChange={e =>
-                  onMeetingChange({ ...meeting, priority: e.target.value as Meeting['priority'] })
-                }
-                className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
+            <select
+              value={meeting.priority}
+              onChange={e =>
+                onMeetingChange({ ...meeting, priority: e.target.value as Meeting['priority'] })
+              }
+              className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
           </div>
 
           <input
@@ -126,28 +113,30 @@ const MeetingModal = ({
             placeholder="Location (optional)"
             value={meeting.location}
             onChange={e => onMeetingChange({ ...meeting, location: e.target.value })}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
+            className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
           />
 
-          {selectedTimeSlot && (
-            <div className="text-sm text-neutral-600 bg-neutral-50 p-2 rounded">
-              <strong>Date:</strong> {format(selectedTimeSlot.date, 'MMM d, yyyy')}
-            </div>
-          )}
+          <textarea
+            placeholder="Description (optional)"
+            value={meeting.description}
+            onChange={e => onMeetingChange({ ...meeting, description: e.target.value })}
+            className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs resize-none"
+            rows={2}
+          />
 
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-1 justify-end pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-neutral-600 text-sm hover:text-neutral-800"
+              className="px-2 py-1 text-neutral-600 text-xs hover:text-neutral-800"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
+              className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
             >
-              {editingMeeting ? 'Update Meeting' : 'Create Meeting'}
+              {editingMeeting ? 'Update' : 'Create'}
             </button>
           </div>
         </form>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
-import { Plus, Clock } from 'lucide-react'
+import { Plus, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
 import { useMeetings } from '../hooks/useMeetings'
 import { useTasks } from '../hooks/useProjects'
@@ -24,11 +24,13 @@ const Calendar = () => {
   )
   const [selectedTask, setSelectedTask] = useState<any>(null)
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null)
+  const [baseDate, setBaseDate] = useState(new Date())
   const [newMeeting, setNewMeeting] = useState({
     title: '',
     description: '',
     start_time: '',
     end_time: '',
+    date: '',
     location: '',
     meeting_type: 'general' as Meeting['meeting_type'],
     priority: 'medium' as Meeting['priority'],
@@ -49,9 +51,27 @@ const Calendar = () => {
     tasksScheduled,
     setTasksScheduled,
     setScheduledTasksCache,
-  } = useCalendarData(windowWidth)
+    scheduledTasksCache,
+  } = useCalendarData(windowWidth, baseDate)
 
   const gridCols = windowWidth > 850 ? '80px 1fr 1fr 1fr 1fr 1fr' : '80px 1fr 1fr 1fr'
+
+  // Navigation functions
+  const navigateBackWeek = () => {
+    setBaseDate(prevDate => new Date(prevDate.getTime() - 5 * 24 * 60 * 60 * 1000))
+  }
+
+  const navigateBackDay = () => {
+    setBaseDate(prevDate => new Date(prevDate.getTime() - 24 * 60 * 60 * 1000))
+  }
+
+  const navigateForwardDay = () => {
+    setBaseDate(prevDate => new Date(prevDate.getTime() + 24 * 60 * 60 * 1000))
+  }
+
+  const navigateForwardWeek = () => {
+    setBaseDate(prevDate => new Date(prevDate.getTime() + 5 * 24 * 60 * 60 * 1000))
+  }
 
   // Listen for window resize
   useEffect(() => {
@@ -107,6 +127,7 @@ const Calendar = () => {
       description: '',
       start_time: startTime,
       end_time: endTime,
+      date: format(date, 'yyyy-MM-dd'),
       location: '',
       meeting_type: 'general',
       priority: 'medium',
@@ -121,6 +142,7 @@ const Calendar = () => {
       description: '',
       start_time: '',
       end_time: '',
+      date: format(new Date(), 'yyyy-MM-dd'),
       location: '',
       meeting_type: 'general',
       priority: 'medium',
@@ -138,6 +160,7 @@ const Calendar = () => {
       description: meeting.description || '',
       start_time: startTime.toTimeString().slice(0, 5),
       end_time: endTime.toTimeString().slice(0, 5),
+      date: format(startTime, 'yyyy-MM-dd'),
       location: meeting.location || '',
       meeting_type: meeting.meeting_type,
       priority: meeting.priority,
@@ -149,26 +172,14 @@ const Calendar = () => {
   const handleCreateMeeting = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const baseDate =
-        selectedTimeSlot?.date ||
-        (editingMeeting ? new Date(editingMeeting.start_time) : new Date())
+      // Parse the date string and create local date objects
+      const [year, month, day] = newMeeting.date.split('-').map(Number)
       const [startHour, startMinute] = newMeeting.start_time.split(':').map(Number)
       const [endHour, endMinute] = newMeeting.end_time.split(':').map(Number)
 
-      const startTime = new Date(
-        baseDate.getFullYear(),
-        baseDate.getMonth(),
-        baseDate.getDate(),
-        startHour,
-        startMinute
-      )
-      const endTime = new Date(
-        baseDate.getFullYear(),
-        baseDate.getMonth(),
-        baseDate.getDate(),
-        endHour,
-        endMinute
-      )
+      // Create dates in local timezone (not UTC)
+      const startTime = new Date(year, month - 1, day, startHour, startMinute)
+      const endTime = new Date(year, month - 1, day, endHour, endMinute)
 
       const meetingData = {
         title: newMeeting.title,
@@ -192,6 +203,7 @@ const Calendar = () => {
         description: '',
         start_time: '',
         end_time: '',
+        date: '',
         location: '',
         meeting_type: 'general',
         priority: 'medium',
@@ -648,46 +660,75 @@ const Calendar = () => {
       isCompleted: boolean
     }> = []
 
-    // Calculate from billable tasks up to the cutoff time
-    tasks.forEach(task => {
-      // Check if task is due or needs to be completed by the cutoff
-      const dueDate = task.due_date ? new Date(task.due_date) : null
-      const taskCreatedDate = new Date(task.created_at)
+    // Calculate from scheduled task chunks up to the cutoff time
+    console.log('123 - scheduledTasksCache:', scheduledTasksCache)
+    console.log('123 - tasksScheduled:', tasksScheduled)
 
-      // Include billable tasks that are:
-      // 1. Due by configured week ending time, OR
-      // 2. Not completed and are billable (upcoming work)
-      const isUpcomingWork =
-        (dueDate && dueDate <= weekEndDate) || (!task.is_complete && task.is_billable)
+    scheduledTasksCache.forEach((chunks, dateKey) => {
+      console.log('123 - Processing date:', dateKey, 'chunks:', chunks)
+      const chunkDate = new Date(dateKey + 'T00:00:00')
 
-      if (isUpcomingWork && task.is_billable && task.estimated_hours) {
-        // Only include tasks with hourly rates > 0 in planned hours
-        if (task.projects?.hourly_rate && Number(task.projects.hourly_rate) > 0) {
-          plannedHours += task.estimated_hours
+      chunks.forEach(chunk => {
+        // The chunk has the task data directly, extract the original task ID
+        const originalTaskId = chunk.id.split('-chunk-')[0]
+
+        // Calculate chunk end time
+        const chunkStartHour = chunk.startTime ? Math.floor(chunk.startTime) : chunk.startHour
+        const chunkStartMinute = chunk.startTime ? (chunk.startTime % 1) * 60 : 0
+        const chunkDateTime = new Date(chunkDate)
+        chunkDateTime.setHours(chunkStartHour, chunkStartMinute, 0, 0)
+
+        // Add chunk duration to get end time (use estimated_hours from chunk)
+        const chunkEndTime = new Date(chunkDateTime)
+        chunkEndTime.setHours(chunkEndTime.getHours() + Math.floor(chunk.estimated_hours))
+        chunkEndTime.setMinutes(chunkEndTime.getMinutes() + (chunk.estimated_hours % 1) * 60)
+
+
+        // Include chunks that start before the cutoff (partial or full)
+        if (chunkDateTime < weekEndDate) {
+          const task = tasks.find(t => t.id === originalTaskId)
+          if (task && task.is_billable) {
+            // Calculate actual hours to include (partial if chunk crosses cutoff)
+            let hoursToInclude = chunk.estimated_hours
+            if (chunkEndTime > weekEndDate) {
+              // Chunk crosses cutoff, only include hours up to cutoff
+              const timeDiff = weekEndDate.getTime() - chunkDateTime.getTime()
+              hoursToInclude = timeDiff / (1000 * 60 * 60) // Convert milliseconds to hours
+            }
+            
+            // Only include chunks with hourly rates > 0 in planned hours
+            if (task.projects?.hourly_rate && Number(task.projects.hourly_rate) > 0) {
+              plannedHours += hoursToInclude
+            }
+
+            // Add to planned breakdown
+            plannedHoursBreakdown.push({
+              sessionName: `${task.title} (${chunkStartHour}:${chunkStartMinute
+                .toString()
+                .padStart(2, '0')})`,
+              projectName: task.projects?.name || 'Project',
+              hours: hoursToInclude,
+              dueDate: dateKey,
+              hourlyRate: task.projects?.hourly_rate || 0,
+              isCompleted: task.is_complete,
+            })
+
+            // Only count actual hours for completed work
+            if (task.is_complete) {
+              actualHours += hoursToInclude
+              actualHoursBreakdown.push({
+                sessionName: `${task.title} (${chunkStartHour}:${chunkStartMinute
+                  .toString()
+                  .padStart(2, '0')})`,
+                projectName: task.projects?.name || 'Project',
+                hours: hoursToInclude,
+                date: dateKey,
+                hourlyRate: task.projects?.hourly_rate || 0,
+              })
+            }
+          }
         }
-
-        // Add to planned breakdown
-        plannedHoursBreakdown.push({
-          sessionName: task.title,
-          projectName: task.projects?.name || 'Project',
-          hours: task.estimated_hours,
-          dueDate: (dueDate || taskCreatedDate).toISOString().split('T')[0],
-          hourlyRate: task.projects?.hourly_rate || 0,
-          isCompleted: task.is_complete,
-        })
-
-        // Only count actual hours for completed work
-        if (task.is_complete) {
-          actualHours += task.estimated_hours
-          actualHoursBreakdown.push({
-            sessionName: task.title,
-            projectName: task.projects?.name || 'Project',
-            hours: task.estimated_hours,
-            date: taskCreatedDate.toISOString().split('T')[0],
-            hourlyRate: task.projects?.hourly_rate || 0,
-          })
-        }
-      }
+      })
     })
 
     return { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown }
@@ -696,25 +737,65 @@ const Calendar = () => {
   const { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown } =
     calculateWorkHours()
 
+  console.log(
+    'time',
+    plannedHoursBreakdown.filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
+  )
+
   return (
     <div className="flex flex-col h-screen bg-white">
-      {/* Top Bar with Work Hours */}
-      <div className="bg-neutral-100 border-b border-neutral-200 px-4 py-1 flex items-center justify-between">
-        <div className="text-sm text-neutral-700">
-          Work Hours (until{' '}
-          {settings?.week_ending_day?.charAt(0).toUpperCase() +
-            settings?.week_ending_day?.slice(1) || 'Sunday'}{' '}
-          {new Date(`1970-01-01T${settings?.week_ending_time || '20:30'}`).toLocaleTimeString(
-            'en-US',
-            {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            }
-          )}{' '}
-          {settings?.week_ending_timezone?.split('/')[1]?.replace('_', ' ') || 'ET'})
+      {/* Top Bar with Navigation and Work Hours */}
+      <div className="bg-neutral-100 border-b border-neutral-200 px-1 py-1 flex items-center justify-between">
+        <div className="flex items-center">
+          {/* Navigation Controls */}
+          <div className="flex items-center">
+            <button
+              onClick={navigateBackWeek}
+              className=" hover:bg-neutral-200 rounded transition-colors"
+              title="Go back 5 days"
+            >
+              <ChevronsLeft className="w-2 h-2 text-neutral-600" />
+            </button>
+            <button
+              onClick={navigateBackDay}
+              className="hover:bg-neutral-200 rounded transition-colors"
+              title="Go back 1 day"
+            >
+              <ChevronLeft className="w-2 h-2 text-neutral-600" />
+            </button>
+            <button
+              onClick={navigateForwardDay}
+              className="hover:bg-neutral-200 rounded transition-colors"
+              title="Go forward 1 day"
+            >
+              <ChevronRight className="w-2 h-2 text-neutral-600" />
+            </button>
+            <button
+              onClick={navigateForwardWeek}
+              className="hover:bg-neutral-200 rounded transition-colors"
+              title="Go forward 5 days"
+            >
+              <ChevronsRight className="w-2 h-2 text-neutral-600" />
+            </button>
+          </div>
+
+          {/* Work Hours Label */}
+          <div className="text-sm text-neutral-700 ml-2">
+            Work Hours (until{' '}
+            {settings?.week_ending_day?.charAt(0).toUpperCase() +
+              settings?.week_ending_day?.slice(1) || 'Sunday'}{' '}
+            {new Date(`1970-01-01T${settings?.week_ending_time || '20:30'}`).toLocaleTimeString(
+              'en-US',
+              {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              }
+            )}{' '}
+            {settings?.week_ending_timezone?.split('/')[1]?.replace('_', ' ') || 'ET'})
+          </div>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
           <div className="text-sm relative planned-hours-tooltip">
             <span className="text-neutral-600">Planned:</span>
             <span
@@ -729,7 +810,7 @@ const Calendar = () => {
               )
             </span>
             {showPlannedHoursTooltip && (
-              <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-neutral-200 shadow-lg rounded-md p-3 z-50">
+              <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-neutral-200 shadow-lg rounded-md p-3 z-50">
                 <div className="text-sm font-medium text-neutral-900 mb-2">
                   Planned Hours Breakdown
                 </div>
@@ -858,7 +939,7 @@ const Calendar = () => {
 
       {/* Headers */}
       <div className="grid border-b border-neutral-200" style={{ gridTemplateColumns: gridCols }}>
-        <div className="p-1.5 bg-neutral-100 border-r border-neutral-200 flex items-center justify-center">
+        <div className="bg-neutral-100 border-r border-neutral-200 flex items-center justify-center">
           <button
             className="p-1 hover:bg-neutral-200 rounded transition-colors"
             title="Add meeting"

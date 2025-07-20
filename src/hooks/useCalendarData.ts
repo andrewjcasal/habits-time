@@ -6,12 +6,11 @@ import { useProjects } from './useProjects'
 import { useSettings } from './useSettings'
 import { useMeetings } from './useMeetings'
 
-export const useCalendarData = (windowWidth: number) => {
+export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const [allTasks, setAllTasks] = useState<any[]>([])
   const [allTasksLoading, setAllTasksLoading] = useState(true)
   const [scheduledTasksCache, setScheduledTasksCache] = useState<Map<string, any[]>>(new Map())
   const [tasksScheduled, setTasksScheduled] = useState(false)
-  const [today] = useState(new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
 
   const { habits, loading: habitsLoading } = useHabits()
@@ -29,18 +28,38 @@ export const useCalendarData = (windowWidth: number) => {
   }, [])
 
   const getDayColumns = () => {
+    const today = new Date()
+    
     if (windowWidth > 850) {
       return Array.from({ length: 5 }, (_, i) => {
-        const date = addDays(today, i)
-        const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : format(date, 'EEE, MMM d')
+        const date = addDays(baseDate, i)
+        let label: string
+        
+        if (format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+          label = 'Today'
+        } else if (format(date, 'yyyy-MM-dd') === format(addDays(today, 1), 'yyyy-MM-dd')) {
+          label = 'Tomorrow'
+        } else {
+          label = format(date, 'EEE, MMM d')
+        }
+        
         return { date, label }
       })
     } else {
-      return [
-        { date: today, label: 'Today' },
-        { date: addDays(today, 1), label: 'Tomorrow' },
-        { date: addDays(today, 2), label: format(addDays(today, 2), 'EEE, MMM d') },
-      ]
+      return Array.from({ length: 3 }, (_, i) => {
+        const date = addDays(baseDate, i)
+        let label: string
+        
+        if (format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+          label = 'Today'
+        } else if (format(date, 'yyyy-MM-dd') === format(addDays(today, 1), 'yyyy-MM-dd')) {
+          label = 'Tomorrow'
+        } else {
+          label = format(date, 'EEE, MMM d')
+        }
+        
+        return { date, label }
+      })
     }
   }
 
@@ -409,7 +428,7 @@ export const useCalendarData = (windowWidth: number) => {
     })
   }
 
-  const dayColumns = useMemo(() => getDayColumns(), [today, windowWidth])
+  const dayColumns = useMemo(() => getDayColumns(), [baseDate, windowWidth])
   const hourSlots = useMemo(() => getHourSlots(), [])
 
   return {
@@ -417,7 +436,7 @@ export const useCalendarData = (windowWidth: number) => {
     allTasksLoading,
     scheduledTasksCache,
     tasksScheduled,
-    today,
+    baseDate,
     currentTime,
     habits,
     habitsLoading,
