@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { format } from 'date-fns'
 import { Plus, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
 import { useMeetings } from '../hooks/useMeetings'
 import { useTasks } from '../hooks/useProjects'
 import { useSettings } from '../hooks/useSettings'
+import { useVirtualizedCalendar } from '../hooks/useVirtualizedCalendar'
 import { Meeting } from '../types'
 import MeetingModal from '../components/MeetingModal'
 import CalendarTaskModal from '../components/CalendarTaskModal'
@@ -12,6 +13,8 @@ import HabitModal from '../components/HabitModal'
 
 const Calendar = () => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  const [containerHeight, setContainerHeight] = useState(600)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [showMeetingModal, setShowMeetingModal] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [showActualHoursTooltip, setShowActualHoursTooltip] = useState(false)
@@ -54,11 +57,23 @@ const Calendar = () => {
     scheduledTasksCache,
   } = useCalendarData(windowWidth, baseDate)
 
-  const gridCols = windowWidth > 850 ? '80px 1fr 1fr 1fr 1fr 1fr' : '80px 1fr 1fr 1fr'
+  // Virtual scrolling for performance
+  const virtualizedCalendar = useVirtualizedCalendar(hourSlots.length, {
+    itemHeight: 64, // h-16 = 64px
+    containerHeight,
+    overscan: 3
+  })
+
+  const gridCols =
+    windowWidth > 1350
+      ? '80px 1fr 1fr 1fr 1fr 1fr 1fr 1fr'
+      : windowWidth > 850
+      ? '80px 1fr 1fr 1fr 1fr 1fr 1fr 1fr'
+      : '80px 1fr 1fr 1fr'
 
   // Navigation functions
   const navigateBackWeek = () => {
-    setBaseDate(prevDate => new Date(prevDate.getTime() - 5 * 24 * 60 * 60 * 1000))
+    setBaseDate(prevDate => new Date(prevDate.getTime() - 7 * 24 * 60 * 60 * 1000))
   }
 
   const navigateBackDay = () => {
@@ -70,14 +85,28 @@ const Calendar = () => {
   }
 
   const navigateForwardWeek = () => {
-    setBaseDate(prevDate => new Date(prevDate.getTime() + 5 * 24 * 60 * 60 * 1000))
+    setBaseDate(prevDate => new Date(prevDate.getTime() + 7 * 24 * 60 * 60 * 1000))
   }
 
-  // Listen for window resize
+  // Listen for window resize and container height changes
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth)
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth)
+      if (containerRef.current) {
+        setContainerHeight(containerRef.current.clientHeight)
+      }
+    }
+    
+    handleResize() // Initial call
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Update container height when component mounts
+  useEffect(() => {
+    if (containerRef.current) {
+      setContainerHeight(containerRef.current.clientHeight)
+    }
   }, [])
 
   // Fetch all tasks with project data
@@ -331,7 +360,7 @@ const Calendar = () => {
   })
 
   // Get meetings for a specific time slot
-  const getMeetingsForTimeSlot = (timeSlot: string, date: Date) => {
+  const getMeetingsForTimeSlot = useCallback((timeSlot: string, date: Date) => {
     const dateKey = format(date, 'yyyy-MM-dd')
     const currentHour = parseInt(timeSlot.split(':')[0])
 
@@ -342,10 +371,10 @@ const Calendar = () => {
 
       return meetingDate === dateKey && meetingHour === currentHour
     })
-  }
+  }, [meetings])
 
   // Get habits for a specific time slot
-  const getHabitsForTimeSlot = (timeSlot: string, date: Date) => {
+  const getHabitsForTimeSlot = useCallback((timeSlot: string, date: Date) => {
     const currentHour = parseInt(timeSlot.split(':')[0])
     const dateKey = format(date, 'yyyy-MM-dd')
 
@@ -487,10 +516,10 @@ const Calendar = () => {
           isRescheduled: false,
         }
       })
-  }
+  }, [habits, meetings, sessions])
 
   // Get sessions for a specific time slot
-  const getSessionsForTimeSlot = (timeSlot: string, date: Date) => {
+  const getSessionsForTimeSlot = useCallback((timeSlot: string, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
     const currentHour = parseInt(timeSlot.split(':')[0])
 
@@ -507,14 +536,28 @@ const Calendar = () => {
           topPosition: (minutes / 60) * 100,
         }
       })
-  }
+  }, [sessions])
 
   // Render all calendar events for a time slot
-  const renderCalendarEvents = (timeSlot: string, date: Date) => {
+  const renderCalendarEvents = useCallback((timeSlot: string, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd')
+    
     const habitsInSlot = getHabitsForTimeSlot(timeSlot, date)
     const sessionsInSlot = getSessionsForTimeSlot(timeSlot, date)
     const meetingsInSlot = getMeetingsForTimeSlot(timeSlot, date)
     const tasksInSlot = tasksScheduled ? getTasksForTimeSlot(timeSlot, date) : []
+    
+    // Log performance data for each time slot with blocks
+    const totalBlocks = habitsInSlot.length + sessionsInSlot.length + meetingsInSlot.length + tasksInSlot.length
+    if (totalBlocks > 0) {
+      console.log(`📅 Time Slot ${dateStr} ${timeSlot}:`, {
+        totalBlocks,
+        habits: { count: habitsInSlot.length },
+        sessions: { count: sessionsInSlot.length },
+        meetings: { count: meetingsInSlot.length },
+        tasks: { count: tasksInSlot.length }
+      })
+    }
 
     return (
       <>
@@ -522,6 +565,8 @@ const Calendar = () => {
         {habitsInSlot.map(habit => {
           const habitHeight = habit.duration ? (habit.duration / 60) * 64 : 64
           const isRescheduled = habit.isRescheduled || false
+          
+          console.log(`🔵 Rendering Habit: ${habit.name} at ${timeSlot}`)
 
           return (
             <div
@@ -547,6 +592,8 @@ const Calendar = () => {
         {/* Sessions */}
         {sessionsInSlot.map(session => {
           const sessionHeight = session.scheduled_hours * 64
+          
+          console.log(`🟣 Rendering Session: ${session.projects?.name} at ${timeSlot}`)
 
           return (
             <div
@@ -573,6 +620,8 @@ const Calendar = () => {
           const minutesIntoHour = (taskStartTime - currentHour) * 60
           const topPositionInSlot = (minutesIntoHour / 60) * 100
           const taskHeight = (task.estimated_hours || 1) * 64
+          
+          console.log(`🟡 Rendering Task: ${task.title} at ${timeSlot}`)
 
           return (
             <div
@@ -598,6 +647,8 @@ const Calendar = () => {
           const topPositionInSlot = (minutesIntoHour / 60) * 100
           const meetingDuration = (meetingEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
           const meetingHeight = (meetingDuration / 60) * 64
+          
+          console.log(`🟢 Rendering Meeting: ${meeting.title} at ${timeSlot}`)
 
           return (
             <div
@@ -618,7 +669,7 @@ const Calendar = () => {
         })}
       </>
     )
-  }
+  }, [getHabitsForTimeSlot, getSessionsForTimeSlot, getMeetingsForTimeSlot, getTasksForTimeSlot, tasksScheduled, handleHabitClick, handleTaskClick])
 
   // Calculate planned vs actual work hours up to configured week ending time
   const calculateWorkHours = () => {
@@ -958,29 +1009,61 @@ const Calendar = () => {
         ))}
       </div>
 
-      {/* Calendar Grid */}
-      <div className="flex-1 overflow-y-auto relative">
-        {hourSlots.map((hour, hourIndex) => (
-          <div
-            key={hourIndex}
-            className="grid border-b border-neutral-100"
-            style={{ gridTemplateColumns: gridCols }}
+      {/* Calendar Grid - Virtualized for Performance */}
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-y-auto relative"
+        onScroll={virtualizedCalendar.handleScroll}
+      >
+        {/* Virtual scrolling container */}
+        <div style={{ height: virtualizedCalendar.totalHeight, position: 'relative' }}>
+          <div 
+            style={{ 
+              transform: `translateY(${virtualizedCalendar.offsetY}px)`,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0
+            }}
           >
-            <div className="border-r border-neutral-200 p-1 h-16 bg-neutral-50 flex items-start">
-              <div className="font-mono text-neutral-600 text-xs">{hour.display}</div>
-            </div>
-            {dayColumns.map((column, columnIndex) => (
-              <div
-                key={columnIndex}
-                className="border-r border-neutral-200 last:border-r-0 p-0.5 h-16 text-xs hover:bg-neutral-50 relative cursor-pointer"
-                onClick={() => handleTimeSlotClick(hour.time, column.date)}
-              >
-                {/* Render calendar events */}
-                {renderCalendarEvents(hour.time, column.date)}
-              </div>
-            ))}
+            {hourSlots
+              .slice(virtualizedCalendar.visibleRange.start, virtualizedCalendar.visibleRange.end)
+              .map((hour, index) => {
+                const hourIndex = virtualizedCalendar.visibleRange.start + index
+                
+                console.log(`⏰ Rendering Time Slot ${hour.time} (index: ${hourIndex})`)
+                
+                const timeSlotDiv = (
+                  <div
+                    key={hourIndex}
+                    className="grid border-b border-neutral-100"
+                    style={{ 
+                      gridTemplateColumns: gridCols,
+                      height: virtualizedCalendar.itemHeight
+                    }}
+                  >
+                    <div className="border-r border-neutral-200 p-1 h-16 bg-neutral-50 flex items-start">
+                      <div className="font-mono text-neutral-600 text-xs">{hour.display}</div>
+                    </div>
+                    {dayColumns.map((column, columnIndex) => (
+                      <div
+                        key={columnIndex}
+                        className="border-r border-neutral-200 last:border-r-0 p-0.5 h-16 text-xs hover:bg-neutral-50 relative cursor-pointer"
+                        onClick={() => handleTimeSlotClick(hour.time, column.date)}
+                      >
+                        {/* Render calendar events */}
+                        {renderCalendarEvents(hour.time, column.date)}
+                      </div>
+                    ))}
+                  </div>
+                )
+                
+                console.log(`✅ Completed Time Slot ${hour.time} render`)
+                
+                return timeSlotDiv
+              })}
           </div>
-        ))}
+        </div>
 
         {/* Current Time Line */}
         <div className="absolute inset-0 pointer-events-none">
