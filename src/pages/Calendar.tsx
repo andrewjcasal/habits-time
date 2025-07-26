@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plus, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
@@ -11,6 +12,7 @@ import CalendarTaskModal from '../components/CalendarTaskModal'
 import HabitModal from '../components/HabitModal'
 
 const Calendar = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [containerHeight, setContainerHeight] = useState(600)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -26,7 +28,25 @@ const Calendar = () => {
   )
   const [selectedTask, setSelectedTask] = useState<any>(null)
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null)
-  const [baseDate, setBaseDate] = useState(new Date())
+  
+  // Initialize baseDate from URL parameter or current date
+  const getInitialDate = () => {
+    const dateParam = searchParams.get('date')
+    if (dateParam) {
+      // Parse as local date to avoid timezone issues
+      const [year, month, day] = dateParam.split('-').map(Number)
+      if (year && month && day) {
+        const parsedDate = new Date(year, month - 1, day) // month is 0-indexed
+        // Validate the date
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate
+        }
+      }
+    }
+    return new Date()
+  }
+  
+  const [baseDate, setBaseDate] = useState(getInitialDate)
   const [newMeeting, setNewMeeting] = useState({
     title: '',
     description: '',
@@ -74,20 +94,43 @@ const Calendar = () => {
 
   // Navigation functions
   const navigateBackWeek = () => {
-    setBaseDate(prevDate => new Date(prevDate.getTime() - 7 * 24 * 60 * 60 * 1000))
+    const newDate = new Date(baseDate.getTime() - 7 * 24 * 60 * 60 * 1000)
+    setBaseDate(newDate)
+    setSearchParams({ date: format(newDate, 'yyyy-MM-dd') })
   }
 
   const navigateBackDay = () => {
-    setBaseDate(prevDate => new Date(prevDate.getTime() - 24 * 60 * 60 * 1000))
+    const newDate = new Date(baseDate.getTime() - 24 * 60 * 60 * 1000)
+    setBaseDate(newDate)
+    setSearchParams({ date: format(newDate, 'yyyy-MM-dd') })
   }
 
   const navigateForwardDay = () => {
-    setBaseDate(prevDate => new Date(prevDate.getTime() + 24 * 60 * 60 * 1000))
+    const newDate = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000)
+    setBaseDate(newDate)
+    setSearchParams({ date: format(newDate, 'yyyy-MM-dd') })
   }
 
   const navigateForwardWeek = () => {
-    setBaseDate(prevDate => new Date(prevDate.getTime() + 7 * 24 * 60 * 60 * 1000))
+    const newDate = new Date(baseDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+    setBaseDate(newDate)
+    setSearchParams({ date: format(newDate, 'yyyy-MM-dd') })
   }
+
+  // Listen for URL parameter changes
+  useEffect(() => {
+    const dateParam = searchParams.get('date')
+    if (dateParam) {
+      // Parse as local date to avoid timezone issues
+      const [year, month, day] = dateParam.split('-').map(Number)
+      if (year && month && day) {
+        const parsedDate = new Date(year, month - 1, day) // month is 0-indexed
+        if (!isNaN(parsedDate.getTime())) {
+          setBaseDate(parsedDate)
+        }
+      }
+    }
+  }, [searchParams])
 
   // Listen for window resize and container height changes
   useEffect(() => {
