@@ -17,7 +17,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const { sessions, loading: sessionsLoading } = useSessions()
   const { projects, loading: projectsLoading } = useProjects()
   const { getWorkHoursRange } = useSettings()
-  const { meetings, loading: meetingsLoading } = useMeetings()
+  const { meetings, loading: meetingsLoading, addMeeting, updateMeeting, deleteMeeting } = useMeetings()
 
   // Update current time every minute
   useEffect(() => {
@@ -549,6 +549,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     projectsLoading,
     meetings,
     meetingsLoading,
+    addMeeting,
+    updateMeeting,
+    deleteMeeting,
     dayColumns,
     hourSlots,
     getCurrentTimeLinePosition,

@@ -19,6 +19,7 @@ interface MeetingModalProps {
   onSubmit: (e: React.FormEvent) => void
   selectedTimeSlot: { time: string; date: Date } | null
   editingMeeting: Meeting | null
+  onDelete?: () => void
 }
 
 const MeetingModal = ({
@@ -29,6 +30,7 @@ const MeetingModal = ({
   onSubmit,
   selectedTimeSlot,
   editingMeeting,
+  onDelete,
 }: MeetingModalProps) => {
   if (!isOpen) return null
 
@@ -124,20 +126,31 @@ const MeetingModal = ({
             rows={2}
           />
 
-          <div className="flex gap-1 justify-end pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-2 py-1 text-neutral-600 text-xs hover:text-neutral-800"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
-            >
-              {editingMeeting ? 'Update' : 'Create'}
-            </button>
+          <div className="flex gap-1 justify-between pt-1">
+            {editingMeeting && onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+              >
+                Delete
+              </button>
+            )}
+            <div className="flex gap-1 ml-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-2 py-1 text-neutral-600 text-xs hover:text-neutral-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
+              >
+                {editingMeeting ? 'Update' : 'Create'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

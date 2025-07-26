@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { format } from 'date-fns'
 import { Plus, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
-import { useMeetings } from '../hooks/useMeetings'
 import { useTasks } from '../hooks/useProjects'
 import { useSettings } from '../hooks/useSettings'
 import { useVirtualizedCalendar } from '../hooks/useVirtualizedCalendar'
@@ -39,7 +38,6 @@ const Calendar = () => {
     priority: 'medium' as Meeting['priority'],
   })
 
-  const { addMeeting, updateMeeting } = useMeetings()
   const { settings } = useSettings()
   const [tasks, setTasks] = useState<any[]>([]) // Tasks with project data
   const {
@@ -55,6 +53,9 @@ const Calendar = () => {
     setTasksScheduled,
     setScheduledTasksCache,
     scheduledTasksCache,
+    addMeeting,
+    updateMeeting,
+    deleteMeeting,
   } = useCalendarData(windowWidth, baseDate)
 
   // Virtual scrolling for performance
@@ -227,6 +228,10 @@ const Calendar = () => {
         await addMeeting(meetingData)
       }
 
+      // Reset task scheduling to recalculate available slots with new/updated meeting
+      setTasksScheduled(false)
+      setScheduledTasksCache(new Map())
+
       setNewMeeting({
         title: '',
         description: '',
@@ -242,6 +247,34 @@ const Calendar = () => {
       setEditingMeeting(null)
     } catch (error) {
       console.error('Error saving meeting:', error)
+    }
+  }
+
+  const handleDeleteMeeting = async () => {
+    if (!editingMeeting) return
+    
+    try {
+      await deleteMeeting(editingMeeting.id)
+      
+      // Reset task scheduling to recalculate available slots without deleted meeting
+      setTasksScheduled(false)
+      setScheduledTasksCache(new Map())
+      
+      setShowMeetingModal(false)
+      setSelectedTimeSlot(null)
+      setEditingMeeting(null)
+      setNewMeeting({
+        title: '',
+        description: '',
+        start_time: '',
+        end_time: '',
+        date: '',
+        location: '',
+        meeting_type: 'general',
+        priority: 'medium',
+      })
+    } catch (error) {
+      console.error('Error deleting meeting:', error)
     }
   }
 
@@ -1111,6 +1144,7 @@ const Calendar = () => {
         onSubmit={handleCreateMeeting}
         selectedTimeSlot={selectedTimeSlot}
         editingMeeting={editingMeeting}
+        onDelete={handleDeleteMeeting}
       />
 
       <CalendarTaskModal
