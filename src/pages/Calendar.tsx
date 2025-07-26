@@ -70,7 +70,7 @@ const Calendar = () => {
       ? '80px 1fr 1fr 1fr 1fr 1fr 1fr 1fr'
       : windowWidth > 600
       ? '80px 1fr 1fr 1fr 1fr 1fr 1fr 1fr'
-      : '80px 1fr 1fr 1fr'
+      : '80px minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr)'
 
   // Navigation functions
   const navigateBackWeek = () => {
@@ -829,57 +829,67 @@ const Calendar = () => {
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       {/* Top Bar with Navigation and Work Hours */}
-      <div className="bg-neutral-100 border-b border-neutral-200 px-2 py-2 sm:px-1 sm:py-1 flex items-center justify-between">
-        <div className="flex items-center">
-          {/* Navigation Controls */}
-          <div className="flex items-center">
-            <button
-              onClick={navigateBackWeek}
-              className=" hover:bg-neutral-200 rounded transition-colors"
-              title="Go back 5 days"
-            >
-              <ChevronsLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
-            </button>
-            <button
-              onClick={navigateBackDay}
-              className="hover:bg-neutral-200 rounded transition-colors"
-              title="Go back 1 day"
-            >
-              <ChevronLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
-            </button>
-            <button
-              onClick={navigateForwardDay}
-              className="hover:bg-neutral-200 rounded transition-colors"
-              title="Go forward 1 day"
-            >
-              <ChevronRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
-            </button>
-            <button
-              onClick={navigateForwardWeek}
-              className="hover:bg-neutral-200 rounded transition-colors"
-              title="Go forward 5 days"
-            >
-              <ChevronsRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
-            </button>
+      <div className="bg-neutral-100 border-b border-neutral-200 px-2 py-2 sm:px-0 sm:py-1">
+        {/* Portrait: Stack vertically, Landscape: Side by side */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:px-2">
+          {/* Top row in portrait: Navigation + Work Hours Label */}
+          <div className="flex items-center justify-between sm:justify-start">
+            {/* Navigation Controls */}
+            <div className="flex items-center">
+              <button
+                onClick={navigateBackWeek}
+                className=" hover:bg-neutral-200 rounded transition-colors"
+                title="Go back 5 days"
+              >
+                <ChevronsLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
+              </button>
+              <button
+                onClick={navigateBackDay}
+                className="hover:bg-neutral-200 rounded transition-colors"
+                title="Go back 1 day"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
+              </button>
+              <button
+                onClick={navigateForwardDay}
+                className="hover:bg-neutral-200 rounded transition-colors"
+                title="Go forward 1 day"
+              >
+                <ChevronRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
+              </button>
+              <button
+                onClick={navigateForwardWeek}
+                className="hover:bg-neutral-200 rounded transition-colors"
+                title="Go forward 5 days"
+              >
+                <ChevronsRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
+              </button>
+            </div>
+
+            {/* Work Hours Label - visible on mobile */}
+            <div className="text-sm text-neutral-700 ml-2 sm:hidden">
+              Work Hours
+            </div>
+
+            {/* Work Hours Label - full version for desktop */}
+            <div className="hidden sm:block text-base sm:text-sm text-neutral-700 ml-2">
+              Work Hours (until{' '}
+              {settings?.week_ending_day?.charAt(0).toUpperCase() +
+                settings?.week_ending_day?.slice(1) || 'Sunday'}{' '}
+              {new Date(`1970-01-01T${settings?.week_ending_time || '20:30'}`).toLocaleTimeString(
+                'en-US',
+                {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                }
+              )}{' '}
+              {settings?.week_ending_timezone?.split('/')[1]?.replace('_', ' ') || 'ET'})
+            </div>
           </div>
 
-          {/* Work Hours Label */}
-          <div className="text-base sm:text-sm text-neutral-700 ml-2">
-            Work Hours (until{' '}
-            {settings?.week_ending_day?.charAt(0).toUpperCase() +
-              settings?.week_ending_day?.slice(1) || 'Sunday'}{' '}
-            {new Date(`1970-01-01T${settings?.week_ending_time || '20:30'}`).toLocaleTimeString(
-              'en-US',
-              {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              }
-            )}{' '}
-            {settings?.week_ending_timezone?.split('/')[1]?.replace('_', ' ') || 'ET'})
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+          {/* Bottom row in portrait: Planned and Actual hours */}
+          <div className="flex items-center gap-6 justify-center sm:justify-end sm:gap-2">
           <div className="text-base sm:text-sm relative planned-hours-tooltip">
             <span className="text-neutral-600">Planned:</span>
             <span
@@ -1018,6 +1028,7 @@ const Calendar = () => {
               </div>
             )}
           </div>
+          </div>
         </div>
       </div>
 
@@ -1035,9 +1046,9 @@ const Calendar = () => {
         {dayColumns.map((column, columnIndex) => (
           <div
             key={columnIndex}
-            className="p-3 sm:p-1.5 bg-neutral-50 border-r border-neutral-200 last:border-r-0"
+            className="p-3 sm:p-1.5 bg-neutral-50 border-r border-neutral-200 last:border-r-0 min-w-0"
           >
-            <h2 className="text-base sm:text-sm font-medium text-neutral-900">{column.label}</h2>
+            <h2 className="text-base sm:text-sm font-medium text-neutral-900 truncate text-center sm:text-left">{column.label}</h2>
           </div>
         ))}
       </div>
