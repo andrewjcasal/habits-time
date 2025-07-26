@@ -7,11 +7,12 @@ interface HabitModalProps {
   onClose: () => void
   habit: any | null
   selectedDate: Date | null
-  onTimeChange: (habitId: string, date: string, newTime: string) => Promise<void>
+  onTimeChange: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
 }
 
 const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: HabitModalProps) => {
   const [newTime, setNewTime] = useState('')
+  const [newDuration, setNewDuration] = useState<number>(0)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -20,9 +21,11 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
       const dateKey = format(selectedDate, 'yyyy-MM-dd')
       const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateKey)
       const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+      const effectiveDuration = dailyLog?.duration || habit.duration || 0
 
       // Set initial time to effective habit time (daily log override or default)
       setNewTime(effectiveStartTime || '')
+      setNewDuration(effectiveDuration)
     }
   }, [habit, selectedDate])
 
@@ -33,10 +36,10 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
     setLoading(true)
     try {
       const dateString = format(selectedDate, 'yyyy-MM-dd')
-      await onTimeChange(habit.id, dateString, newTime)
+      await onTimeChange(habit.id, dateString, newTime, newDuration)
       onClose()
     } catch (error) {
-      console.error('Error updating habit time:', error)
+      console.error('Error updating habit:', error)
     } finally {
       setLoading(false)
     }
@@ -48,7 +51,7 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Edit Habit Time</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Edit Habit</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -63,14 +66,11 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
             <p className="text-sm text-gray-600 mb-1">
               Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </p>
-            {habit.duration && (
-              <p className="text-sm text-gray-600">Duration: {habit.duration} minutes</p>
-            )}
           </div>
 
-          <div className="mb-6">
+          <div className="mb-4">
             <label htmlFor="time" className="block text-sm font-medium text-gray-700 mb-2">
-              New Time
+              Time for Today
             </label>
             <input
               type="time"
@@ -80,6 +80,24 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
+          </div>
+
+          <div className="mb-6">
+            <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-2">
+              Duration for Today (minutes)
+            </label>
+            <input
+              type="number"
+              id="duration"
+              value={newDuration}
+              onChange={e => setNewDuration(parseInt(e.target.value) || 0)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              min="0"
+              placeholder="Enter duration in minutes"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Leave as {habit.duration || 0} to use default duration, or change to override for today only
+            </p>
           </div>
 
           <div className="flex gap-3 justify-end">

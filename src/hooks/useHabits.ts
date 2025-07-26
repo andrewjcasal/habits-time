@@ -67,7 +67,6 @@ export function useHabits(selectedDate?: string) {
       }
 
       setSleepStartTime(currentSleepStartTime)
-      console.log('sleep start', currentSleepStartTime)
 
       // Build the query - show all habits but filter daily logs by sleep time
       let query = supabase
@@ -76,7 +75,7 @@ export function useHabits(selectedDate?: string) {
           `
           *,
           habits_types (*),
-          habits_daily_logs!left (
+          habits_daily_logs (
             *
           )
         `
@@ -84,18 +83,6 @@ export function useHabits(selectedDate?: string) {
         .or(`user_id.eq.${user.id},user_id.is.null`)
         .eq('is_visible', true)
         .eq('habits_daily_logs.log_date', today) // Only selected date's logs for checked status
-
-      // Add sleep time filter to habits_daily_logs if we have a recent sleep time and viewing today
-      if (
-        currentSleepStartTime &&
-        today ===
-          new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0]
-      ) {
-        query = query.gte(
-          'habits_daily_logs.created_at',
-          new Date(today + 'T' + currentSleepStartTime).toISOString()
-        )
-      }
 
       const { data, error } = await query.order('current_start_time', { ascending: true })
 
@@ -208,6 +195,49 @@ export function useHabits(selectedDate?: string) {
       await fetchHabits()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update habit type')
+    }
+  }
+
+  const updateHabitDuration = async (habitId: string, newDuration: number) => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({ duration: newDuration })
+        .eq('id', habitId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      // Update local state
+      setHabits(prevHabits =>
+        prevHabits.map(habit =>
+          habit.id === habitId ? { ...habit, duration: newDuration } : habit
+        )
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update habit duration')
+    }
+  }
+
+  const deleteHabit = async (habitId: string) => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({ is_visible: false })
+        .eq('id', habitId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      // Remove from local state
+      setHabits(prevHabits => prevHabits.filter(habit => habit.id !== habitId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete habit')
+      throw err
     }
   }
 
@@ -363,6 +393,8 @@ export function useHabits(selectedDate?: string) {
     logHabitCompletion,
     updateHabitStartTime,
     updateHabitType,
+    updateHabitDuration,
+    deleteHabit,
     createHabit,
     updateHabitStartTimes,
     refetch: fetchHabits,

@@ -418,6 +418,7 @@ const Habits = () => {
                     benefits: selectedHabit.benefits || '',
                     consequences: selectedHabit.consequences || '',
                   }}
+                  onHabitDeleted={() => setSelectedHabitId(null)}
                 />
               ) : null
             })()}

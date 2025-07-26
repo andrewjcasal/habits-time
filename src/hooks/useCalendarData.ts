@@ -13,7 +13,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [tasksScheduled, setTasksScheduled] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
 
-  const { habits, loading: habitsLoading } = useHabits()
+  const { habits, loading: habitsLoading, refetch: refetchHabits } = useHabits()
   const { sessions, loading: sessionsLoading } = useSessions()
   const { projects, loading: projectsLoading } = useProjects()
   const { getWorkHoursRange } = useSettings()
@@ -70,7 +70,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         if (effectiveStartTime) {
           const [hours, minutes] = effectiveStartTime.split(':').map(Number)
           const startTimeInHours = hours + minutes / 60
-          const duration = habit.duration || 0
+          const duration = dailyLog?.duration || habit.duration || 0
           const endTimeInHours = startTimeInHours + duration / 60
           
           // Check for meeting conflicts and adjust habit time
@@ -542,6 +542,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     currentTime,
     habits,
     habitsLoading,
+    refetchHabits,
     conflictMaps,
     sessions,
     sessionsLoading,

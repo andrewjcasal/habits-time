@@ -289,7 +289,7 @@ const Calendar = () => {
     setShowHabitModal(true)
   }
 
-  const handleHabitTimeChange = async (habitId: string, date: string, newTime: string) => {
+  const handleHabitTimeChange = async (habitId: string, date: string, newTime: string, newDuration?: number) => {
     try {
       const { supabase } = await import('../lib/supabase')
       const {
@@ -297,14 +297,22 @@ const Calendar = () => {
       } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
-      // Insert or update the daily log with the new scheduled start time
+      // Prepare the data to update
+      const updateData: any = {
+        habit_id: habitId,
+        user_id: user.id,
+        log_date: date,
+        scheduled_start_time: newTime,
+      }
+
+      // Only include duration if it's provided
+      if (newDuration !== undefined) {
+        updateData.duration = newDuration
+      }
+
+      // Insert or update the daily log with the new scheduled start time and optionally duration
       const { error } = await supabase.from('habits_daily_logs').upsert(
-        {
-          habit_id: habitId,
-          user_id: user.id,
-          log_date: date,
-          scheduled_start_time: newTime,
-        },
+        updateData,
         {
           onConflict: 'habit_id,user_id,log_date',
         }
@@ -316,7 +324,7 @@ const Calendar = () => {
       setTasksScheduled(false)
       setScheduledTasksCache(new Map())
     } catch (error) {
-      console.error('Error updating habit time:', error)
+      console.error('Error updating habit:', error)
       throw error
     }
   }
@@ -416,6 +424,7 @@ const Calendar = () => {
         // Check if there's a daily log with a scheduled start time for this date
         const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
         const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+        const effectiveDuration = dailyLog?.duration || habit.duration || 0
 
         if (!effectiveStartTime) return false
 
@@ -430,7 +439,7 @@ const Calendar = () => {
 
           if (meetingDateStr !== dateKey) return false
 
-          const habitDuration = habit.duration || 0
+          const habitDuration = effectiveDuration
           const habitStartInHours = habitStartHour + habitStartMinute / 60
           const habitEndInHours = habitStartInHours + habitDuration / 60
           const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
@@ -447,7 +456,7 @@ const Calendar = () => {
           const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
           const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
 
-          const habitDuration = habit.duration || 0
+          const habitDuration = effectiveDuration
           const habitStartInHours = habitStartHour + habitStartMinute / 60
           const habitEndInHours = habitStartInHours + habitDuration / 60
           const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
@@ -477,9 +486,10 @@ const Calendar = () => {
         return habitStartHour === currentHour
       })
       .map(habit => {
-        // Use the same effective start time logic as in the filter
+        // Use the same effective start time and duration logic as in the filter
         const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
         const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+        const effectiveDuration = dailyLog?.duration || habit.duration || 0
 
         const habitStartHour = parseInt(effectiveStartTime!.split(':')[0])
         const habitStartMinute = parseInt(effectiveStartTime!.split(':')[1])
@@ -492,7 +502,7 @@ const Calendar = () => {
 
           if (meetingDateStr !== dateKey) return false
 
-          const habitDuration = habit.duration || 0
+          const habitDuration = effectiveDuration
           const habitStartInHours = habitStartHour + habitStartMinute / 60
           const habitEndInHours = habitStartInHours + habitDuration / 60
           const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
@@ -508,7 +518,7 @@ const Calendar = () => {
           const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
           const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
 
-          const habitDuration = habit.duration || 0
+          const habitDuration = effectiveDuration
           const habitStartInHours = habitStartHour + habitStartMinute / 60
           const habitEndInHours = habitStartInHours + habitDuration / 60
           const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
@@ -596,10 +606,13 @@ const Calendar = () => {
       <>
         {/* Habits */}
         {habitsInSlot.map(habit => {
-          const habitHeight = habit.duration ? (habit.duration / 60) * 64 : 64
+          // Calculate effective duration (daily log override or default habit duration)
+          const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateStr)
+          const effectiveDuration = dailyLog?.duration || habit.duration || 0
+          const habitHeight = effectiveDuration ? (effectiveDuration / 60) * 64 : 64
           const isRescheduled = habit.isRescheduled || false
           
-          console.log(`🔵 Rendering Habit: ${habit.name} at ${timeSlot}`)
+          console.log(`🔵 Rendering Habit: ${habit.name} at ${timeSlot}, effective duration: ${effectiveDuration}min`)
 
           return (
             <div
@@ -615,8 +628,8 @@ const Calendar = () => {
                 {isRescheduled && <Clock className="w-3 h-3 sm:w-2.5 sm:h-2.5 mr-1 flex-shrink-0" />}
                 {habit.name}
               </div>
-              {habit.duration && (
-                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">{habit.duration}min</div>
+              {effectiveDuration > 0 && (
+                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">{effectiveDuration}min</div>
               )}
             </div>
           )
