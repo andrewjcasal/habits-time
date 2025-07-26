@@ -95,8 +95,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           
           const adjustedEndTime = adjustedStartTime + duration / 60
           
-          // Mark all affected time slots
-          for (let time = Math.floor(adjustedStartTime * 2) / 2; time < adjustedEndTime; time += 0.5) {
+          // Mark all affected time slots in 15-minute increments
+          for (let time = Math.floor(adjustedStartTime * 4) / 4; time < adjustedEndTime; time += 0.25) {
             const key = `${dateStr}-${time}`
             habitConflicts.set(key, habit)
           }
@@ -114,7 +114,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const duration = session.session_duration || 2 // Default to 2 hours based on your data
         const endTimeInHours = startTimeInHours + duration
         
-        for (let time = Math.floor(startTimeInHours * 2) / 2; time < endTimeInHours; time += 0.5) {
+        for (let time = Math.floor(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
           const key = `${session.scheduled_date}-${time}`
           sessionConflicts.set(key, session)
         }
@@ -130,7 +130,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       const startTimeInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
       const endTimeInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
       
-      for (let time = Math.floor(startTimeInHours * 2) / 2; time < endTimeInHours; time += 0.5) {
+      for (let time = Math.floor(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
         const key = `${dateStr}-${time}`
         meetingConflicts.set(key, meeting)
       }
@@ -241,8 +241,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const { start, end } = getWorkHoursRange()
 
     for (let hour = start; hour < end; hour++) {
-      for (let halfHour = 0; halfHour < 2; halfHour++) {
-        const minutes = halfHour * 30
+      for (let quarterHour = 0; quarterHour < 4; quarterHour++) {
+        const minutes = quarterHour * 15
         const timeInHours = hour + minutes / 60
         const timeSlot =
           hour.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0')
@@ -371,7 +371,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           currentChunkStart = block.timeInHours
           currentChunkHours = 0
         }
-        currentChunkHours += 0.5
+        currentChunkHours += 0.25
       } else {
         if (currentChunkStart !== null && currentChunkHours > 0) {
           const chunkHours = Math.min(currentChunkHours, remainingHours)
