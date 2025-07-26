@@ -68,7 +68,7 @@ const Calendar = () => {
   const gridCols =
     windowWidth > 1350
       ? '80px 1fr 1fr 1fr 1fr 1fr 1fr 1fr'
-      : windowWidth > 850
+      : windowWidth > 600
       ? '80px 1fr 1fr 1fr 1fr 1fr 1fr 1fr'
       : '80px 1fr 1fr 1fr'
 
@@ -604,7 +604,7 @@ const Calendar = () => {
           return (
             <div
               key={`habit-${habit.id}`}
-              className={`absolute text-xs p-0.5 rounded border-l-2 flex items-start justify-between bg-blue-50 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors`}
+              className={`absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-blue-50 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors`}
               style={getEventStyle(habit.topPosition, habitHeight)}
               onClick={e => {
                 e.stopPropagation()
@@ -612,11 +612,11 @@ const Calendar = () => {
               }}
             >
               <div className="font-medium truncate flex-1 flex items-center">
-                {isRescheduled && <Clock className="w-2.5 h-2.5 mr-1 flex-shrink-0" />}
+                {isRescheduled && <Clock className="w-3 h-3 sm:w-2.5 sm:h-2.5 mr-1 flex-shrink-0" />}
                 {habit.name}
               </div>
               {habit.duration && (
-                <div className="text-xs opacity-75 ml-1 flex-shrink-0">{habit.duration}min</div>
+                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">{habit.duration}min</div>
               )}
             </div>
           )
@@ -631,13 +631,13 @@ const Calendar = () => {
           return (
             <div
               key={`session-${session.id}`}
-              className="absolute text-xs p-0.5 rounded border-l-2 flex items-start justify-between bg-purple-50 border-purple-400 text-purple-800"
+              className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-purple-50 border-purple-400 text-purple-800"
               style={getEventStyle(session.topPosition, sessionHeight, 10)}
             >
               <div className="font-medium truncate flex-1">
                 {session.projects?.name || 'Project Session'}
               </div>
-              <div className="text-xs opacity-75 ml-1 flex-shrink-0">
+              <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
                 {session.scheduled_hours}h
               </div>
             </div>
@@ -659,7 +659,7 @@ const Calendar = () => {
           return (
             <div
               key={`task-${task.id}`}
-              className="absolute text-xs p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-50 border-yellow-400 text-yellow-800 opacity-75 cursor-pointer hover:opacity-100"
+              className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-50 border-yellow-400 text-yellow-800 opacity-75 cursor-pointer hover:opacity-100"
               style={getEventStyle(topPositionInSlot, taskHeight, 5)}
               onClick={e => {
                 e.stopPropagation()
@@ -667,7 +667,7 @@ const Calendar = () => {
               }}
             >
               <div className="font-medium truncate flex-1">{task.title}</div>
-              <div className="text-xs opacity-75 ml-1 flex-shrink-0">{task.estimated_hours}h</div>
+              <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">{task.estimated_hours}h</div>
             </div>
           )
         })}
@@ -686,7 +686,7 @@ const Calendar = () => {
           return (
             <div
               key={`meeting-${meeting.id}`}
-              className="absolute text-xs p-0.5 rounded border-l-2 flex items-start justify-between bg-red-50 border-red-400 text-red-800"
+              className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-red-50 border-red-400 text-red-800"
               style={getEventStyle(topPositionInSlot, meetingHeight, 15)}
               onClick={e => {
                 e.stopPropagation()
@@ -694,7 +694,7 @@ const Calendar = () => {
               }}
             >
               <div className="font-medium truncate flex-1">{meeting.title}</div>
-              <div className="text-xs opacity-75 ml-1 flex-shrink-0">
+              <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
                 {Math.round(meetingDuration)}min
               </div>
             </div>
@@ -829,7 +829,7 @@ const Calendar = () => {
   return (
     <div className="flex flex-col h-screen bg-white">
       {/* Top Bar with Navigation and Work Hours */}
-      <div className="bg-neutral-100 border-b border-neutral-200 px-1 py-1 flex items-center justify-between">
+      <div className="bg-neutral-100 border-b border-neutral-200 px-2 py-2 sm:px-1 sm:py-1 flex items-center justify-between">
         <div className="flex items-center">
           {/* Navigation Controls */}
           <div className="flex items-center">
@@ -838,33 +838,33 @@ const Calendar = () => {
               className=" hover:bg-neutral-200 rounded transition-colors"
               title="Go back 5 days"
             >
-              <ChevronsLeft className="w-2 h-2 text-neutral-600" />
+              <ChevronsLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
             </button>
             <button
               onClick={navigateBackDay}
               className="hover:bg-neutral-200 rounded transition-colors"
               title="Go back 1 day"
             >
-              <ChevronLeft className="w-2 h-2 text-neutral-600" />
+              <ChevronLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
             </button>
             <button
               onClick={navigateForwardDay}
               className="hover:bg-neutral-200 rounded transition-colors"
               title="Go forward 1 day"
             >
-              <ChevronRight className="w-2 h-2 text-neutral-600" />
+              <ChevronRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
             </button>
             <button
               onClick={navigateForwardWeek}
               className="hover:bg-neutral-200 rounded transition-colors"
               title="Go forward 5 days"
             >
-              <ChevronsRight className="w-2 h-2 text-neutral-600" />
+              <ChevronsRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
             </button>
           </div>
 
           {/* Work Hours Label */}
-          <div className="text-sm text-neutral-700 ml-2">
+          <div className="text-base sm:text-sm text-neutral-700 ml-2">
             Work Hours (until{' '}
             {settings?.week_ending_day?.charAt(0).toUpperCase() +
               settings?.week_ending_day?.slice(1) || 'Sunday'}{' '}
@@ -880,7 +880,7 @@ const Calendar = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="text-sm relative planned-hours-tooltip">
+          <div className="text-base sm:text-sm relative planned-hours-tooltip">
             <span className="text-neutral-600">Planned:</span>
             <span
               className="font-medium text-neutral-900 ml-1 cursor-pointer hover:underline"
@@ -969,7 +969,7 @@ const Calendar = () => {
               </div>
             )}
           </div>
-          <div className="text-sm relative actual-hours-tooltip">
+          <div className="text-base sm:text-sm relative actual-hours-tooltip">
             <span className="text-neutral-600">Actual:</span>
             <span
               className="font-medium text-neutral-900 ml-1 cursor-pointer hover:underline"
@@ -1029,15 +1029,15 @@ const Calendar = () => {
             title="Add meeting"
             onClick={handleAddMeeting}
           >
-            <Plus className="w-3 h-3 text-neutral-600" />
+            <Plus className="w-5 h-5 sm:w-3 sm:h-3 text-neutral-600" />
           </button>
         </div>
         {dayColumns.map((column, columnIndex) => (
           <div
             key={columnIndex}
-            className="p-1.5 bg-neutral-50 border-r border-neutral-200 last:border-r-0"
+            className="p-3 sm:p-1.5 bg-neutral-50 border-r border-neutral-200 last:border-r-0"
           >
-            <h2 className="text-sm font-medium text-neutral-900">{column.label}</h2>
+            <h2 className="text-base sm:text-sm font-medium text-neutral-900">{column.label}</h2>
           </div>
         ))}
       </div>
@@ -1075,13 +1075,13 @@ const Calendar = () => {
                       height: virtualizedCalendar.itemHeight
                     }}
                   >
-                    <div className="border-r border-neutral-200 p-1 h-16 bg-neutral-50 flex items-start">
-                      <div className="font-mono text-neutral-600 text-xs">{hour.display}</div>
+                    <div className="border-r border-neutral-200 p-2 sm:p-1 h-16 bg-neutral-50 flex items-start">
+                      <div className="font-mono text-neutral-600 text-sm sm:text-xs">{hour.display}</div>
                     </div>
                     {dayColumns.map((column, columnIndex) => (
                       <div
                         key={columnIndex}
-                        className="border-r border-neutral-200 last:border-r-0 p-0.5 h-16 text-xs hover:bg-neutral-50 relative cursor-pointer"
+                        className="border-r border-neutral-200 last:border-r-0 p-1 sm:p-0.5 h-16 text-sm sm:text-xs hover:bg-neutral-50 relative cursor-pointer"
                         onClick={() => handleTimeSlotClick(hour.time, column.date)}
                       >
                         {/* Render calendar events */}

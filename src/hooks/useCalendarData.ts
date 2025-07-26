@@ -33,7 +33,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const todayStr = format(today, 'yyyy-MM-dd')
     const tomorrowStr = format(addDays(today, 1), 'yyyy-MM-dd')
     
-    const columnCount = windowWidth > 850 ? 7 : 3
+    const columnCount = windowWidth > 600 ? 7 : 3
     
     return Array.from({ length: columnCount }, (_, i) => {
       const date = addDays(baseDate, i)
