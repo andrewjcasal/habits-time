@@ -827,7 +827,7 @@ const Calendar = () => {
   )
 
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className="flex flex-col h-screen bg-white overflow-hidden">
       {/* Top Bar with Navigation and Work Hours */}
       <div className="bg-neutral-100 border-b border-neutral-200 px-2 py-2 sm:px-1 sm:py-1 flex items-center justify-between">
         <div className="flex items-center">
@@ -1022,7 +1022,7 @@ const Calendar = () => {
       </div>
 
       {/* Headers */}
-      <div className="grid border-b border-neutral-200" style={{ gridTemplateColumns: gridCols }}>
+      <div className="grid border-b border-neutral-200 min-w-0" style={{ gridTemplateColumns: gridCols }}>
         <div className="bg-neutral-100 border-r border-neutral-200 flex items-center justify-center">
           <button
             className="p-1 hover:bg-neutral-200 rounded transition-colors"

@@ -6,11 +6,17 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-neutral-50 text-neutral-900;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    font-size: 16px; /* Prevent zoom on iOS */
+    min-height: 100vh;
   }
 
   h1 {
@@ -60,15 +66,17 @@
   }
 
   .input {
-    @apply w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm placeholder-neutral-400 
+    @apply w-full rounded-md border border-neutral-300 px-2.5 py-1.5 placeholder-neutral-400 
            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
            disabled:cursor-not-allowed disabled:opacity-50;
+    font-size: 16px; /* Prevent zoom on iOS */
   }
 
   .select {
-    @apply w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm 
+    @apply w-full rounded-md border border-neutral-300 px-2.5 py-1.5 
            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
            disabled:cursor-not-allowed disabled:opacity-50;
+    font-size: 16px; /* Prevent zoom on iOS */
   }
 
   .badge {
