@@ -53,6 +53,17 @@ export const getAvailableTimeBlocks = (
         tasksDailyLogsConflicts.length === 0 &&
         scheduledTasksInSlot.length === 0
 
+      // Debug conflicts for today
+      if (dateStr === format(new Date(), 'yyyy-MM-dd') && !available && hour >= 10 && hour <= 22) {
+        console.log(`🚫 Conflict at ${timeSlot} on ${dateStr}:`, {
+          habits: habitConflicts.length,
+          sessions: sessionConflicts.length, 
+          meetings: meetingConflicts.length,
+          tasksDailyLogs: tasksDailyLogsConflicts.length,
+          scheduledTasks: scheduledTasksInSlot.length
+        })
+      }
+
       blocks.push({ timeInHours, timeSlot, available })
     }
   }
@@ -145,7 +156,8 @@ export const scheduleAllTasks = async (
   scheduleTaskInAvailableSlots: any,
   saveTaskChunks: any,
   clearTaskLogsForDate: any,
-  userId: string
+  userId: string,
+  tasksDailyLogsData: any[] = []
 ) => {
   const unscheduledTasks = tasksData.filter(
     task =>
@@ -157,14 +169,32 @@ export const scheduleAllTasks = async (
 
   if (unscheduledTasks.length === 0) return new Map()
 
+  // Calculate completed hours for each task from task daily logs
+  const completedHoursByTask = new Map()
+  tasksDailyLogsData.forEach(log => {
+    if (log.task_id) {
+      const completedHours = log.actual_duration || log.scheduled_duration || log.estimated_hours || 0
+      const currentCompleted = completedHoursByTask.get(log.task_id) || 0
+      completedHoursByTask.set(log.task_id, currentCompleted + completedHours)
+    }
+  })
+
   let allScheduledChunks: any[] = []
-  let remainingTasks = unscheduledTasks.map(task => ({
-    ...task,
-    remainingHours: task.estimated_hours,
-  }))
+  let remainingTasks = unscheduledTasks.map(task => {
+    const completedHours = completedHoursByTask.get(task.id) || 0
+    const remainingHours = Math.max(0, task.estimated_hours - completedHours)
+    
+    console.log(`📊 Task "${task.title}": estimated=${task.estimated_hours}h, completed=${completedHours}h, remaining=${remainingHours}h`)
+    
+    return {
+      ...task,
+      remainingHours,
+    }
+  }).filter(task => task.remainingHours > 0) // Only schedule tasks with remaining work
 
   for (const dayColumn of dayColumns) {
     if (remainingTasks.length === 0) break
+    console.log('dayColumn', dayColumn)
 
     let scheduledOnThisDay = true
     while (scheduledOnThisDay && remainingTasks.length > 0) {
@@ -220,7 +250,7 @@ export const scheduleAllTasks = async (
     tasksByDate.get(chunkDateKey).push(chunk)
   })
 
-  // Persist today's task chunks to database
+  // Persist today's task chunks to database (clearing already done in useCalendarData)
   const today = new Date()
   const todayStr = format(today, 'yyyy-MM-dd')
   const todayChunks = allScheduledChunks.filter(chunk => 
@@ -229,7 +259,6 @@ export const scheduleAllTasks = async (
 
   if (todayChunks.length > 0) {
     try {
-      await clearTaskLogsForDate(userId, today)
       await saveTaskChunks(todayChunks, userId)
       console.log(`Persisted ${todayChunks.length} task chunks for today`)
     } catch (error) {

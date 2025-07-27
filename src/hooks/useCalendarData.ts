@@ -83,12 +83,20 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const fetchedTasks = await fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions)
         setAllTasks(fetchedTasks)
 
-        // Step 4: Compute conflict maps
+        // Step 4: Clear today's task logs before computing conflicts to allow rescheduling
+        const today = new Date()
+        await clearTaskLogsForDate(user.id, today)
+        
+        // Filter out today's task logs from conflict computation since we just cleared them
+        const todayStr = format(today, 'yyyy-MM-dd')
+        const filteredTasksDailyLogs = fetchedTasksDailyLogs.filter(log => log.log_date !== todayStr)
+        
+        // Compute conflict maps without today's task logs
         const dayColumnsList = getDayColumns()
-        const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, fetchedTasksDailyLogs)
+        const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
         setConflictMaps(newConflictMaps)
 
-        // Step 5: Schedule tasks
+        // Step 5: Schedule tasks (pass full task logs to calculate completed work)
         const scheduledTasksResult = await scheduleAllTasks(
           fetchedTasks,
           newConflictMaps,
@@ -97,7 +105,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           scheduleTaskInAvailableSlots,
           saveTaskChunks,
           clearTaskLogsForDate,
-          user.id
+          user.id,
+          fetchedTasksDailyLogs // Pass full logs to calculate completed hours
         )
         setScheduledTasksCache(scheduledTasksResult)
         setTasksScheduled(true)
