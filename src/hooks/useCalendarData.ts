@@ -14,6 +14,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [sessions, setSessions] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [meetings, setMeetings] = useState<any[]>([])
+  const [tasksDailyLogs, setTasksDailyLogs] = useState<any[]>([])
   const [scheduledTasksCache, setScheduledTasksCache] = useState<Map<string, any[]>>(new Map())
   const [tasksScheduled, setTasksScheduled] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -21,7 +22,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [conflictMaps, setConflictMaps] = useState({ 
     habitConflicts: new Map(), 
     sessionConflicts: new Map(), 
-    meetingConflicts: new Map() 
+    meetingConflicts: new Map(),
+    tasksDailyLogsConflicts: new Map()
   })
 
   const { getWorkHoursRange } = useSettings()
@@ -50,7 +52,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         }
 
         // Step 1: Fetch all base data in parallel
-        const { habits: fetchedHabits, sessions: fetchedSessions, projects: fetchedProjects, meetings: fetchedMeetings } = 
+        const { habits: fetchedHabits, sessions: fetchedSessions, projects: fetchedProjects, meetings: fetchedMeetings, tasksDailyLogs: fetchedTasksDailyLogs, settings: fetchedSettings } = 
           await fetchAllCalendarData(user.id)
 
         // Step 2: Set base data
@@ -58,6 +60,24 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setSessions(fetchedSessions)
         setProjects(fetchedProjects)
         setMeetings(fetchedMeetings)
+        setTasksDailyLogs(fetchedTasksDailyLogs)
+        
+        // Debug: Log task daily logs
+        console.log('🔍 Tasks Daily Logs fetched:', fetchedTasksDailyLogs)
+
+        // Create work hours range function using fetched settings
+        const getWorkHoursRangeFromSettings = () => {
+          if (!fetchedSettings) {
+            console.warn('⚠️ No settings found, using fallback work hours (10-22)')
+            return { start: 10, end: 22 }
+          }
+          
+          const start = parseInt(fetchedSettings.work_hours_start.split(':')[0], 10)
+          const end = parseInt(fetchedSettings.work_hours_end.split(':')[0], 10)
+          
+          console.log(`✅ Using settings work hours: ${start}:00 - ${end}:00`)
+          return { start, end }
+        }
 
         // Step 3: Fetch tasks for projects without sessions
         const fetchedTasks = await fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions)
@@ -65,7 +85,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         // Step 4: Compute conflict maps
         const dayColumnsList = getDayColumns()
-        const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList)
+        const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, fetchedTasksDailyLogs)
         setConflictMaps(newConflictMaps)
 
         // Step 5: Schedule tasks
@@ -73,7 +93,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           fetchedTasks,
           newConflictMaps,
           dayColumnsList,
-          getWorkHoursRange,
+          getWorkHoursRangeFromSettings,
           scheduleTaskInAvailableSlots,
           saveTaskChunks,
           clearTaskLogsForDate,
@@ -410,6 +430,37 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       })
   }
 
+  // Get task daily logs for a specific time slot
+  const getTasksDailyLogsForTimeSlot = (timeSlot: string, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd')
+    const currentHour = parseInt(timeSlot.split(':')[0])
+
+    console.log(`🔍 Checking task daily logs for ${dateStr} ${timeSlot}:`, {
+      totalLogs: tasksDailyLogs.length,
+      logsForDate: tasksDailyLogs.filter(log => log.log_date === dateStr),
+      sampleLogs: tasksDailyLogs.slice(0, 3)
+    })
+
+    return tasksDailyLogs
+      .filter(log => {
+        if (log.log_date !== dateStr) return false
+        // Use actual_start_time if available, otherwise fall back to scheduled_start_time
+        const startTime = log.actual_start_time || log.scheduled_start_time
+        if (!startTime) return false
+        const logStartHour = parseInt(startTime.split(':')[0])
+        return logStartHour === currentHour
+      })
+      .map(log => {
+        // Use actual_start_time if available, otherwise fall back to scheduled_start_time
+        const startTime = log.actual_start_time || log.scheduled_start_time
+        const minutes = parseInt(startTime!.split(':')[1])
+        return {
+          ...log,
+          topPosition: (minutes / 60) * 100,
+        }
+      })
+  }
+
   const hourSlots = useMemo(() => getHourSlots(), [])
 
   return {
@@ -423,6 +474,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     sessions,
     projects,
     meetings,
+    tasksDailyLogs,
     isDataLoading,
     addMeeting,
     updateMeeting,
@@ -435,6 +487,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     getMeetingsForTimeSlot,
     getHabitsForTimeSlot,
     getSessionsForTimeSlot,
+    getTasksDailyLogsForTimeSlot,
     setAllTasks,
     setScheduledTasksCache,
     setTasksScheduled,

@@ -4,21 +4,25 @@ export const fetchAllCalendarData = async (userId: string) => {
   console.log('⚡ Fetching all calendar data sources in parallel...')
   
   // Fetch all data sources in parallel
-  const [habitsResult, sessionsResult, projectsResult, meetingsResult] = await Promise.all([
-    supabase.from('habits').select('*, habits_daily_logs(*)').eq('user_id', userId),
+  const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, settingsResult] = await Promise.all([
+    supabase.from('habits').select('*, habits_daily_logs(*)').eq('user_id', userId).eq('is_visible', true),
     supabase.from('sessions').select('*, projects(*)').eq('user_id', userId),
     supabase.from('projects').select('*').eq('user_id', userId),
-    supabase.from('meetings').select('*').eq('user_id', userId)
+    supabase.from('meetings').select('*').eq('user_id', userId),
+    supabase.from('tasks_daily_logs').select('*, tasks!inner(*, projects(*))').eq('user_id', userId),
+    supabase.from('user_settings').select('*').eq('user_id', userId).single()
   ])
 
   const habits = habitsResult.data || []
   const sessions = sessionsResult.data || []
   const projects = projectsResult.data || []
   const meetings = meetingsResult.data || []
+  const tasksDailyLogs = tasksDailyLogsResult.data || []
+  const settings = settingsResult.data
 
-  console.log(`📊 Fetched: ${habits.length} habits, ${sessions.length} sessions, ${projects.length} projects, ${meetings.length} meetings`)
+  console.log(`📊 Fetched: ${habits.length} habits, ${sessions.length} sessions, ${projects.length} projects, ${meetings.length} meetings, ${tasksDailyLogs.length} task daily logs, settings: ${settings ? 'loaded' : 'not found'}`)
 
-  return { habits, sessions, projects, meetings }
+  return { habits, sessions, projects, meetings, tasksDailyLogs, settings }
 }
 
 export const fetchTasksForProjects = async (userId: string, projects: any[], sessions: any[]) => {

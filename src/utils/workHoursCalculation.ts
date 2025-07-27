@@ -44,12 +44,7 @@ export const calculateWorkHours = (
     isCompleted: boolean
   }> = []
 
-  // Calculate from scheduled task chunks up to the cutoff time
-  console.log('123 - scheduledTasksCache:', scheduledTasksCache)
-  console.log('123 - tasksScheduled:', tasksScheduled)
-
   scheduledTasksCache.forEach((chunks, dateKey) => {
-    console.log('123 - Processing date:', dateKey, 'chunks:', chunks)
     const chunkDate = new Date(dateKey + 'T00:00:00')
 
     chunks.forEach(chunk => {

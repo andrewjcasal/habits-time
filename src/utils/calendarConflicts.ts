@@ -4,11 +4,13 @@ export const computeConflictMaps = (
   habitsData: any[], 
   sessionsData: any[], 
   meetingsData: any[], 
-  dayColumns: any[]
+  dayColumns: any[],
+  tasksDailyLogsData: any[] = []
 ) => {
   const habitConflicts = new Map()
   const sessionConflicts = new Map()
   const meetingConflicts = new Map()
+  const tasksDailyLogsConflicts = new Map()
   
   // Pre-compute habit conflicts
   habitsData.forEach(habit => {
@@ -85,5 +87,25 @@ export const computeConflictMaps = (
     }
   })
   
-  return { habitConflicts, sessionConflicts, meetingConflicts }
+  // Pre-compute task daily logs conflicts
+  tasksDailyLogsData.forEach(log => {
+    if (log.log_date) {
+      // Use actual_start_time if available, otherwise fall back to scheduled_start_time
+      const startTime = log.actual_start_time || log.scheduled_start_time
+      if (startTime) {
+        const [hours, minutes] = startTime.split(':').map(Number)
+        const startTimeInHours = hours + minutes / 60
+        // Use actual_duration if available, otherwise fall back to estimated_hours or default to 1
+        const duration = log.actual_duration || log.scheduled_duration || log.estimated_hours || 1
+        const endTimeInHours = startTimeInHours + duration
+        
+        for (let time = Math.floor(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
+          const key = `${log.log_date}-${time}`
+          tasksDailyLogsConflicts.set(key, log)
+        }
+      }
+    }
+  })
+  
+  return { habitConflicts, sessionConflicts, meetingConflicts, tasksDailyLogsConflicts }
 }

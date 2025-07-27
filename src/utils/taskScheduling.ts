@@ -9,6 +9,17 @@ export const getAvailableTimeBlocks = (
   const blocks = []
   const dateStr = format(date, 'yyyy-MM-dd')
   const { start, end } = getWorkHoursRange()
+  
+  console.log(`🕐 Work hours for ${dateStr}: ${start}:00 - ${end}:00`)
+  
+  if (start === 7 && end === 23) {
+    console.warn('⚠️ Using fallback work hours instead of user settings!')
+  }
+  
+  // Don't filter by current time - allow scheduling from start of day
+  // const now = new Date()
+  // const isToday = format(now, 'yyyy-MM-dd') === dateStr
+  // const currentHour = isToday ? now.getHours() + now.getMinutes() / 60 : start
 
   for (let hour = start; hour < end; hour++) {
     for (let quarterHour = 0; quarterHour < 4; quarterHour++) {
@@ -21,10 +32,12 @@ export const getAvailableTimeBlocks = (
       const habitConflict = conflictMaps.habitConflicts.get(conflictKey)
       const sessionConflict = conflictMaps.sessionConflicts.get(conflictKey)
       const meetingConflict = conflictMaps.meetingConflicts.get(conflictKey)
+      const tasksDailyLogsConflict = conflictMaps.tasksDailyLogsConflicts?.get(conflictKey)
       
       const habitConflicts = habitConflict ? [habitConflict] : []
       const sessionConflicts = sessionConflict ? [sessionConflict] : []
       const meetingConflicts = meetingConflict ? [meetingConflict] : []
+      const tasksDailyLogsConflicts = tasksDailyLogsConflict ? [tasksDailyLogsConflict] : []
 
       const scheduledTasksInSlot = alreadyScheduledTasks.filter(
         task =>
@@ -37,6 +50,7 @@ export const getAvailableTimeBlocks = (
         habitConflicts.length === 0 &&
         sessionConflicts.length === 0 &&
         meetingConflicts.length === 0 &&
+        tasksDailyLogsConflicts.length === 0 &&
         scheduledTasksInSlot.length === 0
 
       blocks.push({ timeInHours, timeSlot, available })
@@ -73,16 +87,24 @@ export const scheduleTaskInAvailableSlots = (
     } else {
       if (currentChunkStart !== null && currentChunkHours > 0) {
         const chunkHours = Math.min(currentChunkHours, remainingHours)
-        scheduledChunks.push({
-          ...taskInfo,
-          id: `${taskInfo.id}-chunk-${scheduledChunks.length}`,
-          title: `${taskInfo.title}${scheduledChunks.length > 0 ? ` (${scheduledChunks.length + 1})` : ''}`,
-          startTime: currentChunkStart,
-          startHour: Math.floor(currentChunkStart),
-          estimated_hours: chunkHours,
-          topPosition: 0,
-        })
-        remainingHours -= chunkHours
+        const { end } = getWorkHoursRange()
+        
+        // Ensure chunk doesn't extend beyond work hours
+        const chunkEndTime = currentChunkStart + chunkHours
+        const adjustedChunkHours = chunkEndTime > end ? end - currentChunkStart : chunkHours
+        
+        if (adjustedChunkHours > 0) {
+          scheduledChunks.push({
+            ...taskInfo,
+            id: `${taskInfo.id}-chunk-${scheduledChunks.length}`,
+            title: `${taskInfo.title}${scheduledChunks.length > 0 ? ` (${scheduledChunks.length + 1})` : ''}`,
+            startTime: currentChunkStart,
+            startHour: Math.floor(currentChunkStart),
+            estimated_hours: adjustedChunkHours,
+            topPosition: 0,
+          })
+          remainingHours -= adjustedChunkHours
+        }
         currentChunkStart = null
         currentChunkHours = 0
       }
@@ -91,15 +113,25 @@ export const scheduleTaskInAvailableSlots = (
 
   if (currentChunkStart !== null && currentChunkHours > 0 && remainingHours > 0) {
     const chunkHours = Math.min(currentChunkHours, remainingHours)
-    scheduledChunks.push({
-      ...taskInfo,
-      id: `${taskInfo.id}-chunk-${scheduledChunks.length}`,
-      title: `${taskInfo.title}${scheduledChunks.length > 0 ? ` (${scheduledChunks.length + 1})` : ''}`,
-      startTime: currentChunkStart,
-      startHour: Math.floor(currentChunkStart),
-      estimated_hours: chunkHours,
-      topPosition: 0,
-    })
+    const { end } = getWorkHoursRange()
+    
+    // Ensure chunk doesn't extend beyond work hours
+    const chunkEndTime = currentChunkStart + chunkHours
+    const adjustedChunkHours = chunkEndTime > end ? end - currentChunkStart : chunkHours
+    
+    console.log(`📋 Final chunk: start=${currentChunkStart}, hours=${chunkHours}, adjustedHours=${adjustedChunkHours}, workEnd=${end}`)
+    
+    if (adjustedChunkHours > 0) {
+      scheduledChunks.push({
+        ...taskInfo,
+        id: `${taskInfo.id}-chunk-${scheduledChunks.length}`,
+        title: `${taskInfo.title}${scheduledChunks.length > 0 ? ` (${scheduledChunks.length + 1})` : ''}`,
+        startTime: currentChunkStart,
+        startHour: Math.floor(currentChunkStart),
+        estimated_hours: adjustedChunkHours,
+        topPosition: 0,
+      })
+    }
   }
 
   return scheduledChunks
@@ -162,6 +194,8 @@ export const scheduleAllTasks = async (
           )
           task.remainingHours -= totalScheduledHours
 
+          console.log(`📅 Scheduled ${totalScheduledHours}h for "${task.title}" on ${format(dayColumn.date, 'yyyy-MM-dd')}, remaining: ${task.remainingHours}h`)
+
           if (task.remainingHours <= 0) {
             remainingTasks = remainingTasks.filter(t => t.id !== task.id)
             scheduledOnThisDay = true
@@ -169,6 +203,8 @@ export const scheduleAllTasks = async (
             scheduledOnThisDay = true
           }
           break
+        } else {
+          console.log(`❌ No slots found for "${task.title}" on ${format(dayColumn.date, 'yyyy-MM-dd')}`)
         }
       }
     }

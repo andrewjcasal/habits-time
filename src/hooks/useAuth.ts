@@ -11,19 +11,12 @@ export function useAuth() {
   useEffect(() => {
     // Add timeout to prevent infinite loading
     const authTimeout = setTimeout(() => {
-      console.log('⏰ Auth: Timeout reached, stopping loading state')
       setIsLoading(false)
     }, 10000) // 10 second timeout
 
     // Get initial session
     console.log('🔍 Auth: Checking initial session...')
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log('🔍 Auth: getSession result:', { session: !!session, user: !!session?.user, error })
-      if (session) {
-        console.log('✅ Auth: Session found, user:', session.user.email)
-      } else {
-        console.log('❌ Auth: No session found')
-      }
       setUser(session?.user ?? null)
       setIsLoading(false)
       clearTimeout(authTimeout)
