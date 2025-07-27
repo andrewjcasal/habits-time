@@ -3,13 +3,14 @@ import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plus, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
-import { useTasks } from '../hooks/useProjects'
 import { useSettings } from '../hooks/useSettings'
 import { useVirtualizedCalendar } from '../hooks/useVirtualizedCalendar'
 import { Meeting } from '../types'
 import MeetingModal from '../components/MeetingModal'
 import CalendarTaskModal from '../components/CalendarTaskModal'
 import HabitModal from '../components/HabitModal'
+import { handleHabitTimeChange, handleCompleteTask, handleDeleteTask } from '../utils/calendarDatabaseOperations'
+import { calculateWorkHours } from '../utils/workHoursCalculation'
 
 const Calendar = () => {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -59,8 +60,8 @@ const Calendar = () => {
   })
 
   const { settings } = useSettings()
-  const [tasks, setTasks] = useState<any[]>([]) // Tasks with project data
   const {
+    allTasks,
     dayColumns,
     hourSlots,
     getCurrentTimeLinePosition,
@@ -69,6 +70,9 @@ const Calendar = () => {
     meetings,
     currentTime,
     getTasksForTimeSlot,
+    getMeetingsForTimeSlot,
+    getHabitsForTimeSlot,
+    getSessionsForTimeSlot,
     tasksScheduled,
     setTasksScheduled,
     setScheduledTasksCache,
@@ -76,6 +80,7 @@ const Calendar = () => {
     addMeeting,
     updateMeeting,
     deleteMeeting,
+    isDataLoading,
   } = useCalendarData(windowWidth, baseDate)
 
   // Virtual scrolling for performance
@@ -153,40 +158,6 @@ const Calendar = () => {
     }
   }, [])
 
-  // Fetch all tasks with project data
-  useEffect(() => {
-    const fetchAllTasks = async () => {
-      try {
-        const { supabase } = await import('../lib/supabase')
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user) return
-
-        const { data, error } = await supabase
-          .from('tasks')
-          .select(
-            `
-            *,
-            projects (
-              id,
-              name,
-              hourly_rate
-            )
-          `
-          )
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-        setTasks(data || [])
-      } catch (error) {
-        console.error('Error fetching tasks:', error)
-      }
-    }
-
-    fetchAllTasks()
-  }, [])
 
   const handleTimeSlotClick = (timeSlot: string, date: Date) => {
     setEditingMeeting(null)
@@ -332,37 +303,9 @@ const Calendar = () => {
     setShowHabitModal(true)
   }
 
-  const handleHabitTimeChange = async (habitId: string, date: string, newTime: string, newDuration?: number) => {
+  const handleHabitTimeChangeWithReset = async (habitId: string, date: string, newTime: string, newDuration?: number) => {
     try {
-      const { supabase } = await import('../lib/supabase')
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) throw new Error('User not authenticated')
-
-      // Prepare the data to update
-      const updateData: any = {
-        habit_id: habitId,
-        user_id: user.id,
-        log_date: date,
-        scheduled_start_time: newTime,
-      }
-
-      // Only include duration if it's provided
-      if (newDuration !== undefined) {
-        updateData.duration = newDuration
-      }
-
-      // Insert or update the daily log with the new scheduled start time and optionally duration
-      const { error } = await supabase.from('habits_daily_logs').upsert(
-        updateData,
-        {
-          onConflict: 'habit_id,user_id,log_date',
-        }
-      )
-
-      if (error) throw error
-
+      await handleHabitTimeChange(habitId, date, newTime, newDuration)
       // Reset task scheduling to recalculate available slots with new habit time
       setTasksScheduled(false)
       setScheduledTasksCache(new Map())
@@ -372,40 +315,12 @@ const Calendar = () => {
     }
   }
 
-  const handleCompleteTask = async () => {
-    if (!selectedTask) return
-    try {
-      const { supabase } = await import('../lib/supabase')
-      const originalTaskId = selectedTask.id.includes('-chunk-')
-        ? selectedTask.id.split('-chunk-')[0]
-        : selectedTask.id
-
-      const { error } = await supabase
-        .from('tasks')
-        .update({ is_complete: true })
-        .eq('id', originalTaskId)
-
-      if (error) throw error
-      window.location.reload()
-    } catch (error) {
-      console.error('Error completing task:', error)
-    }
+  const handleCompleteTaskWrapper = async () => {
+    await handleCompleteTask(selectedTask)
   }
 
-  const handleDeleteTask = async () => {
-    if (!selectedTask) return
-    try {
-      const { supabase } = await import('../lib/supabase')
-      const originalTaskId = selectedTask.id.includes('-chunk-')
-        ? selectedTask.id.split('-chunk-')[0]
-        : selectedTask.id
-
-      const { error } = await supabase.from('tasks').delete().eq('id', originalTaskId)
-      if (error) throw error
-      window.location.reload()
-    } catch (error) {
-      console.error('Error deleting task:', error)
-    }
+  const handleDeleteTaskWrapper = async () => {
+    await handleDeleteTask(selectedTask)
   }
 
   const closeModal = () => {
@@ -443,186 +358,6 @@ const Calendar = () => {
     zIndex,
   })
 
-  // Get meetings for a specific time slot
-  const getMeetingsForTimeSlot = useCallback((timeSlot: string, date: Date) => {
-    const dateKey = format(date, 'yyyy-MM-dd')
-    const currentHour = parseInt(timeSlot.split(':')[0])
-
-    return meetings.filter(meeting => {
-      const meetingStart = new Date(meeting.start_time)
-      const meetingDate = format(meetingStart, 'yyyy-MM-dd')
-      const meetingHour = meetingStart.getHours()
-
-      return meetingDate === dateKey && meetingHour === currentHour
-    })
-  }, [meetings])
-
-  // Get habits for a specific time slot
-  const getHabitsForTimeSlot = useCallback((timeSlot: string, date: Date) => {
-    const currentHour = parseInt(timeSlot.split(':')[0])
-    const dateKey = format(date, 'yyyy-MM-dd')
-
-    return habits
-      .filter(habit => {
-        // Check if there's a daily log with a scheduled start time for this date
-        const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
-        const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
-        const effectiveDuration = dailyLog?.duration || habit.duration || 0
-
-        if (!effectiveStartTime) return false
-
-        const habitStartHour = parseInt(effectiveStartTime.split(':')[0])
-        const habitStartMinute = parseInt(effectiveStartTime.split(':')[1])
-
-        // Check for meeting conflicts and rescheduling
-        const conflictingMeeting = meetings.find(meeting => {
-          const meetingStart = new Date(meeting.start_time)
-          const meetingEnd = new Date(meeting.end_time)
-          const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
-
-          if (meetingDateStr !== dateKey) return false
-
-          const habitDuration = effectiveDuration
-          const habitStartInHours = habitStartHour + habitStartMinute / 60
-          const habitEndInHours = habitStartInHours + habitDuration / 60
-          const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
-          const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
-
-          return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
-        })
-
-        // Check for session conflicts and rescheduling
-        const conflictingSession = sessions.find(session => {
-          if (!session.actual_start_time || session.scheduled_date !== dateKey) return false
-
-          const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
-          const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
-          const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
-
-          const habitDuration = effectiveDuration
-          const habitStartInHours = habitStartHour + habitStartMinute / 60
-          const habitEndInHours = habitStartInHours + habitDuration / 60
-          const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
-          const sessionEndInHours = sessionStartInHours + sessionDuration / 60
-
-          return habitStartInHours < sessionEndInHours && habitEndInHours > sessionStartInHours
-        })
-
-        if (conflictingMeeting) {
-          const meetingEnd = new Date(conflictingMeeting.end_time)
-          const newStartHour = meetingEnd.getHours() + (meetingEnd.getMinutes() > 30 ? 1 : 0)
-          return newStartHour === currentHour
-        }
-
-        if (conflictingSession) {
-          const sessionStartHour = parseInt(conflictingSession.actual_start_time!.split(':')[0])
-          const sessionStartMinute = parseInt(conflictingSession.actual_start_time!.split(':')[1])
-          const sessionDuration = (conflictingSession.scheduled_hours || 1) * 60 // Duration in minutes
-          const sessionEndMinute = sessionStartMinute + sessionDuration
-          const sessionEndHour = sessionStartHour + Math.floor(sessionEndMinute / 60)
-          const finalEndMinute = sessionEndMinute % 60
-
-          const newStartHour = sessionEndHour + (finalEndMinute > 30 ? 1 : 0)
-          return newStartHour === currentHour
-        }
-
-        return habitStartHour === currentHour
-      })
-      .map(habit => {
-        // Use the same effective start time and duration logic as in the filter
-        const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
-        const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
-        const effectiveDuration = dailyLog?.duration || habit.duration || 0
-
-        const habitStartHour = parseInt(effectiveStartTime!.split(':')[0])
-        const habitStartMinute = parseInt(effectiveStartTime!.split(':')[1])
-
-        // Check for rescheduling (meetings first, then sessions)
-        const conflictingMeeting = meetings.find(meeting => {
-          const meetingStart = new Date(meeting.start_time)
-          const meetingEnd = new Date(meeting.end_time)
-          const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
-
-          if (meetingDateStr !== dateKey) return false
-
-          const habitDuration = effectiveDuration
-          const habitStartInHours = habitStartHour + habitStartMinute / 60
-          const habitEndInHours = habitStartInHours + habitDuration / 60
-          const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
-          const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
-
-          return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
-        })
-
-        const conflictingSession = sessions.find(session => {
-          if (!session.actual_start_time || session.scheduled_date !== dateKey) return false
-
-          const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
-          const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
-          const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
-
-          const habitDuration = effectiveDuration
-          const habitStartInHours = habitStartHour + habitStartMinute / 60
-          const habitEndInHours = habitStartInHours + habitDuration / 60
-          const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
-          const sessionEndInHours = sessionStartInHours + sessionDuration / 60
-
-          return habitStartInHours < sessionEndInHours && habitEndInHours > sessionStartInHours
-        })
-
-        if (conflictingMeeting) {
-          const meetingEnd = new Date(conflictingMeeting.end_time)
-          const newStartMinute =
-            meetingEnd.getMinutes() === 0 ? 0 : meetingEnd.getMinutes() <= 30 ? 30 : 0
-          return {
-            ...habit,
-            topPosition: (newStartMinute / 60) * 100,
-            isRescheduled: true,
-          }
-        }
-
-        if (conflictingSession) {
-          const sessionStartHour = parseInt(conflictingSession.actual_start_time!.split(':')[0])
-          const sessionStartMinute = parseInt(conflictingSession.actual_start_time!.split(':')[1])
-          const sessionDuration = (conflictingSession.scheduled_hours || 1) * 60 // Duration in minutes
-          const sessionEndMinute = sessionStartMinute + sessionDuration
-          const finalEndMinute = sessionEndMinute % 60
-
-          const newStartMinute = finalEndMinute === 0 ? 0 : finalEndMinute <= 30 ? 30 : 0
-          return {
-            ...habit,
-            topPosition: (newStartMinute / 60) * 100,
-            isRescheduled: true,
-          }
-        }
-
-        return {
-          ...habit,
-          topPosition: (habitStartMinute / 60) * 100,
-          isRescheduled: false,
-        }
-      })
-  }, [habits, meetings, sessions])
-
-  // Get sessions for a specific time slot
-  const getSessionsForTimeSlot = useCallback((timeSlot: string, date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    const currentHour = parseInt(timeSlot.split(':')[0])
-
-    return sessions
-      .filter(session => {
-        if (!session.actual_start_time || session.scheduled_date !== dateStr) return false
-        const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
-        return sessionStartHour === currentHour
-      })
-      .map(session => {
-        const minutes = parseInt(session.actual_start_time!.split(':')[1])
-        return {
-          ...session,
-          topPosition: (minutes / 60) * 100,
-        }
-      })
-  }, [sessions])
 
   // Render all calendar events for a time slot
   const renderCalendarEvents = useCallback((timeSlot: string, date: Date) => {
@@ -760,122 +495,8 @@ const Calendar = () => {
     )
   }, [getHabitsForTimeSlot, getSessionsForTimeSlot, getMeetingsForTimeSlot, getTasksForTimeSlot, tasksScheduled, handleHabitClick, handleTaskClick])
 
-  // Calculate planned vs actual work hours up to configured week ending time
-  const calculateWorkHours = () => {
-    const now = new Date()
-
-    // Get week ending configuration from settings
-    const weekEndingDay = settings?.week_ending_day || 'sunday'
-    const weekEndingTime = settings?.week_ending_time || '20:30'
-    const weekEndingTimezone = settings?.week_ending_timezone || 'America/New_York'
-
-    // Calculate days until week ending day
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const targetDayIndex = dayNames.indexOf(weekEndingDay)
-    const currentDayIndex = now.getDay()
-    const daysUntilTarget = (targetDayIndex - currentDayIndex + 7) % 7
-
-    const weekEndDate = new Date(now)
-    weekEndDate.setDate(now.getDate() + daysUntilTarget)
-
-    // Set to configured time
-    const [hours, minutes] = weekEndingTime.split(':').map(Number)
-    weekEndDate.setHours(hours, minutes, 0, 0)
-
-    let plannedHours = 0
-    let actualHours = 0
-    const actualHoursBreakdown: Array<{
-      sessionName: string
-      projectName: string
-      hours: number
-      date: string
-      hourlyRate?: number
-    }> = []
-    const plannedHoursBreakdown: Array<{
-      sessionName: string
-      projectName: string
-      hours: number
-      dueDate: string
-      hourlyRate?: number
-      isCompleted: boolean
-    }> = []
-
-    // Calculate from scheduled task chunks up to the cutoff time
-    console.log('123 - scheduledTasksCache:', scheduledTasksCache)
-    console.log('123 - tasksScheduled:', tasksScheduled)
-
-    scheduledTasksCache.forEach((chunks, dateKey) => {
-      console.log('123 - Processing date:', dateKey, 'chunks:', chunks)
-      const chunkDate = new Date(dateKey + 'T00:00:00')
-
-      chunks.forEach(chunk => {
-        // The chunk has the task data directly, extract the original task ID
-        const originalTaskId = chunk.id.split('-chunk-')[0]
-
-        // Calculate chunk end time
-        const chunkStartHour = chunk.startTime ? Math.floor(chunk.startTime) : chunk.startHour
-        const chunkStartMinute = chunk.startTime ? (chunk.startTime % 1) * 60 : 0
-        const chunkDateTime = new Date(chunkDate)
-        chunkDateTime.setHours(chunkStartHour, chunkStartMinute, 0, 0)
-
-        // Add chunk duration to get end time (use estimated_hours from chunk)
-        const chunkEndTime = new Date(chunkDateTime)
-        chunkEndTime.setHours(chunkEndTime.getHours() + Math.floor(chunk.estimated_hours))
-        chunkEndTime.setMinutes(chunkEndTime.getMinutes() + (chunk.estimated_hours % 1) * 60)
-
-
-        // Include chunks that start before the cutoff (partial or full)
-        if (chunkDateTime < weekEndDate) {
-          const task = tasks.find(t => t.id === originalTaskId)
-          if (task && task.is_billable) {
-            // Calculate actual hours to include (partial if chunk crosses cutoff)
-            let hoursToInclude = chunk.estimated_hours
-            if (chunkEndTime > weekEndDate) {
-              // Chunk crosses cutoff, only include hours up to cutoff
-              const timeDiff = weekEndDate.getTime() - chunkDateTime.getTime()
-              hoursToInclude = timeDiff / (1000 * 60 * 60) // Convert milliseconds to hours
-            }
-            
-            // Only include chunks with hourly rates > 0 in planned hours
-            if (task.projects?.hourly_rate && Number(task.projects.hourly_rate) > 0) {
-              plannedHours += hoursToInclude
-            }
-
-            // Add to planned breakdown
-            plannedHoursBreakdown.push({
-              sessionName: `${task.title} (${chunkStartHour}:${chunkStartMinute
-                .toString()
-                .padStart(2, '0')})`,
-              projectName: task.projects?.name || 'Project',
-              hours: hoursToInclude,
-              dueDate: dateKey,
-              hourlyRate: task.projects?.hourly_rate || 0,
-              isCompleted: task.is_complete,
-            })
-
-            // Only count actual hours for completed work
-            if (task.is_complete) {
-              actualHours += hoursToInclude
-              actualHoursBreakdown.push({
-                sessionName: `${task.title} (${chunkStartHour}:${chunkStartMinute
-                  .toString()
-                  .padStart(2, '0')})`,
-                projectName: task.projects?.name || 'Project',
-                hours: hoursToInclude,
-                date: dateKey,
-                hourlyRate: task.projects?.hourly_rate || 0,
-              })
-            }
-          }
-        }
-      })
-    })
-
-    return { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown }
-  }
-
   const { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown } =
-    calculateWorkHours()
+    calculateWorkHours(scheduledTasksCache, allTasks, tasksScheduled, settings)
 
   console.log(
     'time',
@@ -1218,8 +839,8 @@ const Calendar = () => {
         isOpen={showTaskModal}
         onClose={closeModal}
         task={selectedTask}
-        onComplete={handleCompleteTask}
-        onDelete={handleDeleteTask}
+        onComplete={handleCompleteTaskWrapper}
+        onDelete={handleDeleteTaskWrapper}
       />
 
       <HabitModal
@@ -1227,7 +848,7 @@ const Calendar = () => {
         onClose={closeModal}
         habit={selectedHabit}
         selectedDate={selectedHabitDate}
-        onTimeChange={handleHabitTimeChange}
+        onTimeChange={handleHabitTimeChangeWithReset}
       />
     </div>
   )

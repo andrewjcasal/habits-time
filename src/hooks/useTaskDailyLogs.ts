@@ -44,10 +44,12 @@ export function useTaskDailyLogs() {
         }
       })
 
-      // Insert into tasks_daily_logs table
+      // Upsert into tasks_daily_logs table to handle conflicts
       const { data, error: insertError } = await supabase
         .from('tasks_daily_logs')
-        .insert(taskLogs)
+        .upsert(taskLogs, { 
+          onConflict: 'task_id,user_id,log_date,scheduled_start_time' 
+        })
         .select()
 
       if (insertError) {
