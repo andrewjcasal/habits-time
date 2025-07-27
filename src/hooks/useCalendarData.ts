@@ -5,6 +5,8 @@ import { useSessions } from './useContracts'
 import { useProjects } from './useProjects'
 import { useSettings } from './useSettings'
 import { useMeetings } from './useMeetings'
+import { useTaskDailyLogs } from './useTaskDailyLogs'
+import { supabase } from '../lib/supabase'
 
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const [allTasks, setAllTasks] = useState<any[]>([])
@@ -18,6 +20,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const { projects, loading: projectsLoading } = useProjects()
   const { getWorkHoursRange } = useSettings()
   const { meetings, loading: meetingsLoading, addMeeting, updateMeeting, deleteMeeting } = useMeetings()
+  const { saveTaskChunks, clearTaskLogsForDate } = useTaskDailyLogs()
 
   // Update current time every minute
   useEffect(() => {
@@ -409,80 +412,112 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   // Pre-calculate and cache scheduled tasks with race condition protection
   useEffect(() => {
-    if (!allTasksLoading && allTasks.length > 0 && !tasksScheduled && !habitsLoading && !projectsLoading && !sessionsLoading) {
-      const unscheduledTasks = allTasks.filter(
-        task =>
-          !task.parent_task_id &&
-          task.status !== 'completed' &&
-          task.estimated_hours &&
-          task.estimated_hours > 0
-      )
+    const scheduleAndPersistTasks = async () => {
+      if (!allTasksLoading && allTasks.length > 0 && !tasksScheduled && !habitsLoading && !projectsLoading && !sessionsLoading) {
+        const unscheduledTasks = allTasks.filter(
+          task =>
+            !task.parent_task_id &&
+            task.status !== 'completed' &&
+            task.estimated_hours &&
+            task.estimated_hours > 0
+        )
 
-      if (unscheduledTasks.length === 0) {
-        setTasksScheduled(true)
-        return
-      }
+        if (unscheduledTasks.length === 0) {
+          setTasksScheduled(true)
+          return
+        }
 
-      const allDays = getDayColumns()
-      let allScheduledChunks: any[] = []
-      let remainingTasks = unscheduledTasks.map(task => ({
-        ...task,
-        remainingHours: task.estimated_hours,
-      }))
+        const allDays = getDayColumns()
+        let allScheduledChunks: any[] = []
+        let remainingTasks = unscheduledTasks.map(task => ({
+          ...task,
+          remainingHours: task.estimated_hours,
+        }))
 
-      for (const dayColumn of allDays) {
-        if (remainingTasks.length === 0) break
+        for (const dayColumn of allDays) {
+          if (remainingTasks.length === 0) break
 
-        let scheduledOnThisDay = true
-        while (scheduledOnThisDay && remainingTasks.length > 0) {
-          scheduledOnThisDay = false
+          let scheduledOnThisDay = true
+          while (scheduledOnThisDay && remainingTasks.length > 0) {
+            scheduledOnThisDay = false
 
-          for (let i = 0; i < remainingTasks.length; i++) {
-            const task = remainingTasks[i]
-            const scheduledChunks = scheduleTaskInAvailableSlots(
-              task.remainingHours,
-              dayColumn.date,
-              { ...task, isAutoScheduled: true },
-              allScheduledChunks
-            )
-
-            if (scheduledChunks.length > 0) {
-              const chunksWithDate = scheduledChunks.map(chunk => ({
-                ...chunk,
-                date: dayColumn.date,
-              }))
-              allScheduledChunks.push(...chunksWithDate)
-
-              const totalScheduledHours = scheduledChunks.reduce(
-                (sum, chunk) => sum + chunk.estimated_hours,
-                0
+            for (let i = 0; i < remainingTasks.length; i++) {
+              const task = remainingTasks[i]
+              const scheduledChunks = scheduleTaskInAvailableSlots(
+                task.remainingHours,
+                dayColumn.date,
+                { ...task, isAutoScheduled: true },
+                allScheduledChunks
               )
-              task.remainingHours -= totalScheduledHours
 
-              if (task.remainingHours <= 0) {
-                remainingTasks = remainingTasks.filter(t => t.id !== task.id)
-                scheduledOnThisDay = true
-              } else {
-                scheduledOnThisDay = true
+              if (scheduledChunks.length > 0) {
+                const chunksWithDate = scheduledChunks.map(chunk => ({
+                  ...chunk,
+                  date: dayColumn.date,
+                }))
+                allScheduledChunks.push(...chunksWithDate)
+
+                const totalScheduledHours = scheduledChunks.reduce(
+                  (sum, chunk) => sum + chunk.estimated_hours,
+                  0
+                )
+                task.remainingHours -= totalScheduledHours
+
+                if (task.remainingHours <= 0) {
+                  remainingTasks = remainingTasks.filter(t => t.id !== task.id)
+                  scheduledOnThisDay = true
+                } else {
+                  scheduledOnThisDay = true
+                }
+                break
               }
-              break
             }
           }
         }
-      }
 
-      const tasksByDate = new Map()
-      allScheduledChunks.forEach(chunk => {
-        const chunkDateKey = format(chunk.date, 'yyyy-MM-dd')
-        if (!tasksByDate.has(chunkDateKey)) {
-          tasksByDate.set(chunkDateKey, [])
+        // Cache the scheduled tasks
+        const tasksByDate = new Map()
+        allScheduledChunks.forEach(chunk => {
+          const chunkDateKey = format(chunk.date, 'yyyy-MM-dd')
+          if (!tasksByDate.has(chunkDateKey)) {
+            tasksByDate.set(chunkDateKey, [])
+          }
+          tasksByDate.get(chunkDateKey).push(chunk)
+        })
+        setScheduledTasksCache(tasksByDate)
+
+        // Persist only today's task chunks to database
+        const today = new Date()
+        const todayStr = format(today, 'yyyy-MM-dd')
+        const todayChunks = allScheduledChunks.filter(chunk => 
+          format(chunk.date, 'yyyy-MM-dd') === todayStr
+        )
+
+        if (todayChunks.length > 0) {
+          try {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser()
+            
+            if (user) {
+              // Clear existing task logs for today only
+              await clearTaskLogsForDate(user.id, today)
+              
+              // Save only today's task chunks
+              await saveTaskChunks(todayChunks, user.id)
+              console.log(`Persisted ${todayChunks.length} task chunks for today to database`)
+            }
+          } catch (error) {
+            console.error('Error persisting task chunks:', error)
+          }
         }
-        tasksByDate.get(chunkDateKey).push(chunk)
-      })
-      setScheduledTasksCache(tasksByDate)
-      setTasksScheduled(true)
+
+        setTasksScheduled(true)
+      }
     }
-  }, [allTasks, allTasksLoading, tasksScheduled, habitsLoading, projectsLoading, sessionsLoading])
+
+    scheduleAndPersistTasks()
+  }, [allTasks, allTasksLoading, tasksScheduled, habitsLoading, projectsLoading, sessionsLoading, saveTaskChunks, clearTaskLogsForDate])
 
   // Debounced reset to prevent rapid re-scheduling
   const tasksContentHash = useMemo(() => {
