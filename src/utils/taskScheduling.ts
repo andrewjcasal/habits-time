@@ -41,8 +41,6 @@ export const getAvailableTimeBlocks = (
       const meetingConflicts = meetingConflict ? [meetingConflict] : []
       const tasksDailyLogsConflicts = tasksDailyLogsConflict ? [tasksDailyLogsConflict] : []
 
-      console.log('habitConflicts', habitConflicts)
-
       const scheduledTasksInSlot = alreadyScheduledTasks.filter(
         task =>
           format(task.date, 'yyyy-MM-dd') === dateStr &&
@@ -142,8 +140,9 @@ export const scheduleTaskInAvailableSlots = (
   return scheduledChunks
 }
 
-export const scheduleAllTasks = async (
-  tasksData: any[],
+// Helper function for scheduling without billable hours logic
+const scheduleTasksWithoutBillableLogic = async (
+  tasksToSchedule: any[],
   conflictMaps: any,
   dayColumns: any[],
   getWorkHoursRange: () => { start: number; end: number },
@@ -151,20 +150,9 @@ export const scheduleAllTasks = async (
   saveTaskChunks: any,
   clearTaskLogsForDate: any,
   userId: string,
-  tasksDailyLogsData: any[] = [],
-  weekendDays: string[] = []
+  tasksDailyLogsData: any[],
+  weekendDays: string[]
 ) => {
-  const unscheduledTasks = tasksData.filter(
-    task =>
-      !task.parent_task_id &&
-      task.status !== 'completed' &&
-      task.estimated_hours &&
-      task.estimated_hours > 0
-  )
-
-  if (unscheduledTasks.length === 0) return new Map()
-
-  // Calculate completed hours for each task from task daily logs
   const completedHoursByTask = new Map()
   tasksDailyLogsData.forEach(log => {
     if (log.task_id) {
@@ -175,11 +163,183 @@ export const scheduleAllTasks = async (
   })
 
   let allScheduledChunks: any[] = []
-  let remainingTasks = unscheduledTasks.map(task => {
+  let remainingTasks = tasksToSchedule.map(task => {
     const completedHours = completedHoursByTask.get(task.id) || 0
     const remainingHours = Math.max(0, task.estimated_hours - completedHours)
     
+    return {
+      ...task,
+      remainingHours,
+    }
+  }).filter(task => task.remainingHours > 0)
+
+  for (const dayColumn of dayColumns) {
+    if (remainingTasks.length === 0) break
+
+    let scheduledOnThisDay = true
+    while (scheduledOnThisDay && remainingTasks.length > 0) {
+      scheduledOnThisDay = false
+
+      for (let i = 0; i < remainingTasks.length; i++) {
+        const task = remainingTasks[i]
+        const scheduledChunks = scheduleTaskInAvailableSlots(
+          task.remainingHours,
+          dayColumn.date,
+          { ...task, isAutoScheduled: true },
+          conflictMaps,
+          getWorkHoursRange,
+          allScheduledChunks,
+          weekendDays
+        )
+
+        if (scheduledChunks.length > 0) {
+          const chunksWithDate = scheduledChunks.map(chunk => ({
+            ...chunk,
+            date: dayColumn.date,
+          }))
+          allScheduledChunks.push(...chunksWithDate)
+
+          const totalScheduledHours = scheduledChunks.reduce(
+            (sum, chunk) => sum + chunk.estimated_hours,
+            0
+          )
+          task.remainingHours -= totalScheduledHours
+
+          if (task.remainingHours <= 0) {
+            remainingTasks = remainingTasks.filter(t => t.id !== task.id)
+            scheduledOnThisDay = true
+          } else {
+            scheduledOnThisDay = true
+          }
+          break
+        }
+      }
+    }
+  }
+
+  const tasksByDate = new Map()
+  allScheduledChunks.forEach(chunk => {
+    const chunkDateKey = format(chunk.date, 'yyyy-MM-dd')
+    if (!tasksByDate.has(chunkDateKey)) {
+      tasksByDate.set(chunkDateKey, [])
+    }
+    tasksByDate.get(chunkDateKey).push(chunk)
+  })
+
+  // Persist today's task chunks
+  const today = new Date()
+  const todayStr = format(today, 'yyyy-MM-dd')
+  const todayChunks = allScheduledChunks.filter(chunk => 
+    format(chunk.date, 'yyyy-MM-dd') === todayStr
+  )
+
+  if (todayChunks.length > 0) {
+    try {
+      await saveTaskChunks(todayChunks, userId)
+    } catch (error) {
+      console.error('Error persisting task chunks:', error)
+    }
+  }
+
+  return tasksByDate
+}
+
+export const scheduleAllTasks = async (
+  tasksData: any[],
+  conflictMaps: any,
+  dayColumns: any[],
+  getWorkHoursRange: () => { start: number; end: number },
+  scheduleTaskInAvailableSlots: any,
+  saveTaskChunks: any,
+  clearTaskLogsForDate: any,
+  userId: string,
+  tasksDailyLogsData: any[] = [],
+  weekendDays: string[] = [],
+  userSettings: any = null
+) => {
+  const unscheduledTasks = tasksData.filter(
+    task =>
+      !task.parent_task_id &&
+      task.status !== 'completed' &&
+      task.estimated_hours &&
+      task.estimated_hours > 0
+  )
+
+  // Calculate total billable hours from existing tasks (only count remaining work from Sunday 8:30pm onwards)
+  const billableHoursEnabled = userSettings?.billable_hours_enabled || false
+  const TARGET_REVENUE = userSettings?.weekly_revenue_target || 1000
+  const DEFAULT_HOURLY_RATE = userSettings?.default_hourly_rate || 65
+  const targetHours = Math.ceil(TARGET_REVENUE / DEFAULT_HOURLY_RATE) // Round up: 15.4 -> 16
+  
+  // Skip billable hours logic if disabled
+  if (!billableHoursEnabled) {
+    let tasksToSchedule = [...unscheduledTasks]
+    if (tasksToSchedule.length === 0) return new Map()
     
+    // Continue with normal scheduling without placeholder tasks
+    return scheduleTasksWithoutBillableLogic(tasksToSchedule, conflictMaps, dayColumns, getWorkHoursRange, scheduleTaskInAvailableSlots, saveTaskChunks, clearTaskLogsForDate, userId, tasksDailyLogsData, weekendDays)
+  }
+  
+  // Calculate completed hours for each task from task daily logs
+  const completedHoursByTask = new Map()
+  tasksDailyLogsData.forEach(log => {
+    if (log.task_id) {
+      const completedHours = log.actual_duration || log.scheduled_duration || log.estimated_hours || 0
+      const currentCompleted = completedHoursByTask.get(log.task_id) || 0
+      completedHoursByTask.set(log.task_id, currentCompleted + completedHours)
+      console.log(`⏱️ Task ${log.task_id} completed: ${completedHours}h (total: ${currentCompleted + completedHours}h)`)
+    }
+  })
+  
+  const existingBillableHours = unscheduledTasks.reduce((total, task) => {
+    const hourlyRate = task.projects?.hourly_rate || 0
+    if (hourlyRate > 0) {
+      const completedHours = completedHoursByTask.get(task.id) || 0
+      const remainingHours = Math.max(0, task.estimated_hours - completedHours)
+      console.log(`📊 Billable task: ${task.title} - ${remainingHours}h remaining @ $${hourlyRate}/hr (Project: ${task.projects?.name})`)
+      return total + remainingHours
+    } else {
+      console.log(`❌ Non-billable task: ${task.title} - ${task.estimated_hours}h (Project: ${task.projects?.name}, Rate: $${hourlyRate}/hr)`)
+    }
+    return total
+  }, 0)
+  
+  console.log(`💰 Billable hours calculation: ${existingBillableHours}h remaining billable work, ${targetHours}h target`)
+  const hoursNeeded = Math.max(0, targetHours - existingBillableHours)
+  console.log(`🎯 Hours needed: ${hoursNeeded}h`)
+  
+  // Create placeholder tasks if we need more billable hours
+  let tasksToSchedule = [...unscheduledTasks]
+  if (hoursNeeded > 0) {
+    const placeholderTask = {
+      id: `placeholder-billable-${Date.now()}`,
+      title: `Billable Work`,
+      estimated_hours: hoursNeeded,
+      status: 'todo',
+      priority: 'medium',
+      projects: {
+        id: 'placeholder-project',
+        name: 'Billable Work',
+        hourly_rate: DEFAULT_HOURLY_RATE,
+        color: '#10B981' // Green color for billable work
+      },
+      isPlaceholder: true
+    }
+    tasksToSchedule.push(placeholderTask)
+  }
+
+  if (tasksToSchedule.length === 0) return new Map()
+
+  let allScheduledChunks: any[] = []
+  let remainingTasks = tasksToSchedule.map(task => {
+    const completedHours = completedHoursByTask.get(task.id) || 0
+    const remainingHours = Math.max(0, task.estimated_hours - completedHours)
+    
+    if (task.isPlaceholder) {
+      console.log(`🏷️ Placeholder task: ${task.title} - ${remainingHours}h remaining`)
+    } else {
+      console.log(`📋 Regular task: ${task.title} - ${task.estimated_hours}h estimated, ${completedHours}h completed, ${remainingHours}h remaining`)
+    }
     
     return {
       ...task,

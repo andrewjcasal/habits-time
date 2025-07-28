@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, Save, RotateCcw, Key, Calendar } from 'lucide-react'
+import { Clock, Save, RotateCcw, Key, Calendar, DollarSign } from 'lucide-react'
 import { useSettings } from '../hooks/useSettings'
 
 interface SettingsSectionProps {
@@ -62,6 +62,9 @@ const Settings = () => {
   const [weekEndingTimezone, setWeekEndingTimezone] = useState('America/New_York')
   const [weekendDays, setWeekendDays] = useState<string[]>(['saturday', 'sunday'])
   const [todoistApiKey, setTodoistApiKey] = useState('')
+  const [billableHoursEnabled, setBillableHoursEnabled] = useState(false)
+  const [defaultHourlyRate, setDefaultHourlyRate] = useState('65.00')
+  const [weeklyRevenueTarget, setWeeklyRevenueTarget] = useState('1000.00')
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
 
@@ -78,6 +81,9 @@ const Settings = () => {
         week_ending_timezone: weekEndingTimezone,
         weekend_days: weekendDays,
         todoist_api_key: todoistApiKey,
+        billable_hours_enabled: billableHoursEnabled,
+        default_hourly_rate: parseFloat(defaultHourlyRate) || 65.00,
+        weekly_revenue_target: parseFloat(weeklyRevenueTarget) || 1000.00,
       })
 
       setSaveMessage('Settings saved successfully!')
@@ -99,6 +105,9 @@ const Settings = () => {
     setWeekEndingTimezone('America/New_York')
     setWeekendDays(['saturday', 'sunday'])
     setTodoistApiKey('')
+    setBillableHoursEnabled(false)
+    setDefaultHourlyRate('65.00')
+    setWeeklyRevenueTarget('1000.00')
     setSaveMessage('')
   }
 
@@ -112,6 +121,9 @@ const Settings = () => {
       setWeekEndingTimezone(settings.week_ending_timezone || 'America/New_York')
       setWeekendDays(settings.weekend_days || ['saturday', 'sunday'])
       setTodoistApiKey(settings.todoist_api_key || '')
+      setBillableHoursEnabled(settings.billable_hours_enabled || false)
+      setDefaultHourlyRate((settings.default_hourly_rate || 65.00).toString())
+      setWeeklyRevenueTarget((settings.weekly_revenue_target || 1000.00).toString())
     }
   }, [settings])
 
@@ -282,6 +294,56 @@ const Settings = () => {
                     sync with Todoist.
                   </p>
                 </>
+              </SettingsSection>
+
+              {/* Billable Hours Section */}
+              <SettingsSection
+                icon={DollarSign}
+                title="Billable Hours"
+                description="Configure automatic billable hours tracking and placeholder task generation to meet weekly revenue targets."
+              >
+                <div className="space-y-4">
+                  <label className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={billableHoursEnabled}
+                      onChange={(e) => setBillableHoursEnabled(e.target.checked)}
+                      className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm font-medium text-neutral-700">
+                      Enable billable hours tracking
+                    </span>
+                  </label>
+
+                  {billableHoursEnabled && (
+                    <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-primary-100">
+                      <SettingsInput
+                        label="Default Hourly Rate ($)"
+                        type="number"
+                        value={defaultHourlyRate}
+                        onChange={setDefaultHourlyRate}
+                        placeholder="65.00"
+                      />
+                      <SettingsInput
+                        label="Weekly Revenue Target ($)"
+                        type="number"
+                        value={weeklyRevenueTarget}
+                        onChange={setWeeklyRevenueTarget}
+                        placeholder="1000.00"
+                      />
+                    </div>
+                  )}
+
+                  {billableHoursEnabled && (
+                    <div className="pl-6 border-l-2 border-primary-100">
+                      <p className="text-sm text-blue-800">
+                        <strong>Preview:</strong> Target {Math.ceil(parseFloat(weeklyRevenueTarget) / parseFloat(defaultHourlyRate))} hours per week 
+                        (${weeklyRevenueTarget} ÷ ${defaultHourlyRate}/hr). 
+                        Placeholder tasks will be created if billable hours fall short.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </SettingsSection>
 
               {/* Save Actions */}

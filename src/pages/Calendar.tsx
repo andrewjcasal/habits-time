@@ -511,18 +511,25 @@ const Calendar = () => {
             })
 
             const taskHeight = (task.estimated_hours || 1) * 64
+            const isPlaceholder = task.isPlaceholder || false
+            const taskClassName = isPlaceholder 
+              ? "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-green-50 border-green-400 text-green-800 opacity-60 cursor-pointer hover:opacity-80"
+              : "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-50 border-yellow-400 text-yellow-800 opacity-75 cursor-pointer hover:opacity-100"
 
             return (
               <div
                 key={`task-${task.id}`}
-                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-50 border-yellow-400 text-yellow-800 opacity-75 cursor-pointer hover:opacity-100"
+                className={taskClassName}
                 style={getEventStyle(topPositionInSlot, taskHeight, 5)}
                 onClick={e => {
                   e.stopPropagation()
                   handleTaskClick(task)
                 }}
               >
-                <div className="font-medium truncate flex-1">{task.title}</div>
+                <div className="font-medium truncate flex-1">
+                  {task.title}
+                  {isPlaceholder && <span className="text-xs ml-1 opacity-60">💰</span>}
+                </div>
                 <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
                   {task.estimated_hours}h
                 </div>
