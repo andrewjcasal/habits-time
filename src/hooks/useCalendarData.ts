@@ -338,6 +338,12 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
     return habits
       .filter(habit => {
+        // Only show habits that existed on this date
+        if (habit.created_at) {
+          const habitCreationDate = new Date(habit.created_at).toISOString().split('T')[0]
+          if (dateKey < habitCreationDate) return false
+        }
+        
         // Check if there's a daily log with a scheduled start time for this date
         const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
         
