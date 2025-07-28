@@ -18,12 +18,6 @@ export const getAvailableTimeBlocks = (
   const blocks = []
   const { start, end } = getWorkHoursRange()
   
-  
-  
-  if (start === 7 && end === 23) {
-    console.warn('⚠️ Using fallback work hours instead of user settings!')
-  }
-  
   // Don't filter by current time - allow scheduling from start of day
   // const now = new Date()
   // const isToday = format(now, 'yyyy-MM-dd') === dateStr
@@ -47,6 +41,8 @@ export const getAvailableTimeBlocks = (
       const meetingConflicts = meetingConflict ? [meetingConflict] : []
       const tasksDailyLogsConflicts = tasksDailyLogsConflict ? [tasksDailyLogsConflict] : []
 
+      console.log('habitConflicts', habitConflicts)
+
       const scheduledTasksInSlot = alreadyScheduledTasks.filter(
         task =>
           format(task.date, 'yyyy-MM-dd') === dateStr &&
@@ -60,20 +56,6 @@ export const getAvailableTimeBlocks = (
         meetingConflicts.length === 0 &&
         tasksDailyLogsConflicts.length === 0 &&
         scheduledTasksInSlot.length === 0
-
-      // Debug conflicts for today, especially around 5-6 PM
-      if (dateStr === format(new Date(), 'yyyy-MM-dd') && hour >= 17 && hour <= 18) {
-        console.log(`🔍 Checking slot ${timeSlot} (${timeInHours}h) on ${dateStr}:`, {
-          conflictKey,
-          available,
-          habitConflict: !!habitConflict,
-          habitConflictName: habitConflict?.name,
-          sessionConflict: !!sessionConflict,
-          meetingConflict: !!meetingConflict,
-          tasksDailyLogsConflict: !!tasksDailyLogsConflict,
-          scheduledTasksCount: scheduledTasksInSlot.length
-        })
-      }
 
       blocks.push({ timeInHours, timeSlot, available })
     }

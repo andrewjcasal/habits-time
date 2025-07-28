@@ -44,6 +44,29 @@ export const computeConflictMaps = (
           adjustedStartTime = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
         }
         
+        // Check for session conflicts and adjust habit time (after meeting conflicts)
+        const conflictingSession = sessionsData.find(session => {
+          if (!session.actual_start_time || session.scheduled_date !== dateStr) return false
+          
+          const timeOnly = session.actual_start_time.split(/[+-]/)[0] // Remove timezone part
+          const [sessionHours, sessionMinutes] = timeOnly.split(':').map(Number)
+          const sessionStartInHours = sessionHours + sessionMinutes / 60
+          const sessionDuration = (session.scheduled_hours || 1) // Duration in hours
+          const sessionEndInHours = sessionStartInHours + sessionDuration
+          
+          // Check if habit conflicts with session (using adjusted start time from meeting conflicts)
+          const habitEndInHours = adjustedStartTime + duration / 60
+          return adjustedStartTime < sessionEndInHours && habitEndInHours > sessionStartInHours
+        })
+        
+        if (conflictingSession) {
+          const timeOnly = conflictingSession.actual_start_time.split(/[+-]/)[0]
+          const [sessionHours, sessionMinutes] = timeOnly.split(':').map(Number)
+          const sessionDuration = (conflictingSession.scheduled_hours || 1)
+          const sessionEndInHours = sessionHours + sessionMinutes / 60 + sessionDuration
+          adjustedStartTime = sessionEndInHours
+        }
+        
         const adjustedEndTime = adjustedStartTime + duration / 60
         
         // Mark all affected time slots in 15-minute increments
@@ -51,10 +74,6 @@ export const computeConflictMaps = (
           const key = `${dateStr}-${time}`
           habitConflicts.set(key, habit)
           
-          // Debug habit conflicts around 5-6 PM for today
-          if (dateStr === format(new Date(), 'yyyy-MM-dd') && time >= 17 && time <= 18) {
-            console.log(`📝 Registered habit conflict: ${key} for "${habit.name}" (${adjustedStartTime}h-${adjustedEndTime}h)`)
-          }
         }
       }
     })
