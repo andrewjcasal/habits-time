@@ -61,14 +61,17 @@ export const getAvailableTimeBlocks = (
         tasksDailyLogsConflicts.length === 0 &&
         scheduledTasksInSlot.length === 0
 
-      // Debug conflicts for today
-      if (dateStr === format(new Date(), 'yyyy-MM-dd') && !available && hour >= 10 && hour <= 22) {
-        console.log(`🚫 Conflict at ${timeSlot} on ${dateStr}:`, {
-          habits: habitConflicts.length,
-          sessions: sessionConflicts.length, 
-          meetings: meetingConflicts.length,
-          tasksDailyLogs: tasksDailyLogsConflicts.length,
-          scheduledTasks: scheduledTasksInSlot.length
+      // Debug conflicts for today, especially around 5-6 PM
+      if (dateStr === format(new Date(), 'yyyy-MM-dd') && hour >= 17 && hour <= 18) {
+        console.log(`🔍 Checking slot ${timeSlot} (${timeInHours}h) on ${dateStr}:`, {
+          conflictKey,
+          available,
+          habitConflict: !!habitConflict,
+          habitConflictName: habitConflict?.name,
+          sessionConflict: !!sessionConflict,
+          meetingConflict: !!meetingConflict,
+          tasksDailyLogsConflict: !!tasksDailyLogsConflict,
+          scheduledTasksCount: scheduledTasksInSlot.length
         })
       }
 
@@ -166,7 +169,8 @@ export const scheduleAllTasks = async (
   saveTaskChunks: any,
   clearTaskLogsForDate: any,
   userId: string,
-  tasksDailyLogsData: any[] = []
+  tasksDailyLogsData: any[] = [],
+  weekendDays: string[] = []
 ) => {
   const unscheduledTasks = tasksData.filter(
     task =>
@@ -216,7 +220,8 @@ export const scheduleAllTasks = async (
           { ...task, isAutoScheduled: true },
           conflictMaps,
           getWorkHoursRange,
-          allScheduledChunks
+          allScheduledChunks,
+          weekendDays
         )
 
         if (scheduledChunks.length > 0) {
