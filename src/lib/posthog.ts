@@ -9,7 +9,7 @@ export const initPostHog = () => {
       capture_pageleave: true,
       loaded: posthog => {
         if (import.meta.env.DEV) {
-          console.log('PostHog loaded')
+          
           posthog.debug()
         }
       },

@@ -50,6 +50,11 @@ export const computeConflictMaps = (
         for (let time = Math.floor(adjustedStartTime * 4) / 4; time < adjustedEndTime; time += 0.25) {
           const key = `${dateStr}-${time}`
           habitConflicts.set(key, habit)
+          
+          // Debug habit conflicts around 5-6 PM for today
+          if (dateStr === format(new Date(), 'yyyy-MM-dd') && time >= 17 && time <= 18) {
+            console.log(`📝 Registered habit conflict: ${key} for "${habit.name}" (${adjustedStartTime}h-${adjustedEndTime}h)`)
+          }
         }
       }
     })

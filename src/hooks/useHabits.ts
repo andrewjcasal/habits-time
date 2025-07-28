@@ -33,21 +33,13 @@ export function useHabits(selectedDate?: string) {
       // Check if we should auto-uncheck habits based on sleep start time
       await checkAndResetHabitsAfterSleep()
 
-      // First, let's check what habits exist for this user
-      const { data: allHabits, error: allError } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', user.id)
-
-      console.log('All habits for user:', allHabits)
-
       // Also check visible habits
       const { data: visibleHabits, error: visibleError } = await supabase
         .from('habits')
         .select('*')
         .eq('is_visible', true)
 
-      console.log('All visible habits:', visibleHabits)
+      
 
       // Get the most recent sleep start time from habits_time_logs
       const { data: recentSleep } = await supabase
@@ -63,7 +55,7 @@ export function useHabits(selectedDate?: string) {
       if (recentSleep?.start_time) {
         const sleepDate = new Date(recentSleep.start_time)
         currentSleepStartTime = sleepDate.toTimeString().split(' ')[0] // Get HH:MM:SS format
-        console.log('Most recent sleep start time:', currentSleepStartTime)
+        
       }
 
       setSleepStartTime(currentSleepStartTime)
@@ -85,10 +77,6 @@ export function useHabits(selectedDate?: string) {
         .eq('habits_daily_logs.log_date', today) // Only selected date's logs for checked status
 
       const { data, error } = await query.order('current_start_time', { ascending: true })
-
-      console.log("Habits with today's logs only:", JSON.stringify(data, null, 2))
-
-      console.log('Habits query result:', { data, error })
 
       if (error) throw error
 
@@ -311,7 +299,7 @@ export function useHabits(selectedDate?: string) {
 
       // Only reset if we found a sleep log AND it has ended (indicating wake up)
       if (sleepError || !sleepLog || !sleepLog.end_time) {
-        console.log('No completed sleep cycle found, not resetting habits')
+        
         return
       }
 
@@ -319,14 +307,14 @@ export function useHabits(selectedDate?: string) {
       const sleepEndTime = new Date(sleepLog.end_time)
       const now = new Date()
 
-      console.log('Sleep cycle:', sleepStartTime, 'to', sleepEndTime, 'Current time:', now)
+      
 
       // Only reset habits if we've woken up from sleep (past end_time)
       // AND the sleep was from today (started after midnight today)
       const todayStart = new Date(today + 'T00:00:00Z')
 
       if (now > sleepEndTime && sleepStartTime >= todayStart) {
-        console.log("Woken up from today's sleep, resetting habits")
+        
         // Reset all habit completions for today
         const { error: resetError } = await supabase
           .from('habits_daily_logs')
@@ -338,7 +326,7 @@ export function useHabits(selectedDate?: string) {
           console.error('Error resetting habits after sleep:', resetError)
         }
       } else {
-        console.log('Still in sleep cycle or sleep was from yesterday, keeping habits as-is')
+        
       }
     } catch (err) {
       console.error('Error checking sleep status:', err)
@@ -365,16 +353,16 @@ export function useHabits(selectedDate?: string) {
       return isNotCompleted
     })
 
-    console.log('abc 555', uncompletedHabitsAfterSleep)
+    
     if (uncompletedHabitsAfterSleep.length === 0) {
-      console.log('abc 666')
+      
       // If no uncompleted habits after sleep, default to first habit after sleep time
       const habitsAfterSleep = habits.filter(habit => {
         if (!sleepStartTime || !habit.current_start_time) return true
         return habit.current_start_time > sleepStartTime
       })
 
-      console.log('habits sleep', habitsAfterSleep)
+      
       return habitsAfterSleep[0] || habits[0]
     }
 

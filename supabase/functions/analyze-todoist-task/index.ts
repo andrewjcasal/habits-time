@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    console.log(`Analyzing task: ${title}`)
+    
 
     // Create content hash for change detection
     const contentHash = await crypto.subtle.digest(
@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (existingTask) {
-      console.log('Task content unchanged, returning cached analysis')
+      
       return new Response(
         JSON.stringify({
           success: true,
@@ -192,7 +192,7 @@ Respond with JSON only:
       })
     }
 
-    console.log(`Task categorized as: ${aiResponse.category}`)
+    
 
     return new Response(
       JSON.stringify({

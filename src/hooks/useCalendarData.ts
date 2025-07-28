@@ -28,7 +28,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     tasksDailyLogsConflicts: new Map()
   })
 
-  const { getWorkHoursRange } = useSettings()
+  const { settings, getWorkHoursRange } = useSettings()
   const { saveTaskChunks, clearTaskLogsForDate } = useTaskDailyLogs()
 
   // Don't reset on date changes - keep cached tasks
@@ -47,7 +47,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   // Load data once and cache tasks intelligently
   useEffect(() => {
     const loadAndProcessAllCalendarData = async () => {
-      console.log('📊 Starting optimized calendar data load...')
+      
       setIsDataLoading(true)
       
       try {
@@ -69,7 +69,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setTasksDailyLogs(fetchedTasksDailyLogs)
         setIsDataLoading(false) // Show partial data immediately
         
-        console.log('🔍 Base data loaded, showing partial UI')
+        
 
         // Create work hours range function using fetched settings
         const getWorkHoursRangeFromSettings = () => {
@@ -81,7 +81,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           const start = parseInt(fetchedSettings.work_hours_start.split(':')[0], 10)
           const end = parseInt(fetchedSettings.work_hours_end.split(':')[0], 10)
           
-          console.log(`✅ Using settings work hours: ${start}:00 - ${end}:00`)
+          
           return { start, end }
         }
 
@@ -105,7 +105,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const needsRegeneration = !tasksScheduled || dataHash !== newDataHash
 
         if (needsRegeneration) {
-          console.log('🔄 Data changed, regenerating task schedule...')
+          
           setDataHash(newDataHash)
 
           // Clear today's task logs only when regenerating
@@ -122,7 +122,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               saveTaskChunks,
               clearTaskLogsForDate,
               user.id,
-              filteredTasksDailyLogs
+              filteredTasksDailyLogs,
+              fetchedSettings?.weekend_days || ['saturday', 'sunday']
             )
             setScheduledTasksCache(scheduledTasksResult)
             setTasksScheduled(true)
@@ -246,7 +247,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     
     const newDataHash = createDataHash(habits, sessions, meetings, allTasks, tasksDailyLogs)
     if (dataHash !== newDataHash) {
-      console.log('🔄 Data changed, triggering immediate regeneration...')
+      
       
       // Trigger immediate regeneration
       const regenerateTasks = async () => {
@@ -279,7 +280,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               saveTaskChunks,
               clearTaskLogsForDate,
               user.id,
-              filteredTasksDailyLogs
+              filteredTasksDailyLogs,
+              settings?.weekend_days || ['saturday', 'sunday']
             )
             setScheduledTasksCache(scheduledTasksResult)
             
@@ -333,8 +335,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const getHabitsForTimeSlot = (timeSlot: string, date: Date) => {
     const currentHour = parseInt(timeSlot.split(':')[0])
     const dateKey = format(date, 'yyyy-MM-dd')
-
-    console.log(`🔍 Getting habits for time slot ${timeSlot} on ${dateKey}, currentHour: ${currentHour}`)
 
     return habits
       .filter(habit => {
@@ -412,7 +412,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         // Check if habit starts within this hour slot (handles 30-minute start times like 9:30)
         const shouldShow = habitStartHour === currentHour
-        console.log(`🔍 Habit "${habit.name}" - habitStartHour: ${habitStartHour}, currentHour: ${currentHour}, shouldShow: ${shouldShow}, effectiveStartTime: ${effectiveStartTime}`)
         return shouldShow
       })
       .map(habit => {

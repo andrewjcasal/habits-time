@@ -28,7 +28,7 @@ import FeedbackButton from '../components/FeedbackButton'
 const MainLayout = () => {
   const location = useLocation()
   const { signOut } = useAuth()
-  console.log(location)
+
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 

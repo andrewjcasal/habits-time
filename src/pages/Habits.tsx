@@ -209,12 +209,10 @@ const Habits = () => {
   }, [user])
 
   useEffect(() => {
-    console.log('abc')
     // Auto-select the next habit when habits load
     if (habits.length > 0 && !selectedHabitId) {
-      console.log('abc 123')
       const nextHabit = getNextHabit()
-      console.log('abc next', nextHabit)
+
       setSelectedHabitId(nextHabit?.id || null)
     }
   }, [habits, selectedHabitId])

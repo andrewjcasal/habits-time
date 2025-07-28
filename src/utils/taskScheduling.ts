@@ -4,13 +4,21 @@ export const getAvailableTimeBlocks = (
   date: Date, 
   conflictMaps: any, 
   getWorkHoursRange: () => { start: number; end: number },
-  alreadyScheduledTasks: any[] = []
+  alreadyScheduledTasks: any[] = [],
+  weekendDays: string[] = []
 ) => {
-  const blocks = []
   const dateStr = format(date, 'yyyy-MM-dd')
+  
+  // Skip weekend days for task scheduling
+  const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+  if (weekendDays.includes(dayOfWeek)) {
+    return []
+  }
+  
+  const blocks = []
   const { start, end } = getWorkHoursRange()
   
-  console.log(`🕐 Work hours for ${dateStr}: ${start}:00 - ${end}:00`)
+  
   
   if (start === 7 && end === 23) {
     console.warn('⚠️ Using fallback work hours instead of user settings!')
@@ -77,9 +85,10 @@ export const scheduleTaskInAvailableSlots = (
   taskInfo: any,
   conflictMaps: any,
   getWorkHoursRange: () => { start: number; end: number },
-  alreadyScheduledTasks: any[] = []
+  alreadyScheduledTasks: any[] = [],
+  weekendDays: string[] = []
 ) => {
-  const availableBlocks = getAvailableTimeBlocks(date, conflictMaps, getWorkHoursRange, alreadyScheduledTasks)
+  const availableBlocks = getAvailableTimeBlocks(date, conflictMaps, getWorkHoursRange, alreadyScheduledTasks, weekendDays)
   const scheduledChunks = []
   let remainingHours = taskHours
 
@@ -130,7 +139,7 @@ export const scheduleTaskInAvailableSlots = (
     const chunkEndTime = currentChunkStart + chunkHours
     const adjustedChunkHours = chunkEndTime > end ? end - currentChunkStart : chunkHours
     
-    console.log(`📋 Final chunk: start=${currentChunkStart}, hours=${chunkHours}, adjustedHours=${adjustedChunkHours}, workEnd=${end}`)
+    
     
     if (adjustedChunkHours > 0) {
       scheduledChunks.push({
@@ -184,7 +193,7 @@ export const scheduleAllTasks = async (
     const completedHours = completedHoursByTask.get(task.id) || 0
     const remainingHours = Math.max(0, task.estimated_hours - completedHours)
     
-    console.log(`📊 Task "${task.title}": estimated=${task.estimated_hours}h, completed=${completedHours}h, remaining=${remainingHours}h`)
+    
     
     return {
       ...task,
@@ -194,7 +203,6 @@ export const scheduleAllTasks = async (
 
   for (const dayColumn of dayColumns) {
     if (remainingTasks.length === 0) break
-    console.log('dayColumn', dayColumn)
 
     let scheduledOnThisDay = true
     while (scheduledOnThisDay && remainingTasks.length > 0) {
@@ -224,8 +232,6 @@ export const scheduleAllTasks = async (
           )
           task.remainingHours -= totalScheduledHours
 
-          console.log(`📅 Scheduled ${totalScheduledHours}h for "${task.title}" on ${format(dayColumn.date, 'yyyy-MM-dd')}, remaining: ${task.remainingHours}h`)
-
           if (task.remainingHours <= 0) {
             remainingTasks = remainingTasks.filter(t => t.id !== task.id)
             scheduledOnThisDay = true
@@ -234,7 +240,6 @@ export const scheduleAllTasks = async (
           }
           break
         } else {
-          console.log(`❌ No slots found for "${task.title}" on ${format(dayColumn.date, 'yyyy-MM-dd')}`)
         }
       }
     }
@@ -260,7 +265,6 @@ export const scheduleAllTasks = async (
   if (todayChunks.length > 0) {
     try {
       await saveTaskChunks(todayChunks, userId)
-      console.log(`Persisted ${todayChunks.length} task chunks for today`)
     } catch (error) {
       console.error('Error persisting task chunks:', error)
     }

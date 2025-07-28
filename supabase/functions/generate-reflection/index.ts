@@ -301,7 +301,6 @@ Return JSON array of the ${numMatches} best matches that would provide valuable 
         
         if (endIndex !== -1) {
           cleanContent = cleanContent.substring(startIndex, endIndex + 1);
-          console.log('DEBUG - Extracted JSON array:', cleanContent.substring(0, 500) + '...')
         } else {
           console.log('DEBUG - Could not find matching closing bracket')
         }

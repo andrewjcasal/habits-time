@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase'
 
 export const fetchAllCalendarData = async (userId: string) => {
-  console.log('⚡ Fetching all calendar data sources in parallel...')
+  
   
   // Add timeout wrapper for each query
   const withTimeout = <T>(promise: Promise<T>, ms: number = 5000): Promise<T> => {
@@ -46,7 +46,7 @@ export const fetchAllCalendarData = async (userId: string) => {
       console.warn(`⚠️ Failed to fetch: ${failures.join(', ')}`)
     }
 
-    console.log(`📊 Fetched: ${habits.length} habits, ${sessions.length} sessions, ${projects.length} projects, ${meetings.length} meetings, ${tasksDailyLogs.length} task daily logs, settings: ${settings ? 'loaded' : 'not found'}`)
+    
 
     return { habits, sessions, projects, meetings, tasksDailyLogs, settings }
   } catch (error) {
@@ -57,7 +57,7 @@ export const fetchAllCalendarData = async (userId: string) => {
 }
 
 export const fetchTasksForProjects = async (userId: string, projects: any[], sessions: any[]) => {
-  console.log('⚡ Fetching tasks for projects without sessions...')
+  
   
   if (projects.length === 0) return []
 
@@ -84,6 +84,6 @@ export const fetchTasksForProjects = async (userId: string, projects: any[], ses
     project: task.projects
   }))
 
-  console.log(`📝 Fetched ${tasks.length} tasks`)
+  
   return tasks
 }

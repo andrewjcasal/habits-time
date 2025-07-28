@@ -9,6 +9,7 @@ interface UserSettings {
   week_ending_day: string // 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
   week_ending_time: string // HH:MM format
   week_ending_timezone: string // e.g., 'America/New_York'
+  weekend_days: string[] // Array of weekday names like ['saturday', 'sunday']
   todoist_api_key?: string
   created_at?: string
   updated_at?: string
@@ -60,6 +61,7 @@ export const useSettings = (): UseSettingsReturn => {
           week_ending_day: 'sunday',
           week_ending_time: '20:30',
           week_ending_timezone: 'America/New_York',
+          weekend_days: ['saturday', 'sunday'],
         }
 
         const { data: newSettings, error: createError } = await supabase
@@ -87,6 +89,7 @@ export const useSettings = (): UseSettingsReturn => {
           week_ending_day: 'sunday',
           week_ending_time: '20:30',
           week_ending_timezone: 'America/New_York',
+          weekend_days: ['saturday', 'sunday'],
         })
       }
     } finally {

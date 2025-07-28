@@ -60,6 +60,7 @@ const Settings = () => {
   const [weekEndingDay, setWeekEndingDay] = useState('sunday')
   const [weekEndingTime, setWeekEndingTime] = useState('20:30')
   const [weekEndingTimezone, setWeekEndingTimezone] = useState('America/New_York')
+  const [weekendDays, setWeekendDays] = useState<string[]>(['saturday', 'sunday'])
   const [todoistApiKey, setTodoistApiKey] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
@@ -75,6 +76,7 @@ const Settings = () => {
         week_ending_day: weekEndingDay,
         week_ending_time: weekEndingTime,
         week_ending_timezone: weekEndingTimezone,
+        weekend_days: weekendDays,
         todoist_api_key: todoistApiKey,
       })
 
@@ -95,6 +97,7 @@ const Settings = () => {
     setWeekEndingDay('sunday')
     setWeekEndingTime('20:30')
     setWeekEndingTimezone('America/New_York')
+    setWeekendDays(['saturday', 'sunday'])
     setTodoistApiKey('')
     setSaveMessage('')
   }
@@ -107,6 +110,7 @@ const Settings = () => {
       setWeekEndingDay(settings.week_ending_day || 'sunday')
       setWeekEndingTime(settings.week_ending_time || '20:30')
       setWeekEndingTimezone(settings.week_ending_timezone || 'America/New_York')
+      setWeekendDays(settings.weekend_days || ['saturday', 'sunday'])
       setTodoistApiKey(settings.todoist_api_key || '')
     }
   }, [settings])
@@ -165,6 +169,37 @@ const Settings = () => {
                     minute: '2-digit',
                     hour12: true,
                   })}
+                </p>
+              </SettingsSection>
+
+              {/* Weekend Days Section */}
+              <SettingsSection
+                icon={Calendar}
+                title="Weekend Days"
+                description="Select which days are considered weekends and should be excluded from task scheduling."
+              >
+                <div className="grid grid-cols-4 gap-2">
+                  {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                    <label key={day} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={weekendDays.includes(day)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setWeekendDays([...weekendDays, day])
+                          } else {
+                            setWeekendDays(weekendDays.filter(d => d !== day))
+                          }
+                        }}
+                        className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm capitalize">{day}</span>
+                    </label>
+                  ))}
+                </div>
+                
+                <p className="text-sm text-blue-800">
+                  <strong>Selected weekend days:</strong> {weekendDays.length > 0 ? weekendDays.map(day => day.charAt(0).toUpperCase() + day.slice(1)).join(', ') : 'None'}
                 </p>
               </SettingsSection>
 

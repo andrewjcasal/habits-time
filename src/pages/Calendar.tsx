@@ -366,9 +366,15 @@ const Calendar = () => {
   }, [showActualHoursTooltip, showPlannedHoursTooltip])
 
   // Common styles for all calendar events
-  const getEventStyle = (topPosition: number, height: number, zIndex: number = 5) => ({
-    left: '0',
-    width: '93%',
+  const getEventStyle = (
+    topPosition: number,
+    height: number,
+    zIndex: number = 5,
+    leftOffset: number = 0,
+    widthFraction: number = 1
+  ) => ({
+    left: `${leftOffset}%`,
+    width: `${93 * widthFraction}%`,
     top: `${topPosition}%`,
     height: `${height - 2}px`, // Reduce height by 2px for separation
     zIndex,
@@ -401,40 +407,32 @@ const Calendar = () => {
         tasksInSlot.length +
         tasksDailyLogsInSlot.length
       if (totalBlocks > 0) {
-        console.log(
-          `📅 Time Slot ${dateStr} ${timeSlot} (${
-            isPast ? 'PAST' : isToday ? 'TODAY' : 'FUTURE'
-          }):`,
-          {
-            totalBlocks,
-            habits: { count: habitsInSlot.length },
-            sessions: { count: sessionsInSlot.length },
-            meetings: { count: meetingsInSlot.length },
-            tasks: { count: tasksInSlot.length },
-            tasksDailyLogs: { count: tasksDailyLogsInSlot.length },
-          }
-        )
       }
+
+      // Calculate vertical offsets to stack items without overlap
+      let currentVerticalOffset = 0
+      const baseItemHeight = 32 // Base height for calculating offsets
 
       return (
         <>
           {/* Habits */}
-          {habitsInSlot.map(habit => {
+          {habitsInSlot.map((habit, index) => {
             // Calculate effective duration (daily log override or default habit duration)
             const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateStr)
             const effectiveDuration = dailyLog?.duration || habit.duration || 0
             const habitHeight = effectiveDuration ? (effectiveDuration / 60) * 64 : 64
             const isRescheduled = habit.isRescheduled || false
 
-            console.log(
-              `🔵 Rendering Habit: ${habit.name} at ${timeSlot}, effective duration: ${effectiveDuration}min`
-            )
+            // Calculate position with vertical offset
+            const baseTopPosition = habit.topPosition || 0
+            const verticalOffset = index * baseItemHeight
+            const adjustedTopPosition = baseTopPosition + (verticalOffset / 64) * 100
 
             return (
               <div
                 key={`habit-${habit.id}`}
                 className={`absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-blue-50 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors`}
-                style={getEventStyle(habit.topPosition, habitHeight)}
+                style={getEventStyle(adjustedTopPosition, habitHeight)}
                 onClick={e => {
                   e.stopPropagation()
                   handleHabitClick(habit, date)
@@ -456,16 +454,19 @@ const Calendar = () => {
           })}
 
           {/* Sessions */}
-          {sessionsInSlot.map(session => {
+          {sessionsInSlot.map((session, index) => {
             const sessionHeight = session.scheduled_hours * 64
 
-            console.log(`🟣 Rendering Session: ${session.projects?.name} at ${timeSlot}`)
+            // Calculate position after habits
+            const baseTopPosition = session.topPosition || 0
+            const verticalOffset = (habitsInSlot.length + index) * baseItemHeight
+            const adjustedTopPosition = baseTopPosition + (verticalOffset / 64) * 100
 
             return (
               <div
                 key={`session-${session.id}`}
                 className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-purple-50 border-purple-400 text-purple-800"
-                style={getEventStyle(session.topPosition, sessionHeight, 10)}
+                style={getEventStyle(adjustedTopPosition, sessionHeight, 10)}
               >
                 <div className="font-medium truncate flex-1">
                   {session.projects?.name || 'Project Session'}
@@ -484,10 +485,32 @@ const Calendar = () => {
 
             // Calculate position within the starting hour slot
             const minutesIntoHour = (taskStartTime - currentHour) * 60
-            const topPositionInSlot = (minutesIntoHour / 60) * 100
-            const taskHeight = (task.estimated_hours || 1) * 64
+            let topPositionInSlot = (minutesIntoHour / 60) * 100
 
-            console.log(`🟡 Rendering Task: ${task.title} at ${timeSlot}`)
+            // Check if there are habits in this slot that would end during this hour
+            habitsInSlot.forEach(habit => {
+              const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateStr)
+              const effectiveDuration = dailyLog?.duration || habit.duration || 0
+
+              // Parse habit start time correctly (e.g., "17:30" -> 17.5)
+              const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+              const [habitHour, habitMinute] = effectiveStartTime
+                ? effectiveStartTime.split(':').map(Number)
+                : [currentHour, 0]
+              const habitStartTime = habitHour + habitMinute / 60
+              const habitEndTime = habitStartTime + effectiveDuration / 60
+
+              // If habit ends in this time slot and after task start time, adjust task position
+              if (habitEndTime > taskStartTime && habitStartTime <= currentHour + 1) {
+                const habitEndMinutes = (habitEndTime - currentHour) * 60
+                const habitEndPosition = (habitEndMinutes / 60) * 100
+                if (habitEndPosition > topPositionInSlot) {
+                  topPositionInSlot = habitEndPosition
+                }
+              }
+            })
+
+            const taskHeight = (task.estimated_hours || 1) * 64
 
             return (
               <div
@@ -515,8 +538,6 @@ const Calendar = () => {
             const topPositionInSlot = (minutesIntoHour / 60) * 100
             const meetingDuration = (meetingEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
             const meetingHeight = (meetingDuration / 60) * 64
-
-            console.log(`🟢 Rendering Meeting: ${meeting.title} at ${timeSlot}`)
 
             return (
               <div

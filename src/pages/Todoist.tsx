@@ -139,8 +139,6 @@ const Todoist = () => {
       setLoading(true)
       setError(null)
 
-      console.log('Fetching Todoist tasks...')
-
       const { data, error: functionError } = await supabase.functions.invoke('todoist-sync')
 
       if (functionError) {
@@ -149,18 +147,6 @@ const Todoist = () => {
 
       if (data.error) {
         throw new Error(data.error)
-      }
-
-      console.log('Todoist data received:', data)
-
-      // Debug the specific task from API
-      const debugTask = data.tasks.all?.find(t => t.id === '9284835213')
-      if (debugTask) {
-        console.log('=== TASK FROM API ===')
-        console.log('API Task ID:', debugTask.id)
-        console.log('API Title:', debugTask.title)
-        console.log('API Description:', debugTask.description)
-        console.log('API AI Category:', debugTask.aiCategory)
       }
 
       const newTodayTodos = data.tasks.today || []
@@ -177,37 +163,17 @@ const Todoist = () => {
 
       // Create a lookup of all current tasks (might be empty on first load)
       const allCurrentTasks = [...todayTodos, ...overdueTodos, ...inboxTodos, ...allTodos]
-      console.log('Total current tasks for lookup:', allCurrentTasks.length)
 
       if (allCurrentTasks.length > 0) {
         // We have local state - do change detection
-        const currentTaskLookup = allCurrentTasks.reduce(
-          (acc, task) => {
-            acc[task.id] = task
-            return acc
-          },
-          {} as Record<string, TodoItem>
-        )
+        const currentTaskLookup = allCurrentTasks.reduce((acc, task) => {
+          acc[task.id] = task
+          return acc
+        }, {} as Record<string, TodoItem>)
 
         // Compare with ALL new tasks to find content changes
         newAllTodos.forEach(newTask => {
           const oldTask = currentTaskLookup[newTask.id]
-
-          // Debug specific task
-          if (newTask.id === '9284835213') {
-            console.log('=== DEBUG TASK 9284835213 ===')
-            console.log('Old task exists:', !!oldTask)
-            console.log('Old task has aiCategory:', oldTask?.aiCategory)
-            console.log('Old title:', oldTask?.title)
-            console.log('New title:', newTask.title)
-            console.log('Old description:', oldTask?.description)
-            console.log('New description:', newTask.description)
-            console.log('Title changed:', oldTask?.title !== newTask.title)
-            console.log(
-              'Description changed:',
-              (oldTask.description || '') !== (newTask.description || '')
-            )
-          }
 
           if (oldTask && oldTask.aiCategory) {
             // Check if title or description changed
@@ -228,7 +194,6 @@ const Todoist = () => {
           }
         })
       } else {
-        console.log('No local state for comparison - will rely on backend content hash detection')
         // On first load or empty state, the backend should handle content hash comparison
         // Any tasks with existing AI categories but different content will need re-analysis
         // This should be handled by the backend content hash logic
@@ -364,7 +329,6 @@ const Todoist = () => {
       return
     }
 
-    console.log(`Starting analysis for task ${task.id}: "${task.title}"`)
     setAnalyzingTasks(prev => new Set(prev).add(task.id))
 
     try {
@@ -388,8 +352,6 @@ const Todoist = () => {
         console.error('Data error for task', task.id, ':', data.error)
         throw new Error(data.error)
       }
-
-      console.log(`Analysis complete for task ${task.id}:`, data)
 
       // Update task in all arrays
       const updateTask = (todos: TodoItem[]) =>
@@ -544,8 +506,6 @@ const Todoist = () => {
       setOverdueTodos(updateTask)
       setInboxTodos(updateTask)
       setAllTodos(updateTask)
-
-      console.log('✅ Task description updated with conversation in Todoist')
     } catch (err) {
       console.error('Error updating task description with conversation:', err)
       // Don't throw - this shouldn't break the chat flow
@@ -641,7 +601,6 @@ const Todoist = () => {
     )
 
     // TODO: Call Todoist API to actually complete the task
-    console.log('TODO: Implement task completion via Todoist API for task:', id)
   }
 
   const formatDate = (dateString: string) => {

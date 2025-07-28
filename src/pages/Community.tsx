@@ -68,7 +68,7 @@ const Community = () => {
 
   const handleSubmitPost = (postData: any) => {
     // Handle post submission logic here
-    console.log('Post submitted:', postData)
+
     setIsCreatePostModalOpen(false)
   }
 

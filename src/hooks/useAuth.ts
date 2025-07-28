@@ -15,7 +15,6 @@ export function useAuth() {
     }, 10000) // 10 second timeout
 
     // Get initial session
-    console.log('🔍 Auth: Checking initial session...')
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       setUser(session?.user ?? null)
       setIsLoading(false)
@@ -30,14 +29,12 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔍 Auth: State change event:', event, { session: !!session, user: !!session?.user })
       const newUser = session?.user ?? null
       setUser(newUser)
       setIsLoading(false)
 
       // Only redirect on specific auth events, not on token refresh
       if (event === 'SIGNED_OUT' && !newUser) {
-        console.log('🚪 Auth: Signing out, redirecting to login')
         navigate('/login')
       }
       // Don't redirect on SIGNED_IN as it can interfere with navigation

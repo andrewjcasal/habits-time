@@ -578,7 +578,6 @@ const TimeTracker = () => {
         .lte('start_time', endOfSelectedDay.toISOString())
         .order('start_time', { ascending: false })
 
-        console.log('data', data)
       if (error) {
         throw error
       }
