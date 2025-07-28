@@ -40,6 +40,37 @@ export const handleHabitTimeChange = async (
   }
 }
 
+export const handleHabitSkip = async (
+  habitId: string, 
+  date: string
+) => {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    // Insert or update the daily log to mark as skipped
+    const { error } = await supabase.from('habits_daily_logs').upsert(
+      {
+        habit_id: habitId,
+        user_id: user.id,
+        log_date: date,
+        is_skipped: true,
+        scheduled_start_time: null, // Clear any scheduled time
+      },
+      {
+        onConflict: 'habit_id,user_id,log_date',
+      }
+    )
+
+    if (error) throw error
+  } catch (error) {
+    console.error('Error skipping habit:', error)
+    throw error
+  }
+}
+
 export const handleCompleteTask = async (selectedTask: any) => {
   if (!selectedTask) return
   try {

@@ -86,6 +86,7 @@ export type HabitDailyLog = {
   actual_start_time: string | null
   actual_end_time: string | null
   is_completed: boolean
+  is_skipped: boolean
   notes: string | null
 }
 

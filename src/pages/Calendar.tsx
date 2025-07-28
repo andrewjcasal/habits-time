@@ -11,6 +11,7 @@ import CalendarTaskModal from '../components/CalendarTaskModal'
 import HabitModal from '../components/HabitModal'
 import {
   handleHabitTimeChange,
+  handleHabitSkip,
   handleCompleteTask,
   handleDeleteTask,
 } from '../utils/calendarDatabaseOperations'
@@ -321,6 +322,21 @@ const Calendar = () => {
       setScheduledTasksCache(new Map())
     } catch (error) {
       console.error('Error updating habit:', error)
+      throw error
+    }
+  }
+
+  const handleHabitSkipWithReset = async (
+    habitId: string,
+    date: string
+  ) => {
+    try {
+      await handleHabitSkip(habitId, date)
+      // Reset task scheduling to recalculate available slots with skipped habit
+      setTasksScheduled(false)
+      setScheduledTasksCache(new Map())
+    } catch (error) {
+      console.error('Error skipping habit:', error)
       throw error
     }
   }
@@ -938,6 +954,7 @@ const Calendar = () => {
         habit={selectedHabit}
         selectedDate={selectedHabitDate}
         onTimeChange={handleHabitTimeChangeWithReset}
+        onSkip={handleHabitSkipWithReset}
       />
     </div>
   )

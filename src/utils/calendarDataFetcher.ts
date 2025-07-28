@@ -3,26 +3,57 @@ import { supabase } from '../lib/supabase'
 export const fetchAllCalendarData = async (userId: string) => {
   console.log('⚡ Fetching all calendar data sources in parallel...')
   
-  // Fetch all data sources in parallel
-  const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, settingsResult] = await Promise.all([
-    supabase.from('habits').select('*, habits_daily_logs(*)').eq('user_id', userId).eq('is_visible', true),
-    supabase.from('sessions').select('*, projects(*)').eq('user_id', userId),
-    supabase.from('projects').select('*').eq('user_id', userId),
-    supabase.from('meetings').select('*').eq('user_id', userId),
-    supabase.from('tasks_daily_logs').select('*, tasks!inner(*, projects(*))').eq('user_id', userId),
-    supabase.from('user_settings').select('*').eq('user_id', userId).single()
-  ])
+  // Add timeout wrapper for each query
+  const withTimeout = <T>(promise: Promise<T>, ms: number = 5000): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error(`Query timeout after ${ms}ms`)), ms)
+      )
+    ])
+  }
 
-  const habits = habitsResult.data || []
-  const sessions = sessionsResult.data || []
-  const projects = projectsResult.data || []
-  const meetings = meetingsResult.data || []
-  const tasksDailyLogs = tasksDailyLogsResult.data || []
-  const settings = settingsResult.data
+  try {
+    // Fetch all data sources in parallel with timeout protection
+    const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, settingsResult] = await Promise.allSettled([
+      withTimeout(supabase.from('habits').select('*, habits_daily_logs(*)').eq('user_id', userId).eq('is_visible', true)),
+      withTimeout(supabase.from('sessions').select('*, projects(*)').eq('user_id', userId)),
+      withTimeout(supabase.from('projects').select('*').eq('user_id', userId)),
+      withTimeout(supabase.from('meetings').select('*').eq('user_id', userId)),
+      withTimeout(supabase.from('tasks_daily_logs').select('*, tasks!inner(*, projects(*))').eq('user_id', userId)),
+      withTimeout(supabase.from('user_settings').select('*').eq('user_id', userId).single())
+    ])
 
-  console.log(`📊 Fetched: ${habits.length} habits, ${sessions.length} sessions, ${projects.length} projects, ${meetings.length} meetings, ${tasksDailyLogs.length} task daily logs, settings: ${settings ? 'loaded' : 'not found'}`)
+    // Extract data with fallbacks
+    const habits = habitsResult.status === 'fulfilled' ? (habitsResult.value.data || []) : []
+    const sessions = sessionsResult.status === 'fulfilled' ? (sessionsResult.value.data || []) : []
+    const projects = projectsResult.status === 'fulfilled' ? (projectsResult.value.data || []) : []
+    const meetings = meetingsResult.status === 'fulfilled' ? (meetingsResult.value.data || []) : []
+    const tasksDailyLogs = tasksDailyLogsResult.status === 'fulfilled' ? (tasksDailyLogsResult.value.data || []) : []
+    const settings = settingsResult.status === 'fulfilled' ? settingsResult.value.data : null
 
-  return { habits, sessions, projects, meetings, tasksDailyLogs, settings }
+    // Log any failures
+    const failures = [
+      habitsResult.status === 'rejected' && 'habits',
+      sessionsResult.status === 'rejected' && 'sessions', 
+      projectsResult.status === 'rejected' && 'projects',
+      meetingsResult.status === 'rejected' && 'meetings',
+      tasksDailyLogsResult.status === 'rejected' && 'tasksDailyLogs',
+      settingsResult.status === 'rejected' && 'settings'
+    ].filter(Boolean)
+    
+    if (failures.length > 0) {
+      console.warn(`⚠️ Failed to fetch: ${failures.join(', ')}`)
+    }
+
+    console.log(`📊 Fetched: ${habits.length} habits, ${sessions.length} sessions, ${projects.length} projects, ${meetings.length} meetings, ${tasksDailyLogs.length} task daily logs, settings: ${settings ? 'loaded' : 'not found'}`)
+
+    return { habits, sessions, projects, meetings, tasksDailyLogs, settings }
+  } catch (error) {
+    console.error('Critical error fetching calendar data:', error)
+    // Return minimal data to prevent complete failure
+    return { habits: [], sessions: [], projects: [], meetings: [], tasksDailyLogs: [], settings: null }
+  }
 }
 
 export const fetchTasksForProjects = async (userId: string, projects: any[], sessions: any[]) => {

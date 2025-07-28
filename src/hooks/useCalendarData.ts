@@ -17,6 +17,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [tasksDailyLogs, setTasksDailyLogs] = useState<any[]>([])
   const [scheduledTasksCache, setScheduledTasksCache] = useState<Map<string, any[]>>(new Map())
   const [tasksScheduled, setTasksScheduled] = useState(false)
+  const [dataHash, setDataHash] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [conflictMaps, setConflictMaps] = useState({ 
@@ -29,19 +30,23 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const { getWorkHoursRange } = useSettings()
   const { saveTaskChunks, clearTaskLogsForDate } = useTaskDailyLogs()
 
-  // Reset when date changes
-  useEffect(() => {
-    setTasksScheduled(false)
-    setScheduledTasksCache(new Map())
-  }, [baseDate])
+  // Don't reset on date changes - keep cached tasks
 
-  // Single consolidated data loading and processing effect
-  useEffect(() => {
-    // Only run once and prevent re-runs if already scheduled
-    if (tasksScheduled) return
+  // Create data hash to detect when regeneration is needed
+  const createDataHash = (habits: any[], sessions: any[], meetings: any[], tasks: any[], tasksDailyLogs: any[]) => {
+    return [
+      habits.map(h => `${h.id}-${h.current_start_time}-${h.duration}`).join('|'),
+      sessions.map(s => `${s.id}-${s.scheduled_date}-${s.actual_start_time}-${s.scheduled_hours}`).join('|'),
+      meetings.map(m => `${m.id}-${m.start_time}-${m.end_time}`).join('|'),
+      tasks.map(t => `${t.id}-${t.estimated_hours}-${t.status}`).join('|'),
+      tasksDailyLogs.map(l => `${l.id}-${l.log_date}-${l.scheduled_start_time}`).join('|')
+    ].join('::')
+  }
 
+  // Load data once and cache tasks intelligently
+  useEffect(() => {
     const loadAndProcessAllCalendarData = async () => {
-      console.log('📊 Starting consolidated calendar data load...')
+      console.log('📊 Starting optimized calendar data load...')
       setIsDataLoading(true)
       
       try {
@@ -51,19 +56,19 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           return
         }
 
-        // Step 1: Fetch all base data in parallel
-        const { habits: fetchedHabits, sessions: fetchedSessions, projects: fetchedProjects, meetings: fetchedMeetings, tasksDailyLogs: fetchedTasksDailyLogs, settings: fetchedSettings } = 
-          await fetchAllCalendarData(user.id)
+        // Step 1: Fetch all base data in parallel and update UI immediately
+        const dataPromise = fetchAllCalendarData(user.id)
+        const { habits: fetchedHabits, sessions: fetchedSessions, projects: fetchedProjects, meetings: fetchedMeetings, tasksDailyLogs: fetchedTasksDailyLogs, settings: fetchedSettings } = await dataPromise
 
-        // Step 2: Set base data
+        // Step 2: Update UI immediately with base data (shows habits, sessions, meetings)
         setHabits(fetchedHabits)
         setSessions(fetchedSessions)
         setProjects(fetchedProjects)
         setMeetings(fetchedMeetings)
         setTasksDailyLogs(fetchedTasksDailyLogs)
+        setIsDataLoading(false) // Show partial data immediately
         
-        // Debug: Log task daily logs
-        console.log('🔍 Tasks Daily Logs fetched:', fetchedTasksDailyLogs)
+        console.log('🔍 Base data loaded, showing partial UI')
 
         // Create work hours range function using fetched settings
         const getWorkHoursRangeFromSettings = () => {
@@ -79,49 +84,63 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           return { start, end }
         }
 
-        // Step 3: Fetch tasks for projects without sessions
-        const fetchedTasks = await fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions)
-        setAllTasks(fetchedTasks)
-
-        // Step 4: Clear today's task logs before computing conflicts to allow rescheduling
-        const today = new Date()
-        await clearTaskLogsForDate(user.id, today)
+        // Step 3: Fetch and process tasks in background
+        const tasksPromise = fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions)
         
-        // Filter out today's task logs from conflict computation since we just cleared them
+        // Step 4: Process conflict maps while tasks are loading
+        const today = new Date()
         const todayStr = format(today, 'yyyy-MM-dd')
         const filteredTasksDailyLogs = fetchedTasksDailyLogs.filter(log => log.log_date !== todayStr)
-        
-        // Compute conflict maps without today's task logs
         const dayColumnsList = getDayColumns()
         const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
         setConflictMaps(newConflictMaps)
 
-        // Step 5: Schedule tasks (pass full task logs to calculate completed work)
-        const scheduledTasksResult = await scheduleAllTasks(
-          fetchedTasks,
-          newConflictMaps,
-          dayColumnsList,
-          getWorkHoursRangeFromSettings,
-          scheduleTaskInAvailableSlots,
-          saveTaskChunks,
-          clearTaskLogsForDate,
-          user.id,
-          fetchedTasksDailyLogs // Pass full logs to calculate completed hours
-        )
-        setScheduledTasksCache(scheduledTasksResult)
-        setTasksScheduled(true)
+        // Step 5: Wait for tasks and schedule them
+        const fetchedTasks = await tasksPromise
+        setAllTasks(fetchedTasks)
 
-        console.log('🎯 Calendar data loading and processing complete!')
+        // Step 6: Check if we need to regenerate tasks
+        const newDataHash = createDataHash(fetchedHabits, fetchedSessions, fetchedMeetings, fetchedTasks, fetchedTasksDailyLogs)
+        const needsRegeneration = !tasksScheduled || dataHash !== newDataHash
+
+        if (needsRegeneration) {
+          console.log('🔄 Data changed, regenerating task schedule...')
+          setDataHash(newDataHash)
+
+          // Clear today's task logs only when regenerating
+          await clearTaskLogsForDate(user.id, today)
+
+          // Schedule tasks
+          const scheduledTasksResult = await scheduleAllTasks(
+            fetchedTasks,
+            newConflictMaps,
+            dayColumnsList,
+            getWorkHoursRangeFromSettings,
+            scheduleTaskInAvailableSlots,
+            saveTaskChunks,
+            clearTaskLogsForDate,
+            user.id,
+            fetchedTasksDailyLogs
+          )
+          setScheduledTasksCache(scheduledTasksResult)
+          setTasksScheduled(true)
+
+          console.log('🎯 Task scheduling complete!')
+        } else {
+          console.log('✨ Using cached task schedule')
+        }
         
       } catch (error) {
-        console.error('Error in consolidated calendar data loading:', error)
-      } finally {
+        console.error('Error in calendar data loading:', error)
         setIsDataLoading(false)
       }
     }
 
-    loadAndProcessAllCalendarData()
-  }, [baseDate]) // Only run when baseDate changes
+    // Only load if not already scheduled, or if explicitly reset
+    if (!tasksScheduled) {
+      loadAndProcessAllCalendarData()
+    }
+  }, [tasksScheduled]) // Re-run when tasksScheduled changes
 
   // Update current time every minute
   useEffect(() => {
@@ -211,38 +230,58 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
 
 
-  // Debounced reset to prevent rapid re-scheduling
-  const tasksContentHash = useMemo(() => {
-    return allTasks.map(t => `${t.id}-${t.estimated_hours}-${t.status}`).join(',')
-  }, [allTasks])
-
-  const habitsWithLogsHash = useMemo(() => {
-    return habits
-      .map(h => {
-        const dailyLogs = h.habits_daily_logs || []
-        const logsHash = dailyLogs
-          .map(log => `${log.log_date}-${log.scheduled_start_time}`)
-          .join('|')
-        return `${h.id}-${h.current_start_time}-${logsHash}`
-      })
-      .join(',')
-  }, [habits])
-
+  // Trigger regeneration when data changes
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout
+    if (!tasksScheduled || !dataHash) return // Don't trigger on initial load
     
-    const debouncedReset = () => {
-      clearTimeout(timeoutId)
-      timeoutId = setTimeout(() => {
-        setTasksScheduled(false)
-        setScheduledTasksCache(new Map())
-      }, 100)
+    const newDataHash = createDataHash(habits, sessions, meetings, allTasks, tasksDailyLogs)
+    if (dataHash !== newDataHash) {
+      console.log('🔄 Data changed, triggering immediate regeneration...')
+      
+      // Trigger immediate regeneration
+      const regenerateTasks = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
+
+          setDataHash(newDataHash)
+          
+          // Clear today's task logs and regenerate
+          const today = new Date()
+          await clearTaskLogsForDate(user.id, today)
+          
+          // Filter out today's task logs for conflict computation
+          const todayStr = format(today, 'yyyy-MM-dd')
+          const filteredTasksDailyLogs = tasksDailyLogs.filter(log => log.log_date !== todayStr)
+          
+          // Recompute conflicts with new data
+          const newConflictMaps = computeConflictMaps(habits, sessions, meetings, dayColumns, filteredTasksDailyLogs)
+          setConflictMaps(newConflictMaps)
+
+          // Schedule tasks with new conflicts
+          const scheduledTasksResult = await scheduleAllTasks(
+            allTasks,
+            newConflictMaps,
+            dayColumns,
+            getWorkHoursRange,
+            scheduleTaskInAvailableSlots,
+            saveTaskChunks,
+            clearTaskLogsForDate,
+            user.id,
+            tasksDailyLogs
+          )
+          setScheduledTasksCache(scheduledTasksResult)
+          
+          console.log('🎯 Regeneration complete!')
+          
+        } catch (error) {
+          console.error('Error regenerating tasks:', error)
+        }
+      }
+      
+      regenerateTasks()
     }
-    
-    debouncedReset()
-    
-    return () => clearTimeout(timeoutId)
-  }, [tasksContentHash, habitsWithLogsHash])
+  }, [habits, sessions, meetings, allTasks, tasksDailyLogs, dataHash, tasksScheduled, dayColumns, getWorkHoursRange, saveTaskChunks, clearTaskLogsForDate])
 
   // Get tasks for a specific time slot
   const getTasksForTimeSlot = (timeSlot: string, date: Date) => {
@@ -281,6 +320,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       .filter(habit => {
         // Check if there's a daily log with a scheduled start time for this date
         const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
+        
+        // Skip habit if it's marked as skipped for this date
+        if (dailyLog?.is_skipped) return false
+        
         const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
 

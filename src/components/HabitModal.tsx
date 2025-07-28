@@ -8,9 +8,10 @@ interface HabitModalProps {
   habit: any | null
   selectedDate: Date | null
   onTimeChange: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
+  onSkip?: (habitId: string, date: string) => Promise<void>
 }
 
-const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: HabitModalProps) => {
+const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange, onSkip }: HabitModalProps) => {
   const [newTime, setNewTime] = useState('')
   const [newDuration, setNewDuration] = useState<number>(0)
   const [loading, setLoading] = useState(false)
@@ -40,6 +41,21 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
       onClose()
     } catch (error) {
       console.error('Error updating habit:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSkip = async () => {
+    if (!habit || !selectedDate || !onSkip) return
+
+    setLoading(true)
+    try {
+      const dateString = format(selectedDate, 'yyyy-MM-dd')
+      await onSkip(habit.id, dateString)
+      onClose()
+    } catch (error) {
+      console.error('Error skipping habit:', error)
     } finally {
       setLoading(false)
     }
@@ -100,7 +116,7 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
             </p>
           </div>
 
-          <div className="flex gap-3 justify-end">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
@@ -108,6 +124,17 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange }: Habi
             >
               Cancel
             </button>
+            {onSkip && (
+              <button
+                type="button"
+                onClick={handleSkip}
+                disabled={loading}
+                className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? 'Skipping...' : 'Skip Today'}
+              </button>
+            )}
+            <div className="flex-1"></div>
             <button
               type="submit"
               disabled={loading || !newTime}
