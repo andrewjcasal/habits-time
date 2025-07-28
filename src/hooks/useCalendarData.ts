@@ -17,6 +17,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [tasksDailyLogs, setTasksDailyLogs] = useState<any[]>([])
   const [scheduledTasksCache, setScheduledTasksCache] = useState<Map<string, any[]>>(new Map())
   const [tasksScheduled, setTasksScheduled] = useState(false)
+  
   const [dataHash, setDataHash] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isDataLoading, setIsDataLoading] = useState(true)
@@ -110,29 +111,38 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           // Clear today's task logs only when regenerating
           await clearTaskLogsForDate(user.id, today)
 
-          // Schedule tasks
-          const scheduledTasksResult = await scheduleAllTasks(
-            fetchedTasks,
-            newConflictMaps,
-            dayColumnsList,
-            getWorkHoursRangeFromSettings,
-            scheduleTaskInAvailableSlots,
-            saveTaskChunks,
-            clearTaskLogsForDate,
-            user.id,
-            fetchedTasksDailyLogs
-          )
-          setScheduledTasksCache(scheduledTasksResult)
-          setTasksScheduled(true)
+          try {
+            // Schedule tasks - use filtered data consistent with conflict computation
+            const scheduledTasksResult = await scheduleAllTasks(
+              fetchedTasks,
+              newConflictMaps,
+              dayColumnsList,
+              getWorkHoursRangeFromSettings,
+              scheduleTaskInAvailableSlots,
+              saveTaskChunks,
+              clearTaskLogsForDate,
+              user.id,
+              filteredTasksDailyLogs
+            )
+            setScheduledTasksCache(scheduledTasksResult)
+            setTasksScheduled(true)
 
-          console.log('🎯 Task scheduling complete!')
+          } catch (error) {
+            console.error('❌ Task scheduling failed:', error)
+            // Set tasksScheduled to true even if scheduling fails to prevent infinite loading
+            // This ensures the UI shows whatever tasks are available
+            setTasksScheduled(true)
+          }
         } else {
-          console.log('✨ Using cached task schedule')
+          // Ensure tasksScheduled is true when using cached data
+          setTasksScheduled(true)
         }
         
       } catch (error) {
         console.error('Error in calendar data loading:', error)
         setIsDataLoading(false)
+        // Set tasksScheduled to true to prevent infinite loading state
+        setTasksScheduled(true)
       }
     }
 
@@ -258,21 +268,25 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           const newConflictMaps = computeConflictMaps(habits, sessions, meetings, dayColumns, filteredTasksDailyLogs)
           setConflictMaps(newConflictMaps)
 
-          // Schedule tasks with new conflicts
-          const scheduledTasksResult = await scheduleAllTasks(
-            allTasks,
-            newConflictMaps,
-            dayColumns,
-            getWorkHoursRange,
-            scheduleTaskInAvailableSlots,
-            saveTaskChunks,
-            clearTaskLogsForDate,
-            user.id,
-            tasksDailyLogs
-          )
-          setScheduledTasksCache(scheduledTasksResult)
-          
-          console.log('🎯 Regeneration complete!')
+          try {
+            // Schedule tasks with new conflicts - use filtered data consistent with clearing
+            const scheduledTasksResult = await scheduleAllTasks(
+              allTasks,
+              newConflictMaps,
+              dayColumns,
+              getWorkHoursRange,
+              scheduleTaskInAvailableSlots,
+              saveTaskChunks,
+              clearTaskLogsForDate,
+              user.id,
+              filteredTasksDailyLogs
+            )
+            setScheduledTasksCache(scheduledTasksResult)
+            
+          } catch (error) {
+            console.error('❌ Task regeneration failed:', error)
+            // Continue with existing cache to avoid breaking the UI
+          }
           
         } catch (error) {
           console.error('Error regenerating tasks:', error)
@@ -285,16 +299,20 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   // Get tasks for a specific time slot
   const getTasksForTimeSlot = (timeSlot: string, date: Date) => {
-    if (!tasksScheduled) return []
+    if (!tasksScheduled) {
+      return []
+    }
 
     const dateKey = format(date, 'yyyy-MM-dd')
     const cachedTasks = scheduledTasksCache.get(dateKey) || []
     const currentHour = parseInt(timeSlot.split(':')[0])
-
-    return cachedTasks.filter(chunk => {
+    
+    const filteredTasks = cachedTasks.filter(chunk => {
       const taskStartHour = chunk.startTime ? Math.floor(chunk.startTime) : chunk.startHour
       return taskStartHour === currentHour
     })
+
+    return filteredTasks
   }
 
   // Get meetings for a specific time slot
@@ -315,6 +333,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const getHabitsForTimeSlot = (timeSlot: string, date: Date) => {
     const currentHour = parseInt(timeSlot.split(':')[0])
     const dateKey = format(date, 'yyyy-MM-dd')
+
+    console.log(`🔍 Getting habits for time slot ${timeSlot} on ${dateKey}, currentHour: ${currentHour}`)
 
     return habits
       .filter(habit => {
@@ -384,7 +404,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           return newStartHour === currentHour
         }
 
-        return habitStartHour === currentHour
+        // Check if habit starts within this hour slot (handles 30-minute start times like 9:30)
+        const shouldShow = habitStartHour === currentHour
+        console.log(`🔍 Habit "${habit.name}" - habitStartHour: ${habitStartHour}, currentHour: ${currentHour}, shouldShow: ${shouldShow}, effectiveStartTime: ${effectiveStartTime}`)
+        return shouldShow
       })
       .map(habit => {
         // Use the same effective start time and duration logic as in the filter
