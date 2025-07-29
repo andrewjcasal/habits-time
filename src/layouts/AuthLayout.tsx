@@ -9,7 +9,7 @@ const AuthLayout = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Bot className="h-8 w-8 text-primary-600" />
-              <span className="ml-2 text-xl font-semibold text-neutral-900">Reflectify</span>
+              <span className="ml-2 text-xl font-semibold text-neutral-900">Cassian</span>
             </div>
             <div>
               <Link

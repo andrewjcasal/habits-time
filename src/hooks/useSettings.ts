@@ -59,7 +59,7 @@ export const useSettings = (): UseSettingsReturn => {
         // Create default settings if none exist
         const defaultSettings = {
           user_id: user.id,
-          work_hours_start: '07:00:00',
+          work_hours_start: '06:00:00',
           work_hours_end: '23:00:00',
           week_ending_day: 'sunday',
           week_ending_time: '20:30',
@@ -87,7 +87,7 @@ export const useSettings = (): UseSettingsReturn => {
       if (user) {
         setSettings({
           user_id: user.id,
-          work_hours_start: '07:00:00',
+          work_hours_start: '06:00:00',
           work_hours_end: '23:00:00',
           week_ending_day: 'sunday',
           week_ending_time: '20:30',
@@ -130,7 +130,7 @@ export const useSettings = (): UseSettingsReturn => {
   // Get work hours as numbers (24-hour format)
   const getWorkHoursRange = () => {
     if (!settings) {
-      return { start: 7, end: 23 } // Default fallback
+      return { start: 6, end: 23 } // Default fallback
     }
 
     const start = parseInt(settings.work_hours_start.split(':')[0], 10)

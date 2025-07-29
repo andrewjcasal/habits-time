@@ -570,11 +570,6 @@ const Calendar = () => {
             const duration = log.estimated_hours || 1
             const logHeight = duration * 64
 
-            console.log(
-              `📋 Rendering Task Daily Log: ${log.tasks?.title} at ${timeSlot}, log:`,
-              log
-            )
-
             return (
               <div
                 key={`task-daily-log-${log.id}`}

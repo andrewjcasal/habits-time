@@ -16,7 +16,7 @@ export const fetchAllCalendarData = async (userId: string) => {
   try {
     // Fetch all data sources in parallel with timeout protection
     const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, settingsResult] = await Promise.allSettled([
-      withTimeout(supabase.from('habits').select('*, habits_daily_logs(*)').eq('user_id', userId).eq('is_visible', true)),
+      withTimeout(supabase.from('habits').select('*, habits_daily_logs(*), habits_types(*)').eq('user_id', userId).eq('is_visible', true)),
       withTimeout(supabase.from('sessions').select('*, projects(*)').eq('user_id', userId)),
       withTimeout(supabase.from('projects').select('*').eq('user_id', userId)),
       withTimeout(supabase.from('meetings').select('*').eq('user_id', userId)),

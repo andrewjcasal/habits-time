@@ -296,10 +296,7 @@ export const scheduleAllTasks = async (
     if (hourlyRate > 0) {
       const completedHours = completedHoursByTask.get(task.id) || 0
       const remainingHours = Math.max(0, task.estimated_hours - completedHours)
-      console.log(`📊 Billable task: ${task.title} - ${remainingHours}h remaining @ $${hourlyRate}/hr (Project: ${task.projects?.name})`)
       return total + remainingHours
-    } else {
-      console.log(`❌ Non-billable task: ${task.title} - ${task.estimated_hours}h (Project: ${task.projects?.name}, Rate: $${hourlyRate}/hr)`)
     }
     return total
   }, 0)

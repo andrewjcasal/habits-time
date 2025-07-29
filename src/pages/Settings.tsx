@@ -55,7 +55,7 @@ const SettingsSection = ({ icon: Icon, title, description, children }: SettingsS
 
 const Settings = () => {
   const { settings, loading, error, updateSettings } = useSettings()
-  const [workHoursStart, setWorkHoursStart] = useState('07:00')
+  const [workHoursStart, setWorkHoursStart] = useState('06:00')
   const [workHoursEnd, setWorkHoursEnd] = useState('23:00')
   const [weekEndingDay, setWeekEndingDay] = useState('sunday')
   const [weekEndingTime, setWeekEndingTime] = useState('20:30')
@@ -98,7 +98,7 @@ const Settings = () => {
   }
 
   const handleReset = () => {
-    setWorkHoursStart('07:00')
+    setWorkHoursStart('06:00')
     setWorkHoursEnd('23:00')
     setWeekEndingDay('sunday')
     setWeekEndingTime('20:30')

@@ -11,7 +11,7 @@ export const WelcomeModal = ({ onClose }: WelcomeModalProps) => {
 
   const steps = [
     {
-      title: 'Welcome to Reflectify',
+      title: 'Welcome to Cassian',
       description:
         'Your comprehensive productivity platform for managing time, habits, and projects with intelligent scheduling.',
       image:

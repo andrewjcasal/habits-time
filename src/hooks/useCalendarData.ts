@@ -8,6 +8,43 @@ import { computeConflictMaps } from '../utils/calendarConflicts'
 import { scheduleAllTasks, scheduleTaskInAvailableSlots } from '../utils/taskScheduling'
 import { addMeeting as addMeetingUtil, updateMeeting as updateMeetingUtil, deleteMeeting as deleteMeetingUtil } from '../utils/meetingManager'
 
+// Calculate pull-back time for habits with pull_back_15min scheduling rule
+const calculatePullBackTime = (habit: any, dateKey: string, baseStartTime: string) => {
+  // Find the most recent habit_daily_log to start from
+  const sortedLogs = (habit.habits_daily_logs || [])
+    .filter((log: any) => log.log_date <= dateKey)
+    .sort((a: any, b: any) => b.log_date.localeCompare(a.log_date))
+  
+  const mostRecentLog = sortedLogs[0]
+  
+  // If we have a recent log with a scheduled start time, use that as the reference
+  let referenceTime = mostRecentLog?.scheduled_start_time || baseStartTime
+  let referenceDate = mostRecentLog?.log_date || dateKey
+  
+  // Calculate how many days forward from the reference date
+  const daysDifference = Math.floor((new Date(dateKey).getTime() - new Date(referenceDate).getTime()) / (1000 * 60 * 60 * 24))
+  
+  if (daysDifference <= 0) {
+    return referenceTime // Same day or past day, use reference time
+  }
+  
+  // Parse the reference time
+  const [hours, minutes] = referenceTime.split(':').map(Number)
+  let totalMinutes = hours * 60 + minutes
+  
+  // Pull back 15 minutes for each day forward
+  totalMinutes -= (daysDifference * 15)
+  
+  // Ensure minimum time is 6:00 AM (360 minutes from midnight)
+  totalMinutes = Math.max(totalMinutes, 360)
+  
+  // Convert back to HH:MM format
+  const newHours = Math.floor(totalMinutes / 60)
+  const newMinutes = totalMinutes % 60
+  
+  return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}`
+}
+
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const [allTasks, setAllTasks] = useState<any[]>([])
   const [habits, setHabits] = useState<any[]>([])
@@ -195,7 +232,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const getHourSlots = () => {
     const { end } = getWorkHoursRange()
     const hours = []
-    for (let i = 7; i <= end; i++) {
+    for (let i = 6; i <= end; i++) {
       const hour12 = i > 12 ? i - 12 : i === 0 ? 12 : i
       const ampm = i >= 12 ? 'PM' : 'AM'
       const hourStr = hour12.toString() + ':00 ' + ampm
@@ -210,12 +247,12 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const currentMinute = currentTime.getMinutes()
     const { end } = getWorkHoursRange()
 
-    if (currentHour < 7 || currentHour >= end) return null
+    if (currentHour < 6 || currentHour >= end) return null
 
     const isToday = format(date, 'yyyy-MM-dd') === format(currentTime, 'yyyy-MM-dd')
     if (!isToday) return null
 
-    const hourIndex = currentHour - 7
+    const hourIndex = currentHour - 6
     const minutePercentage = currentMinute / 60
     const totalPosition = (hourIndex + minutePercentage) * 64
 
@@ -313,6 +350,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     
     const filteredTasks = cachedTasks.filter(chunk => {
       const taskStartHour = chunk.startTime ? Math.floor(chunk.startTime) : chunk.startHour
+      
+      // Hide anything before 6 AM
+      if (taskStartHour < 6) return false
+      
       return taskStartHour === currentHour
     })
 
@@ -328,6 +369,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       const meetingStart = new Date(meeting.start_time)
       const meetingDate = format(meetingStart, 'yyyy-MM-dd')
       const meetingHour = meetingStart.getHours()
+
+      // Hide anything before 6 AM
+      if (meetingHour < 6) return false
 
       return meetingDate === dateKey && meetingHour === currentHour
     })
@@ -352,13 +396,30 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         // Skip habit if it's marked as skipped for this date
         if (dailyLog?.is_skipped) return false
         
-        const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+        let effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
+
+        // Special handling for pull_back_15min habits - pull back 15 minutes each day, minimum 6 AM
+        if (habit.habits_types?.scheduling_rule === 'pull_back_15min' && effectiveStartTime) {
+          effectiveStartTime = calculatePullBackTime(habit, dateKey, effectiveStartTime)
+        }
 
         if (!effectiveStartTime) return false
 
         const habitStartHour = parseInt(effectiveStartTime.split(':')[0])
         const habitStartMinute = parseInt(effectiveStartTime.split(':')[1])
+
+        // Hide anything before 6 AM - enforce minimum time regardless of source
+        if (habitStartHour < 6) {
+          console.log(`🚫 Filtering out habit ${habit.name} starting at ${effectiveStartTime} (before 6 AM)`)
+          return false
+        }
+
+        // Additional safety check: if somehow the time is before 6 AM, force it to 6 AM
+        if (habitStartHour < 6) {
+          console.log(`⚠️ Forcing habit ${habit.name} from ${effectiveStartTime} to 06:00`)
+          effectiveStartTime = '06:00'
+        }
 
         // Check for meeting conflicts and rescheduling
         const conflictingMeeting = meetings.find(meeting => {
@@ -419,8 +480,21 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       .map(habit => {
         // Use the same effective start time and duration logic as in the filter
         const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
-        const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+        let effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
+
+        // Special handling for pull_back_15min habits - pull back 15 minutes each day, minimum 6 AM
+        if (habit.habits_types?.scheduling_rule === 'pull_back_15min' && effectiveStartTime) {
+          effectiveStartTime = calculatePullBackTime(habit, dateKey, effectiveStartTime)
+        }
+
+        // Additional safety check: if somehow the time is before 6 AM, force it to 6 AM
+        if (effectiveStartTime) {
+          const checkHour = parseInt(effectiveStartTime.split(':')[0])
+          if (checkHour < 6) {
+            effectiveStartTime = '06:00'
+          }
+        }
 
         const habitStartHour = parseInt(effectiveStartTime!.split(':')[0])
         const habitStartMinute = parseInt(effectiveStartTime!.split(':')[1])
@@ -501,6 +575,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       .filter(session => {
         if (!session.actual_start_time || session.scheduled_date !== dateStr) return false
         const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
+        
+        // Hide anything before 6 AM
+        if (sessionStartHour < 6) return false
+        
         return sessionStartHour === currentHour
       })
       .map(session => {
@@ -517,12 +595,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const dateStr = format(date, 'yyyy-MM-dd')
     const currentHour = parseInt(timeSlot.split(':')[0])
 
-    console.log(`🔍 Checking task daily logs for ${dateStr} ${timeSlot}:`, {
-      totalLogs: tasksDailyLogs.length,
-      logsForDate: tasksDailyLogs.filter(log => log.log_date === dateStr),
-      sampleLogs: tasksDailyLogs.slice(0, 3)
-    })
-
     return tasksDailyLogs
       .filter(log => {
         if (log.log_date !== dateStr) return false
@@ -530,6 +602,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const startTime = log.actual_start_time || log.scheduled_start_time
         if (!startTime) return false
         const logStartHour = parseInt(startTime.split(':')[0])
+        
+        // Hide anything before 6 AM
+        if (logStartHour < 6) return false
+        
         return logStartHour === currentHour
       })
       .map(log => {
