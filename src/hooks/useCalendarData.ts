@@ -8,6 +8,7 @@ import { computeConflictMaps } from '../utils/calendarConflicts'
 import { scheduleAllTasks, scheduleTaskInAvailableSlots } from '../utils/taskScheduling'
 import { addMeeting as addMeetingUtil, updateMeeting as updateMeetingUtil, deleteMeeting as deleteMeetingUtil } from '../utils/meetingManager'
 import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
+import { generateBuffersForDays, getBuffersForTimeSlot, BufferTime } from '../utils/bufferManager'
 
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const [allTasks, setAllTasks] = useState<any[]>([])
@@ -18,6 +19,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [tasksDailyLogs, setTasksDailyLogs] = useState<any[]>([])
   const [scheduledTasksCache, setScheduledTasksCache] = useState<Map<string, any[]>>(new Map())
   const [tasksScheduled, setTasksScheduled] = useState(false)
+  const [buffers, setBuffers] = useState<Map<string, BufferTime>>(new Map())
   
   const [dataHash, setDataHash] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -26,7 +28,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     habitConflicts: new Map(), 
     sessionConflicts: new Map(), 
     meetingConflicts: new Map(),
-    tasksDailyLogsConflicts: new Map()
+    tasksDailyLogsConflicts: new Map(),
+    bufferConflicts: new Map()
   })
 
   const { settings, getWorkHoursRange } = useSettings()
@@ -96,6 +99,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const dayColumnsList = getDayColumns()
         const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
         setConflictMaps(newConflictMaps)
+        
+        // Step 4.5: Generate daily buffers (extracted from conflict maps)
+        const generatedBuffers = generateBuffersForDays(dayColumnsList, fetchedMeetings)
+        setBuffers(generatedBuffers)
 
         // Step 5: Wait for tasks and schedule them
         const fetchedTasks = await tasksPromise
@@ -267,9 +274,13 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           const todayStr = format(today, 'yyyy-MM-dd')
           const filteredTasksDailyLogs = tasksDailyLogs.filter(log => log.log_date !== todayStr)
           
-          // Recompute conflicts with new data
+          // Recompute conflicts with new data (includes buffer conflicts)
           const newConflictMaps = computeConflictMaps(habits, sessions, meetings, dayColumns, filteredTasksDailyLogs)
           setConflictMaps(newConflictMaps)
+          
+          // Regenerate buffers with updated meetings
+          const regeneratedBuffers = generateBuffersForDays(dayColumns, meetings)
+          setBuffers(regeneratedBuffers)
 
           try {
             // Schedule tasks with new conflicts - use filtered data consistent with clearing
@@ -573,6 +584,11 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       })
   }
 
+  // Get buffers for a specific time slot
+  const getBuffersForCalendarTimeSlot = (timeSlot: string, date: Date) => {
+    return getBuffersForTimeSlot(timeSlot, date, buffers)
+  }
+
   const hourSlots = useMemo(() => getHourSlots(), [])
 
   return {
@@ -600,6 +616,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     getHabitsForTimeSlot,
     getSessionsForTimeSlot,
     getTasksDailyLogsForTimeSlot,
+    getBuffersForCalendarTimeSlot,
+    buffers,
     setAllTasks,
     setScheduledTasksCache,
     setTasksScheduled,

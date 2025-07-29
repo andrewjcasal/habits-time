@@ -80,6 +80,8 @@ const Calendar = () => {
     getHabitsForTimeSlot,
     getSessionsForTimeSlot,
     getTasksDailyLogsForTimeSlot,
+    getBuffersForCalendarTimeSlot,
+    buffers,
     tasksScheduled,
     scheduledTasksCache,
     addMeeting,
@@ -392,6 +394,7 @@ const Calendar = () => {
       const habitsInSlot = getHabitsForTimeSlot(timeSlot, date)
       const sessionsInSlot = getSessionsForTimeSlot(timeSlot, date)
       const meetingsInSlot = getMeetingsForTimeSlot(timeSlot, date)
+      const buffersInSlot = getBuffersForCalendarTimeSlot(timeSlot, date)
 
       // For past dates: only show task daily logs
       // For today and future: show auto-generated tasks
@@ -405,7 +408,8 @@ const Calendar = () => {
         sessionsInSlot.length +
         meetingsInSlot.length +
         tasksInSlot.length +
-        tasksDailyLogsInSlot.length
+        tasksDailyLogsInSlot.length +
+        buffersInSlot.length
       if (totalBlocks > 0) {
       }
 
@@ -588,6 +592,31 @@ const Calendar = () => {
               </div>
             )
           })}
+
+          {/* Buffer Time */}
+          {buffersInSlot.map(buffer => {
+            const bufferHeight = (buffer.duration / 60) * 64
+            const bufferClassName = buffer.isReduced 
+              ? "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-orange-50 border-orange-400 text-orange-800 opacity-80"
+              : "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-indigo-50 border-indigo-400 text-indigo-800"
+
+            return (
+              <div
+                key={`buffer-${buffer.id}`}
+                className={bufferClassName}
+                style={getEventStyle(buffer.topPosition || 0, bufferHeight, 8)}
+                title={`${buffer.title} - ${buffer.duration} minutes${buffer.isReduced ? ' (reduced due to same day)' : ''}`}
+              >
+                <div className="font-medium truncate flex-1">
+                  {buffer.title}
+                  {buffer.isReduced && <span className="text-xs ml-1 opacity-60">⏰</span>}
+                </div>
+                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
+                  {buffer.duration}min
+                </div>
+              </div>
+            )
+          })}
         </>
       )
     },
@@ -597,6 +626,7 @@ const Calendar = () => {
       getMeetingsForTimeSlot,
       getTasksForTimeSlot,
       getTasksDailyLogsForTimeSlot,
+      getBuffersForCalendarTimeSlot,
       tasksScheduled,
       handleHabitClick,
       handleTaskClick,

@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { getEffectiveHabitStartTime } from './habitScheduling'
+import { generateBuffersForDays, BufferTime } from './bufferManager'
 
 export const computeConflictMaps = (
   habitsData: any[], 
@@ -12,6 +13,7 @@ export const computeConflictMaps = (
   const sessionConflicts = new Map()
   const meetingConflicts = new Map()
   const tasksDailyLogsConflicts = new Map()
+  const bufferConflicts = new Map()
 
   // Pre-compute habit conflicts
   habitsData.forEach(habit => {
@@ -136,5 +138,22 @@ export const computeConflictMaps = (
     }
   })
   
-  return { habitConflicts, sessionConflicts, meetingConflicts, tasksDailyLogsConflicts }
+  // Pre-compute buffer conflicts
+  const buffers = generateBuffersForDays(dayColumns, meetingsData)
+  buffers.forEach((buffer: BufferTime, dateStr: string) => {
+    if (buffer.isActive) {
+      const [hours, minutes] = buffer.startTime.split(':').map(Number)
+      const startTimeInHours = hours + minutes / 60
+      const durationInHours = buffer.duration / 60
+      const endTimeInHours = startTimeInHours + durationInHours
+      
+      // Mark all affected time slots in 15-minute increments
+      for (let time = Math.floor(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
+        const key = `${dateStr}-${time}`
+        bufferConflicts.set(key, buffer)
+      }
+    }
+  })
+  
+  return { habitConflicts, sessionConflicts, meetingConflicts, tasksDailyLogsConflicts, bufferConflicts }
 }

@@ -35,11 +35,13 @@ export const getAvailableTimeBlocks = (
       const sessionConflict = conflictMaps.sessionConflicts.get(conflictKey)
       const meetingConflict = conflictMaps.meetingConflicts.get(conflictKey)
       const tasksDailyLogsConflict = conflictMaps.tasksDailyLogsConflicts?.get(conflictKey)
+      const bufferConflict = conflictMaps.bufferConflicts?.get(conflictKey)
       
       const habitConflicts = habitConflict ? [habitConflict] : []
       const sessionConflicts = sessionConflict ? [sessionConflict] : []
       const meetingConflicts = meetingConflict ? [meetingConflict] : []
       const tasksDailyLogsConflicts = tasksDailyLogsConflict ? [tasksDailyLogsConflict] : []
+      const bufferConflicts = bufferConflict ? [bufferConflict] : []
 
       const scheduledTasksInSlot = alreadyScheduledTasks.filter(
         task =>
@@ -53,6 +55,7 @@ export const getAvailableTimeBlocks = (
         sessionConflicts.length === 0 &&
         meetingConflicts.length === 0 &&
         tasksDailyLogsConflicts.length === 0 &&
+        bufferConflicts.length === 0 &&
         scheduledTasksInSlot.length === 0
 
 
