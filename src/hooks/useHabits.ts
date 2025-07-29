@@ -60,7 +60,7 @@ export function useHabits(selectedDate?: string) {
 
       setSleepStartTime(currentSleepStartTime)
 
-      // Build the query - show all habits but filter daily logs by sleep time
+      // Build the query - show all habits and include recent daily logs for pull-back calculation
       let query = supabase
         .from('habits')
         .select(
@@ -74,7 +74,8 @@ export function useHabits(selectedDate?: string) {
         )
         .or(`user_id.eq.${user.id},user_id.is.null`)
         .eq('is_visible', true)
-        .eq('habits_daily_logs.log_date', today) // Only selected date's logs for checked status
+        // Include logs from the last 30 days for pull-back calculations
+        .gte('habits_daily_logs.log_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
 
       const { data, error } = await query.order('current_start_time', { ascending: true })
 

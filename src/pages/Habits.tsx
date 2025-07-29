@@ -16,6 +16,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import CreateHabitModal from '../components/CreateHabitModal'
 import HabitsTopbar from '../components/HabitsTopbar'
 import HabitsLast7Days from '../components/HabitsLast7Days'
+import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
 
 const Habits = () => {
   const { user } = useAuth()
@@ -40,9 +41,29 @@ const Habits = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'today' | 'last7days'>('today')
 
+  // Helper function to get the display text and time for habit scheduling
+  const getHabitScheduleDisplay = (habit: any, dailyLog: any) => {
+    const today = new Date().toISOString().split('T')[0]
+    const isToday = selectedDate === today
+    const isCompleted = dailyLog?.actual_start_time || false
+
+    if (isToday && !isCompleted) {
+      // Today, not completed - show "Today: [pull-back time]"
+      const effectiveTime = getEffectiveHabitStartTime(habit, selectedDate, dailyLog)
+      return { label: 'Today', time: effectiveTime }
+    } else {
+      // Completed today or future date - show "Next: [tomorrow's pull-back time]"
+      const tomorrow = new Date(selectedDate)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const tomorrowStr = tomorrow.toISOString().split('T')[0]
+      const effectiveTime = getEffectiveHabitStartTime(habit, tomorrowStr)
+      return { label: 'Next', time: effectiveTime }
+    }
+  }
+
   const toggleCompletion = async (habitId: string) => {
     const habit = habits.find(h => h.id === habitId)
-    const currentLog = habit?.habits_daily_logs?.[0]
+    const currentLog = habit?.habits_daily_logs?.find(log => log.log_date === selectedDate)
     const newCompletionState = !currentLog?.is_completed
 
     const now = new Date()
@@ -95,7 +116,7 @@ const Habits = () => {
 
   const updateCompletedTime = async (habitId: string, newTime: string) => {
     const habit = habits.find(h => h.id === habitId)
-    const currentLog = habit?.habits_daily_logs?.[0]
+    const currentLog = habit?.habits_daily_logs?.find(log => log.log_date === selectedDate)
 
     if (currentLog?.is_completed) {
       await logHabitCompletion(
@@ -278,7 +299,9 @@ const Habits = () => {
               </div>
             ) : (
               habits.map((habit, index) => {
-                const dailyLog = habit.habits_daily_logs?.[0]
+                // Find today's daily log specifically
+                const todayStr = new Date().toISOString().split('T')[0]
+                const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === selectedDate)
                 const isCompleted = dailyLog?.actual_start_time || false
                 const isSelected = selectedHabitId === habit.id
 
@@ -390,7 +413,10 @@ const Habits = () => {
                           </div>
                         ) : (
                           <span className="font-mono text-xs text-neutral-600">
-                            Next: {formatTime(habit.current_start_time)}
+                            {(() => {
+                              const { label, time } = getHabitScheduleDisplay(habit, dailyLog)
+                              return `${label}: ${formatTime(time)}`
+                            })()}
                           </span>
                         )}
                       </div>
@@ -402,7 +428,7 @@ const Habits = () => {
           </div>
         </div>
         {/* Detail Panel - Show only selected habit */}
-        <div className="bg-white col-span-2">
+        <div className="bg-white col-span-2 h-full overflow-hidden">
           {selectedHabitId &&
             (() => {
               const selectedHabit = habits.find(h => h.id === selectedHabitId)

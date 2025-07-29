@@ -55,6 +55,7 @@ export const getAvailableTimeBlocks = (
         tasksDailyLogsConflicts.length === 0 &&
         scheduledTasksInSlot.length === 0
 
+
       blocks.push({ timeInHours, timeSlot, available })
     }
   }
@@ -72,6 +73,9 @@ export const scheduleTaskInAvailableSlots = (
   weekendDays: string[] = []
 ) => {
   const availableBlocks = getAvailableTimeBlocks(date, conflictMaps, getWorkHoursRange, alreadyScheduledTasks, weekendDays)
+  const dateStr = format(date, 'yyyy-MM-dd')
+  
+  
   const scheduledChunks = []
   let remainingHours = taskHours
 
@@ -122,8 +126,6 @@ export const scheduleTaskInAvailableSlots = (
     const chunkEndTime = currentChunkStart + chunkHours
     const adjustedChunkHours = chunkEndTime > end ? end - currentChunkStart : chunkHours
     
-    
-    
     if (adjustedChunkHours > 0) {
       scheduledChunks.push({
         ...taskInfo,
@@ -136,6 +138,7 @@ export const scheduleTaskInAvailableSlots = (
       })
     }
   }
+
 
   return scheduledChunks
 }

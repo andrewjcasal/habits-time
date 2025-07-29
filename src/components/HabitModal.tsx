@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { X, Clock } from 'lucide-react'
+import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
 
 interface HabitModalProps {
   isOpen: boolean
@@ -21,10 +22,10 @@ const HabitModal = ({ isOpen, onClose, habit, selectedDate, onTimeChange, onSkip
       // Check if there's a daily log for this date with a scheduled start time
       const dateKey = format(selectedDate, 'yyyy-MM-dd')
       const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateKey)
-      const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+      const effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
       const effectiveDuration = dailyLog?.duration || habit.duration || 0
 
-      // Set initial time to effective habit time (daily log override or default)
+      // Set initial time to effective habit time (with pull-back applied if needed)
       setNewTime(effectiveStartTime || '')
       setNewDuration(effectiveDuration)
     }

@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import { getEffectiveHabitStartTime } from './habitScheduling'
 
 export const computeConflictMaps = (
   habitsData: any[], 
@@ -11,12 +12,12 @@ export const computeConflictMaps = (
   const sessionConflicts = new Map()
   const meetingConflicts = new Map()
   const tasksDailyLogsConflicts = new Map()
-  
+
   // Pre-compute habit conflicts
   habitsData.forEach(habit => {
     dayColumns.forEach(({ dateStr }) => {
       const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateStr)
-      const effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+      const effectiveStartTime = getEffectiveHabitStartTime(habit, dateStr, dailyLog)
       
       if (effectiveStartTime) {
         const [hours, minutes] = effectiveStartTime.split(':').map(Number)
@@ -69,8 +70,12 @@ export const computeConflictMaps = (
         
         const adjustedEndTime = adjustedStartTime + duration / 60
         
+        
         // Mark all affected time slots in 15-minute increments
-        for (let time = Math.floor(adjustedStartTime * 4) / 4; time < adjustedEndTime; time += 0.25) {
+        // Use Math.round to avoid floating point precision issues
+        const startSlot = Math.floor(adjustedStartTime * 4) / 4
+        const endSlot = Math.ceil(adjustedEndTime * 4) / 4
+        for (let time = startSlot; time < endSlot; time += 0.25) {
           const key = `${dateStr}-${time}`
           habitConflicts.set(key, habit)
           

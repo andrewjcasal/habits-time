@@ -30,7 +30,7 @@ const HabitsTopbar = ({ activeTab, onTabChange }: HabitsTopbarProps) => {
             <button
               key={tab.key}
               onClick={() => onTabChange(tab.key)}
-              className={`flex items-center gap-2 px-6 py-1 text-sm font-medium transition-colors border-b-2 ${
+              className={`flex items-center gap-2 px-3 py-0.5 text-sm font-medium transition-colors border-b-2 ${
                 isActive
                   ? 'text-blue-700 border-blue-500 bg-blue-50'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-transparent'

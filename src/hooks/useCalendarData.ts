@@ -7,43 +7,7 @@ import { fetchAllCalendarData, fetchTasksForProjects } from '../utils/calendarDa
 import { computeConflictMaps } from '../utils/calendarConflicts'
 import { scheduleAllTasks, scheduleTaskInAvailableSlots } from '../utils/taskScheduling'
 import { addMeeting as addMeetingUtil, updateMeeting as updateMeetingUtil, deleteMeeting as deleteMeetingUtil } from '../utils/meetingManager'
-
-// Calculate pull-back time for habits with pull_back_15min scheduling rule
-const calculatePullBackTime = (habit: any, dateKey: string, baseStartTime: string) => {
-  // Find the most recent habit_daily_log to start from
-  const sortedLogs = (habit.habits_daily_logs || [])
-    .filter((log: any) => log.log_date <= dateKey)
-    .sort((a: any, b: any) => b.log_date.localeCompare(a.log_date))
-  
-  const mostRecentLog = sortedLogs[0]
-  
-  // If we have a recent log with a scheduled start time, use that as the reference
-  let referenceTime = mostRecentLog?.scheduled_start_time || baseStartTime
-  let referenceDate = mostRecentLog?.log_date || dateKey
-  
-  // Calculate how many days forward from the reference date
-  const daysDifference = Math.floor((new Date(dateKey).getTime() - new Date(referenceDate).getTime()) / (1000 * 60 * 60 * 24))
-  
-  if (daysDifference <= 0) {
-    return referenceTime // Same day or past day, use reference time
-  }
-  
-  // Parse the reference time
-  const [hours, minutes] = referenceTime.split(':').map(Number)
-  let totalMinutes = hours * 60 + minutes
-  
-  // Pull back 15 minutes for each day forward
-  totalMinutes -= (daysDifference * 15)
-  
-  // Ensure minimum time is 6:00 AM (360 minutes from midnight)
-  totalMinutes = Math.max(totalMinutes, 360)
-  
-  // Convert back to HH:MM format
-  const newHours = Math.floor(totalMinutes / 60)
-  const newMinutes = totalMinutes % 60
-  
-  return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}`
-}
+import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
 
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const [allTasks, setAllTasks] = useState<any[]>([])
@@ -396,13 +360,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         // Skip habit if it's marked as skipped for this date
         if (dailyLog?.is_skipped) return false
         
-        let effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+        const effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
-
-        // Special handling for pull_back_15min habits - pull back 15 minutes each day, minimum 6 AM
-        if (habit.habits_types?.scheduling_rule === 'pull_back_15min' && effectiveStartTime) {
-          effectiveStartTime = calculatePullBackTime(habit, dateKey, effectiveStartTime)
-        }
 
         if (!effectiveStartTime) return false
 
@@ -480,13 +439,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       .map(habit => {
         // Use the same effective start time and duration logic as in the filter
         const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
-        let effectiveStartTime = dailyLog?.scheduled_start_time || habit.current_start_time
+        const effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
-
-        // Special handling for pull_back_15min habits - pull back 15 minutes each day, minimum 6 AM
-        if (habit.habits_types?.scheduling_rule === 'pull_back_15min' && effectiveStartTime) {
-          effectiveStartTime = calculatePullBackTime(habit, dateKey, effectiveStartTime)
-        }
 
         // Additional safety check: if somehow the time is before 6 AM, force it to 6 AM
         if (effectiveStartTime) {
