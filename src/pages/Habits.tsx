@@ -341,9 +341,11 @@ const Habits = () => {
                           >
                             {habit.name}
                           </h3>
-                          <div className="flex items-center space-x-1 text-xs text-neutral-600">
-                            <Clock className="w-2 h-2" />
-                            <span>{habit.duration}m</span>
+                          {/* Only show timing info for calendar habits */}
+                          {habit.habits_types?.scheduling_rule !== 'non_calendar' && (
+                            <div className="flex items-center space-x-1 text-xs text-neutral-600">
+                              <Clock className="w-2 h-2" />
+                              <span>{habit.duration}m</span>
                             {dailyLog?.actual_start_time &&
                               dailyLog?.actual_end_time &&
                               (editingCompletedTime === habit.id ? (
@@ -381,45 +383,49 @@ const Habits = () => {
                                   • {formatTime(dailyLog.actual_start_time)}
                                 </span>
                               ))}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center">
-                        {editingHabit === habit.id ? (
-                          <div
-                            className="flex items-center space-x-1"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <input
-                              type="time"
-                              value={tempTime}
-                              onChange={e => setTempTime(e.target.value)}
-                              className="px-1 py-0.5 border border-neutral-300 rounded text-xs w-16"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => updateTime(habit.id, tempTime)}
-                              className="px-1.5 py-0.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
+                      {/* Only show scheduling controls for calendar habits */}
+                      {habit.habits_types?.scheduling_rule !== 'non_calendar' && (
+                        <div className="flex items-center">
+                          {editingHabit === habit.id ? (
+                            <div
+                              className="flex items-center space-x-1"
+                              onClick={e => e.stopPropagation()}
                             >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingHabit(null)}
-                              className="px-1.5 py-0.5 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="font-mono text-xs text-neutral-600">
-                            {(() => {
-                              const { label, time } = getHabitScheduleDisplay(habit, dailyLog)
-                              return `${label}: ${formatTime(time)}`
-                            })()}
-                          </span>
-                        )}
-                      </div>
+                              <input
+                                type="time"
+                                value={tempTime}
+                                onChange={e => setTempTime(e.target.value)}
+                                className="px-1 py-0.5 border border-neutral-300 rounded text-xs w-16"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => updateTime(habit.id, tempTime)}
+                                className="px-1.5 py-0.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingHabit(null)}
+                                className="px-1.5 py-0.5 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="font-mono text-xs text-neutral-600">
+                              {(() => {
+                                const { label, time } = getHabitScheduleDisplay(habit, dailyLog)
+                                return `${label}: ${formatTime(time)}`
+                              })()}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )

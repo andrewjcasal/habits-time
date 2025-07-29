@@ -359,6 +359,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
     return habits
       .filter(habit => {
+        // Filter out non-calendar habits
+        if (habit.habits_types?.scheduling_rule === 'non_calendar') {
+          return false
+        }
         // Only show habits that existed on this date
         if (habit.created_at) {
           const habitCreationDate = new Date(habit.created_at).toISOString().split('T')[0]

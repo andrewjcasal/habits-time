@@ -210,6 +210,53 @@ export function useHabits(selectedDate?: string) {
     }
   }
 
+  const updateHabitName = async (habitId: string, newName: string) => {
+    if (!user) return
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({ name: newName })
+        .eq('id', habitId)
+        .eq('user_id', user.id)
+      if (error) throw error
+      // Update local state
+      setHabits(prevHabits =>
+        prevHabits.map(habit =>
+          habit.id === habitId ? { ...habit, name: newName } : habit
+        )
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update habit name')
+    }
+  }
+
+  const updateHabitDefaultStartTime = async (habitId: string, newStartTime: string) => {
+    if (!user) return
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({ 
+          default_start_time: newStartTime,
+          current_start_time: newStartTime 
+        })
+        .eq('id', habitId)
+        .eq('user_id', user.id)
+      if (error) throw error
+      // Update local state
+      setHabits(prevHabits =>
+        prevHabits.map(habit =>
+          habit.id === habitId ? { 
+            ...habit, 
+            default_start_time: newStartTime,
+            current_start_time: newStartTime 
+          } : habit
+        )
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update habit start time')
+    }
+  }
+
   const deleteHabit = async (habitId: string) => {
     if (!user) return
 
@@ -234,7 +281,7 @@ export function useHabits(selectedDate?: string) {
     name: string
     duration: number
     habit_type_id: string
-    default_start_time: string
+    default_start_time?: string
     background: string
     benefits: string
     consequences: string
@@ -242,18 +289,24 @@ export function useHabits(selectedDate?: string) {
     if (!user) return
 
     try {
-      const { error } = await supabase.from('habits').insert({
+      const insertData: any = {
         name: habitData.name,
         user_id: user.id,
         duration: habitData.duration,
         habit_type_id: habitData.habit_type_id,
-        default_start_time: habitData.default_start_time,
-        current_start_time: habitData.default_start_time,
         background: habitData.background,
         benefits: habitData.benefits,
         consequences: habitData.consequences,
         is_visible: true,
-      })
+      }
+
+      // Only add start time fields for calendar habits
+      if (habitData.default_start_time) {
+        insertData.default_start_time = habitData.default_start_time
+        insertData.current_start_time = habitData.default_start_time
+      }
+
+      const { error } = await supabase.from('habits').insert(insertData)
 
       if (error) throw error
 
@@ -383,6 +436,8 @@ export function useHabits(selectedDate?: string) {
     updateHabitStartTime,
     updateHabitType,
     updateHabitDuration,
+    updateHabitName,
+    updateHabitDefaultStartTime,
     deleteHabit,
     createHabit,
     updateHabitStartTimes,

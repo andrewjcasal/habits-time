@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Settings, MessageSquare, Trash2 } from 'lucide-react'
 import HabitContext from './HabitContext'
 import { useHabits } from '../hooks/useHabits'
@@ -23,11 +23,15 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'settings' | 'questions'>('questions')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const { habits, updateHabitType, updateHabitDuration, deleteHabit } = useHabits()
+  const [unsavedName, setUnsavedName] = useState<string | null>(null)
+  const [unsavedStartTime, setUnsavedStartTime] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const { habits, updateHabitType, updateHabitDuration, updateHabitName, updateHabitDefaultStartTime, deleteHabit } = useHabits()
   const { habitTypes } = useHabitTypes()
   
   const currentHabit = habits.find(h => h.id === habitId)
   const currentHabitType = currentHabit?.habits_types
+
 
   const handleDeleteHabit = async () => {
     try {
@@ -38,6 +42,27 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
       console.error('Error deleting habit:', error)
     }
   }
+
+
+  const handleSaveSettings = async () => {
+    setIsSaving(true)
+    try {
+      if (unsavedName !== null && unsavedName.trim() !== habitName) {
+        await updateHabitName(habitId, unsavedName.trim())
+        setUnsavedName(null)
+      }
+      if (unsavedStartTime !== null) {
+        await updateHabitDefaultStartTime(habitId, unsavedStartTime)
+        setUnsavedStartTime(null)
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const hasUnsavedChanges = unsavedName !== null || unsavedStartTime !== null
 
   const tabs = [
     {
@@ -89,23 +114,49 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                 <label className="block text-xs font-medium text-gray-700 mb-0.5">Habit Name</label>
                 <input
                   type="text"
-                  value={habitName}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                  readOnly
+                  value={unsavedName !== null ? unsavedName : (currentHabit?.name || habitName)}
+                  onChange={e => setUnsavedName(e.target.value)}
+                  className={`w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent ${
+                    unsavedName !== null && unsavedName !== habitName ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
+                  }`}
                 />
+                {unsavedName !== null && unsavedName !== habitName && (
+                  <p className="text-xs text-yellow-600 mt-1">Unsaved changes</p>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-0.5">Duration (minutes)</label>
-                <input
-                  type="number"
-                  value={currentHabit?.duration || 0}
-                  onChange={e => updateHabitDuration(habitId, parseInt(e.target.value) || 0)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter duration in minutes"
-                  min="0"
-                />
-              </div>
+              {/* Only show duration for calendar habits */}
+              {currentHabit?.habits_types?.scheduling_rule !== 'non_calendar' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Duration (minutes)</label>
+                  <input
+                    type="number"
+                    value={currentHabit?.duration || 0}
+                    onChange={e => updateHabitDuration(habitId, parseInt(e.target.value) || 0)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter duration in minutes"
+                    min="0"
+                  />
+                </div>
+              )}
+
+              {/* Only show default start time for calendar habits */}
+              {currentHabit?.habits_types?.scheduling_rule !== 'non_calendar' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Default Start Time</label>
+                  <input
+                    type="time"
+                    value={unsavedStartTime !== null ? unsavedStartTime : (currentHabit?.default_start_time || '')}
+                    onChange={e => setUnsavedStartTime(e.target.value)}
+                    className={`w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent ${
+                      hasUnsavedChanges ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
+                    }`}
+                  />
+                  {hasUnsavedChanges && (
+                    <p className="text-xs text-yellow-600 mt-1">Unsaved changes</p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-0.5">
@@ -129,6 +180,19 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                   </p>
                 )}
               </div>
+
+              {/* Save Button */}
+              {hasUnsavedChanges && (
+                <div className="pt-2">
+                  <button
+                    onClick={handleSaveSettings}
+                    disabled={isSaving}
+                    className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              )}
 
               {/* Delete Habit Section */}
               <div className="pt-2 border-t border-gray-200">

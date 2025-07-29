@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { FileText, Trophy, Info, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 interface HabitContextProps {
@@ -23,9 +22,6 @@ const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initial
     initialContext || { background: '', benefits: '', consequences: '' }
   )
   const [saving, setSaving] = useState(false)
-  const [activeSection, setActiveSection] = useState<'background' | 'benefits' | 'consequences'>(
-    'background'
-  )
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Save context with debounced autosave
@@ -62,10 +58,12 @@ const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initial
       clearTimeout(autosaveTimeoutRef.current)
     }
 
-    // Set new timeout for autosave
-    autosaveTimeoutRef.current = setTimeout(() => {
-      saveContext(newContext)
-    }, 1000) // 1 second delay
+    // Trigger autosave after user types a couple letters
+    if (content.length >= 2) {
+      autosaveTimeoutRef.current = setTimeout(() => {
+        saveContext(newContext)
+      }, 500) // 500ms delay after 2+ characters
+    }
   }
 
   // Cleanup timeout on unmount
@@ -81,72 +79,47 @@ const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initial
     {
       key: 'background' as const,
       label: 'Background',
-      icon: Info,
-      placeholder:
-        'Why is this habit important? What are the benefits and reasons for building this habit?',
+      placeholder: 'Why is this habit important? What are the benefits and reasons for building this habit?',
     },
     {
       key: 'benefits' as const,
       label: 'Benefits',
-      icon: Trophy,
-      placeholder:
-        'What positive outcomes and productivity gains have you experienced from this habit?',
+      placeholder: 'What positive outcomes and productivity gains have you experienced from this habit?',
     },
     {
       key: 'consequences' as const,
       label: "What Happens When You Don't",
-      icon: AlertTriangle,
-      placeholder:
-        'What negative consequences or missed opportunities happen when you skip this habit?',
+      placeholder: 'What negative consequences or missed opportunities happen when you skip this habit?',
     },
   ]
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Section Tabs */}
-      <div className="flex border-b border-gray-200 flex-shrink-0">
-        {sections.map(section => {
-          const Icon = section.icon
-          const isActive = activeSection === section.key
-
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-1.5 space-y-2">
+        {sections.map((section) => {
           return (
-            <button
-              key={section.key}
-              onClick={() => setActiveSection(section.key)}
-              className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium transition-colors border-b-2 ${
-                isActive
-                  ? 'bg-blue-50 text-blue-700 border-blue-500'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-transparent'
-              }`}
-            >
-              <Icon className="w-3 h-3" />
-              <span className="hidden sm:inline">{section.label}</span>
-            </button>
+            <div key={section.key} className="flex flex-col space-y-1">
+              <h3 className="text-sm font-medium text-gray-900">{section.label}</h3>
+              <textarea
+                value={context[section.key]}
+                onChange={e => handleContentChange(section.key, e.target.value)}
+                placeholder={section.placeholder}
+                className="w-full h-32 resize-none border border-gray-200 rounded-md p-1.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  wordWrap: 'break-word',
+                  whiteSpace: 'pre-wrap',
+                }}
+              />
+            </div>
           )
         })}
       </div>
-
-      {/* Content Area */}
-      <div className="flex-1 p-3 overflow-hidden">
-        {sections.map(section => (
-          <div
-            key={section.key}
-            className={`h-full ${activeSection === section.key ? 'block' : 'hidden'}`}
-          >
-            <textarea
-              value={context[section.key]}
-              onChange={e => handleContentChange(section.key, e.target.value)}
-              placeholder={section.placeholder}
-              className="w-full h-full resize-none border-none outline-none text-gray-900 placeholder-gray-400 text-sm leading-relaxed"
-              style={{
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                wordWrap: 'break-word',
-                whiteSpace: 'pre-wrap',
-              }}
-            />
-          </div>
-        ))}
-      </div>
+      {saving && (
+        <div className="flex-shrink-0 px-1.5 py-1 text-xs text-gray-500 border-t border-gray-200">
+          Saving...
+        </div>
+      )}
     </div>
   )
 }

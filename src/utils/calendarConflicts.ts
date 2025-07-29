@@ -15,8 +15,8 @@ export const computeConflictMaps = (
   const tasksDailyLogsConflicts = new Map()
   const bufferConflicts = new Map()
 
-  // Pre-compute habit conflicts
-  habitsData.forEach(habit => {
+  // Pre-compute habit conflicts (exclude non-calendar habits)
+  habitsData.filter(habit => habit.habits_types?.scheduling_rule !== 'non_calendar').forEach(habit => {
     dayColumns.forEach(({ dateStr }) => {
       const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateStr)
       const effectiveStartTime = getEffectiveHabitStartTime(habit, dateStr, dailyLog)

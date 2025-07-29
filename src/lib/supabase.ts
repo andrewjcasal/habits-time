@@ -57,7 +57,7 @@ export type HabitType = {
   created_at: string
   name: string
   description: string | null
-  scheduling_rule: 'pull_back_15min' | 'fixed_time' | 'flexible'
+  scheduling_rule: 'pull_back_15min' | 'fixed_time' | 'flexible' | 'non_calendar'
 }
 
 export type Habit = {
