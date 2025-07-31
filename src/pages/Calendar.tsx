@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Plus, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Plus, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Info } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
 import { useSettings } from '../hooks/useSettings'
 import { useVirtualizedCalendar } from '../hooks/useVirtualizedCalendar'
@@ -641,48 +641,42 @@ const Calendar = () => {
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       {/* Top Bar with Navigation and Work Hours */}
-      <div className="bg-neutral-100 border-b border-neutral-200 px-2 py-2 sm:px-0 sm:py-1">
-        {/* Portrait: Stack vertically, Landscape: Side by side */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:px-2">
-          {/* Top row in portrait: Navigation + Work Hours Label */}
-          <div className="flex items-center justify-between sm:justify-start">
-            {/* Navigation Controls */}
-            <div className="flex items-center">
-              <button
-                onClick={navigateBackWeek}
-                className=" hover:bg-neutral-200 rounded transition-colors"
-                title="Go back 5 days"
-              >
-                <ChevronsLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
-              </button>
-              <button
-                onClick={navigateBackDay}
-                className="hover:bg-neutral-200 rounded transition-colors"
-                title="Go back 1 day"
-              >
-                <ChevronLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
-              </button>
-              <button
-                onClick={navigateForwardDay}
-                className="hover:bg-neutral-200 rounded transition-colors"
-                title="Go forward 1 day"
-              >
-                <ChevronRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
-              </button>
-              <button
-                onClick={navigateForwardWeek}
-                className="hover:bg-neutral-200 rounded transition-colors"
-                title="Go forward 5 days"
-              >
-                <ChevronsRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
-              </button>
-            </div>
+      <div className="bg-neutral-100 border-b border-neutral-200 px-2 py-0.5 sm:px-0 sm:py-1">
+        {/* Navigation, Work Hours Label, and Planned/Actual all on one line */}
+        <div className="flex items-center justify-between sm:px-2">
+          {/* Left side: Navigation Controls */}
+          <div className="flex items-center">
+            <button
+              onClick={navigateBackWeek}
+              className=" hover:bg-neutral-200 rounded transition-colors"
+              title="Go back 5 days"
+            >
+              <ChevronsLeft className="w-3 h-3 text-neutral-600" />
+            </button>
+            <button
+              onClick={navigateBackDay}
+              className="hover:bg-neutral-200 rounded transition-colors"
+              title="Go back 1 day"
+            >
+              <ChevronLeft className="w-3 h-3 text-neutral-600" />
+            </button>
+            <button
+              onClick={navigateForwardDay}
+              className="hover:bg-neutral-200 rounded transition-colors"
+              title="Go forward 1 day"
+            >
+              <ChevronRight className="w-3 h-3 text-neutral-600" />
+            </button>
+            <button
+              onClick={navigateForwardWeek}
+              className="hover:bg-neutral-200 rounded transition-colors"
+              title="Go forward 5 days"
+            >
+              <ChevronsRight className="w-3 h-3 text-neutral-600" />
+            </button>
 
-            {/* Work Hours Label - visible on mobile */}
-            <div className="text-sm text-neutral-700 ml-2 sm:hidden">Work Hours</div>
-
-            {/* Work Hours Label - full version for desktop */}
-            <div className="hidden sm:block text-base sm:text-sm text-neutral-700 ml-2">
+            {/* Work Hours Label - desktop only */}
+            <div className="hidden sm:block text-sm text-neutral-700 ml-2">
               Work Hours (until{' '}
               {settings?.week_ending_day?.charAt(0).toUpperCase() +
                 settings?.week_ending_day?.slice(1) || 'Sunday'}{' '}
@@ -698,9 +692,9 @@ const Calendar = () => {
             </div>
           </div>
 
-          {/* Bottom row in portrait: Planned and Actual hours */}
-          <div className="flex items-center gap-6 justify-center sm:justify-end sm:gap-2">
-            <div className="text-base sm:text-sm relative planned-hours-tooltip">
+          {/* Right side: Planned and Actual hours */}
+          <div className="flex items-center gap-2">
+            <div className="text-sm relative planned-hours-tooltip">
               <span className="text-neutral-600">Planned:</span>
               <span
                 className="font-medium text-neutral-900 ml-1 cursor-pointer hover:underline"
@@ -791,7 +785,7 @@ const Calendar = () => {
                 </div>
               )}
             </div>
-            <div className="text-base sm:text-sm relative actual-hours-tooltip">
+            <div className="hidden sm:block text-sm relative actual-hours-tooltip">
               <span className="text-neutral-600">Actual:</span>
               <span
                 className="font-medium text-neutral-900 ml-1 cursor-pointer hover:underline"
@@ -844,24 +838,39 @@ const Calendar = () => {
         </div>
       </div>
 
+      {/* Calendar Setup Banner - shown when calendar is sparse */}
+      {meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
+        <div className="-mx-2 mb-2 px-4 py-2 bg-amber-50 border-b border-amber-100 sm:mx-0 sm:mb-0 sm:px-4 sm:py-3 sm:bg-amber-50 sm:border sm:border-amber-100 sm:rounded-lg sm:mx-2 sm:mt-2">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <Info className="w-3 h-3 mt-0.5 flex-shrink-0 text-amber-600" />
+            <p className="text-sm text-amber-700 leading-tight sm:leading-relaxed">
+              Your calendar looks empty! Visit the{' '}
+              <a href="/habits" className="font-medium underline hover:text-amber-800">Habits</a>,{' '}
+              <a href="/projects" className="font-medium underline hover:text-amber-800">Projects</a>, or use the{' '}
+              <span className="font-medium">+ button</span> above to add meetings and fill out your schedule.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Headers */}
       <div
         className="grid border-b border-neutral-200 min-w-0"
         style={{ gridTemplateColumns: gridCols }}
       >
-        <div className="bg-neutral-100 border-r border-neutral-200 flex items-center justify-center">
+        <div className="bg-neutral-100 border-r border-neutral-200 flex items-center justify-center py-1 sm:py-0.5">
           <button
-            className="p-1 hover:bg-neutral-200 rounded transition-colors"
+            className="p-0.5 hover:bg-neutral-200 rounded transition-colors"
             title="Add meeting"
             onClick={handleAddMeeting}
           >
-            <Plus className="w-5 h-5 sm:w-3 sm:h-3 text-neutral-600" />
+            <Plus className="w-3 h-3 text-neutral-600" />
           </button>
         </div>
         {dayColumns.map((column, columnIndex) => (
           <div
             key={columnIndex}
-            className="p-3 sm:p-1.5 bg-neutral-50 border-r border-neutral-200 last:border-r-0 min-w-0"
+            className="py-1 px-1.5 sm:py-0.5 sm:px-1 bg-neutral-50 border-r border-neutral-200 last:border-r-0 min-w-0 flex items-center justify-center sm:justify-start"
           >
             <h2 className="text-base sm:text-sm font-medium text-neutral-900 truncate text-center sm:text-left">
               {column.label}
@@ -902,8 +911,8 @@ const Calendar = () => {
                         height: virtualizedCalendar.itemHeight,
                       }}
                     >
-                      <div className="border-r border-neutral-200 p-2 sm:p-1 h-16 bg-neutral-50 flex items-start">
-                        <div className="font-mono text-neutral-600 text-sm sm:text-xs">
+                      <div className="border-r border-neutral-200 py-0.5 px-1 sm:p-1 h-16 bg-neutral-50 flex items-start">
+                        <div className="font-mono text-neutral-600 text-xs">
                           {hour.display}
                         </div>
                       </div>

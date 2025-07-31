@@ -6,6 +6,7 @@ import {
   ArrowUp,
   MessageCircle,
   TrendingUp,
+  Info,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useBehaviors } from '../hooks/useBehaviors'
@@ -31,19 +32,6 @@ const Dashboard = () => {
     }
   }
 
-  const handleGenerateReflection = async () => {
-    try {
-      setGeneratingReflection(true)
-      const reflection = await generateReflection()
-      if (reflection) {
-        setTodaysReflection(reflection)
-      }
-    } catch (error) {
-      console.error('Error generating reflection:', error)
-    } finally {
-      setGeneratingReflection(false)
-    }
-  }
 
   const getCategoryColor = (category?: string) => {
     const colors = {
@@ -67,97 +55,102 @@ const Dashboard = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-4">
-      {/* Header */}
-      <div className="mb-4">
-        <h1 className="text-3xl font-light text-gray-900 mb-2">Daily Reflection</h1>
-        <p className="text-gray-600">Your journey of growth and self-discovery</p>
+
+      {/* Info Banner */}
+      <div className="-mx-4 -mt-4 mb-4 px-4 py-2 bg-blue-50 md:mx-0 md:mt-0 md:mb-6 md:px-4 md:py-3 md:bg-blue-50 md:border md:border-blue-100 md:rounded-lg">
+        <div className="flex items-start gap-2 md:gap-3">
+          <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-500 md:w-5 md:h-5" />
+          <p className="text-sm text-blue-700 leading-tight md:leading-relaxed">
+            Reflections and Reddit posts generate automatically each day based on your completed habits and notes. 
+            Navigate to any page to trigger generation when you have new completions.
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content - Reflection */}
-        <div className="lg:col-span-2">
-          {/* Generate Button */}
-          <div className="mb-4">
-            <button
-              onClick={handleGenerateReflection}
-              disabled={generatingReflection || reflectionLoading}
-              className="inline-flex items-center gap-2 px-2 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {generatingReflection ? <>Generating...</> : <>Generate Today's Reflection</>}
-            </button>
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* Reddit Posts - First on mobile, Right Column on desktop (2/3 width) */}
+        <div className="w-full md:w-2/3 md:order-2">
+          <h2 className="text-xl font-medium text-gray-900 mb-4 flex items-center gap-2">
+            <TrendingUp className="w-3 h-3" />
+            From People 1-2 Steps Ahead
+          </h2>
+          <div className="p-1">
+            {todaysReflection?.reddit_links &&
+            Array.isArray(todaysReflection.reddit_links) &&
+            todaysReflection.reddit_links.length > 0 ? (
+              <div className="space-y-2">
+                {todaysReflection.reddit_links.map((post, index) => (
+                  <div key={index}>
+                    <a
+                      href={post.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block group"
+                    >
+                      <div className="flex items-start justify-between">
+        <div className="flex items-start text-sm text-gray-600">
+                          <div className="flex flex-col items-center gap-0.5 w-6">
+                            <ArrowUp className="w-3 h-3" />
+                            <span className="text-xs font-medium text-gray-700">{post.upvotes}</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-0.5 w-6">
+                            <MessageCircle className="w-3 h-3" />
+                            <span className="text-xs font-medium text-gray-700">{post.comments}</span>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0 ml-3">
+                          <h4 className="font-medium text-emerald-700 group-hover:text-indigo-600 line-clamp-3 text-base mb-2">
+                            {post.title}
+                          </h4>
+                          <span className="font-medium text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                            r/{post.subreddit}
+                          </span>
+                        </div>
+                        <ExternalLink className="w-3 h-3 mt-1 text-gray-400 group-hover:text-blue-600 flex-shrink-0 ml-2" />
+                      </div>
+                    </a>
+                    {index < todaysReflection.reddit_links.length - 1 && (
+                      <div className="mt-2 border-t border-gray-200"></div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Reddit posts yet</h3>
+                <p className="text-gray-600">
+                  Reddit posts will appear here when your reflection is generated.
+                </p>
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Reflection Content */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+        {/* Reflection - Second on mobile, Left Column on desktop (1/3 width) */}
+        <div className="w-full md:w-1/3 md:order-1">
+          <h2 className="text-xl font-medium text-gray-900 mb-4">Today's Reflection</h2>
+          <div className="p-1">
             {todaysReflection ? (
               <div>
-                <div className="prose prose-lg max-w-none">
+                <div className="prose prose-sm max-w-none">
                   <div
                     className="text-gray-800 leading-relaxed"
                     style={{
                       fontFamily: 'Georgia, Times, serif',
-                      fontSize: '18px',
-                      lineHeight: '1.7',
+                      fontSize: '16px',
+                      lineHeight: '1.6',
                     }}
                   >
                     {todaysReflection.content.split('\n\n').map((paragraph, index) => (
-                      <p key={index} className="mb-4">
+                      <p key={index} className="mb-3">
                         {paragraph}
                       </p>
                     ))}
                   </div>
                 </div>
-                {/* Reddit Links Section */}
-                {todaysReflection.reddit_links &&
-                  Array.isArray(todaysReflection.reddit_links) &&
-                  todaysReflection.reddit_links.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" />
-                        From People 1-2 Steps Ahead
-                      </h3>
-                      <div className="space-y-2">
-                        {todaysReflection.reddit_links.map((post, index) => (
-                          <div key={index}>
-                            <a
-                              href={post.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block group"
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-start gap-3 text-sm text-gray-600">
-                                  <div className="flex flex-col items-center gap-0.5 w-4">
-                                    <ArrowUp className="w-3 h-3" />
-                                    <span className="text-sm text-gray-700">{post.upvotes}</span>
-                                  </div>
-                                  <div className="flex flex-col items-center gap-0.5 w-3">
-                                    <MessageCircle className="w-3 h-3" />
-                                    <span className="text-sm text-gray-700">{post.comments}</span>
-                                  </div>
-                                </div>
-                                <div className="flex-1 min-w-0 ml-4">
-                                  <h4 className="font-medium text-emerald-700 group-hover:text-indigo-600 line-clamp-2">
-                                    {post.title}
-                                  </h4>
-                                  <span className="font-medium text-xs text-gray-600 mt-1 block">
-                                    r/{post.subreddit}
-                                  </span>
-                                </div>
-                                <ExternalLink className="w-2 h-2 mt-[2px] text-gray-400 group-hover:text-blue-600 flex-shrink-0 ml-3" />
-                              </div>
-                            </a>
-                            {index < todaysReflection.reddit_links.length - 1 && (
-                              <div className="mt-2 border-t border-gray-200"></div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                <div className="mt-3 pt-1 border-t border-gray-200">
-                  <p className="text-sm text-gray-500">
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
                     Generated on{' '}
                     {new Date(todaysReflection.generated_at).toLocaleDateString('en-US', {
                       year: 'numeric',
@@ -170,12 +163,11 @@ const Dashboard = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-12">
-                <Sparkles className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <div className="text-center py-8">
+                <Sparkles className="w-8 h-8 text-gray-400 mx-auto mb-3" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No reflection yet</h3>
-                <p className="text-gray-600 mb-6">
-                  Generate your daily reflection to get personalized insights based on your recent
-                  habits and notes.
+                <p className="text-gray-600 text-sm">
+                  Complete some habits or write notes to generate your daily reflection.
                 </p>
               </div>
             )}

@@ -210,6 +210,16 @@ const Notes = () => {
           </div>
         </div>
 
+        {/* Info Banner */}
+        <div className="px-3 py-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-700">
+          <div className="flex items-start gap-2">
+            <FileText className="w-3 h-3 mt-0.5 flex-shrink-0 text-blue-500" />
+            <p className="leading-relaxed">
+              Notes written here contribute to AI reflection generation and enhance Reddit link suggestions based on your content.
+            </p>
+          </div>
+        </div>
+
         {/* Notes List */}
         <div className="flex-1 overflow-y-auto w-full max-w-full">
           {filteredNotes.length === 0 ? (

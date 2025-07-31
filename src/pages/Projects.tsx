@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Settings, Folder } from 'lucide-react'
+import { Settings, Folder, Zap, Info } from 'lucide-react'
 import { useProjects, useTasks } from '../hooks/useProjects'
 import { useSessions } from '../hooks/useContracts'
 import { Project, Task } from '../types'
@@ -292,6 +292,38 @@ const Projects = () => {
         </div>
       </nav>
 
+      {/* Info Banner - show when no projects exist */}
+      {projects.length === 0 && !projectsLoading && (
+        <div className="mx-4 mt-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Zap className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-500" />
+            <div>
+              <h3 className="text-sm font-medium text-blue-900 mb-1">Create a project to get started!</h3>
+              <p className="text-sm text-blue-700 leading-relaxed">
+                Add projects and tasks to populate your calendar and watch them auto-shuffle as you complete work. 
+                Projects help organize your tasks and track progress over time.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Banner - show when projects exist but few tasks */}
+      {projects.length > 0 && tasks.length < 2 && !tasksLoading && (
+        <div className="px-4 py-3 bg-green-50 border-b border-green-100 mb-4">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 mt-0.5 flex-shrink-0 text-green-500" />
+            <div>
+              <h3 className="text-sm font-medium text-green-900 mb-1">Add tasks to see the magic happen!</h3>
+              <p className="text-sm text-green-700 leading-relaxed">
+                Fill your projects with tasks to see how they work together in the calendar. 
+                Make sure to add durations to each task so they can be properly scheduled and auto-shuffled as you work.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       <NewProjectModal
         isOpen={showNewProjectForm}
@@ -369,7 +401,7 @@ const Projects = () => {
               </div>
               <h3 className="text-lg font-medium mb-2">Select a project to start working</h3>
               <p className="text-sm">
-                Choose a project from the dropdown above or create a new one
+                Choose a project from the dropdown above
               </p>
             </div>
           </div>

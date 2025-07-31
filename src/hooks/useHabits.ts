@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase, Habit, HabitDailyLog, HabitWithType } from '../lib/supabase'
 import { useAuth } from './useAuth'
+import { useReflections } from './useReflections'
 
 export function useHabits(selectedDate?: string) {
   const { user } = useAuth()
+  const { generateReflection, getTodaysReflection } = useReflections()
   const [habits, setHabits] = useState<HabitWithType[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

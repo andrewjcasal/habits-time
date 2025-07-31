@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import FeedbackButton from '../components/FeedbackButton'
+import { useAutoReflection } from '../hooks/useAutoReflection'
 
 const MainLayout = () => {
   const location = useLocation()
@@ -33,6 +34,9 @@ const MainLayout = () => {
 
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Auto-generate reflection when habits or tasks are completed
+  useAutoReflection()
 
   const navItems = [
     // { path: '/time-tracker', label: 'Time Tracker', icon: Clock },
@@ -151,22 +155,8 @@ const MainLayout = () => {
               transition={{ type: 'tween', duration: 0.3 }}
               className="md:hidden fixed top-0 right-0 h-full w-64 bg-white border-l border-neutral-200 z-50 flex flex-col"
             >
-              {/* Close button and first nav item on same line */}
-              <div className="flex items-center justify-between p-0">
-                <NavLink
-                  to="/reflections"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center rounded-md px-1 py-1 text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-                    }`
-                  }
-                >
-                  <Home className="mr-1 h-2 w-2" />
-                  Dashboard
-                </NavLink>
+              {/* Close button */}
+              <div className="flex items-center justify-end p-1">
                 <button
                   onClick={() => setMobileMenuOpen(false)}
                   className="p-1 rounded text-neutral-500 hover:text-neutral-700"
@@ -178,7 +168,7 @@ const MainLayout = () => {
               {/* Navigation */}
               <nav className="flex-1 px-0 py-0">
                 <ul className="space-y-1">
-                  {navItems.slice(1).map(item => {
+                  {navItems.map(item => {
                     const Icon = item.icon
                     return (
                       <li key={item.path}>

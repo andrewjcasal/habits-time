@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Info,
 } from 'lucide-react'
 import { useHabits } from '../hooks/useHabits'
 import { supabase } from '../lib/supabase'
@@ -255,6 +256,22 @@ const Habits = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <HabitsTopbar activeTab={activeTab} onTabChange={setActiveTab} />
+      
+      {/* Info Banner - show when no habits exist */}
+      {habits.length === 0 && !loading && (
+        <div className="px-4 py-3 bg-purple-50 border-b border-purple-100 mb-4">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 mt-0.5 flex-shrink-0 text-purple-500" />
+            <div>
+              <h3 className="text-sm font-medium text-purple-900 mb-1">Start building better habits!</h3>
+              <p className="text-sm text-purple-700 leading-relaxed">
+                Adding a habit will allow you to create contexts for yourself on why they're important. 
+                Once you complete a habit, you'll start seeing daily reflections. You'll also see them in your calendar too!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {activeTab === 'today' ? (
         <div
