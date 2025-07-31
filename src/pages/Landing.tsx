@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import {
   Heart,
-  Bot,
+  Crown,
   MessageCircle,
   TrendingUp,
   Sparkles,
@@ -28,8 +28,9 @@ const Landing = () => {
                 Scheduling
               </h1>
               <p className="mt-6 text-lg leading-8 text-neutral-600 max-w-2xl mx-auto">
-                Intelligently schedule habits, tasks, and meetings in one unified calendar. 
-                Track billable hours, avoid conflicts, and get AI-powered insights to optimize your daily routine.
+                Intelligently schedule habits, tasks, and meetings in one unified calendar. Track
+                billable hours, avoid conflicts, and get AI-powered insights to optimize your daily
+                routine.
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
                 <Link
@@ -61,19 +62,27 @@ const Landing = () => {
                     <div className="space-y-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="text-blue-600 font-medium">9:00 AM</span>
-                        <span className="bg-blue-100 px-2 py-1 rounded text-blue-800">Morning Exercise</span>
+                        <span className="bg-blue-100 px-2 py-1 rounded text-blue-800">
+                          Morning Exercise
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-purple-600 font-medium">10:00 AM</span>
-                        <span className="bg-purple-100 px-2 py-1 rounded text-purple-800">Client Work</span>
+                        <span className="bg-purple-100 px-2 py-1 rounded text-purple-800">
+                          Client Work
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-yellow-600 font-medium">2:00 PM</span>
-                        <span className="bg-yellow-100 px-2 py-1 rounded text-yellow-800">Auto-scheduled Task</span>
+                        <span className="bg-yellow-100 px-2 py-1 rounded text-yellow-800">
+                          Auto-scheduled Task
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-red-600 font-medium">3:30 PM</span>
-                        <span className="bg-red-100 px-2 py-1 rounded text-red-800">Team Meeting</span>
+                        <span className="bg-red-100 px-2 py-1 rounded text-red-800">
+                          Team Meeting
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -81,7 +90,7 @@ const Landing = () => {
                   {/* Intelligent Scheduling Demo */}
                   <div className="bg-white rounded-lg p-4 shadow-sm border">
                     <div className="flex items-center mb-3">
-                      <Bot className="w-5 h-5 text-green-500 mr-2" />
+                      <Crown className="w-5 h-5 text-green-500 mr-2" />
                       <span className="font-medium text-sm">Smart Scheduling</span>
                     </div>
                     <div className="space-y-2 text-xs">
@@ -118,7 +127,9 @@ const Landing = () => {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-neutral-600">This Week</span>
-                        <span className="text-xs bg-green-100 px-2 py-1 rounded text-green-800">On Track</span>
+                        <span className="text-xs bg-green-100 px-2 py-1 rounded text-green-800">
+                          On Track
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -138,8 +149,8 @@ const Landing = () => {
               Everything you need for intelligent time management
             </p>
             <p className="mt-6 text-lg leading-8 text-neutral-600">
-              Our platform combines smart calendar scheduling, habit tracking, and work management to create a
-              comprehensive productivity system that adapts to your lifestyle.
+              Our platform combines smart calendar scheduling, habit tracking, and work management
+              to create a comprehensive productivity system that adapts to your lifestyle.
             </p>
           </div>
 
@@ -155,8 +166,9 @@ const Landing = () => {
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-neutral-600">
                   <p className="flex-auto">
-                    See all your habits, tasks, meetings, and work sessions in one intelligent calendar view. 
-                    Auto-scheduling prevents conflicts and maximizes your productive time.
+                    See all your habits, tasks, meetings, and work sessions in one intelligent
+                    calendar view. Auto-scheduling prevents conflicts and maximizes your productive
+                    time.
                   </p>
                   <div className="mt-6 space-y-2">
                     <div className="flex items-center">
@@ -164,7 +176,7 @@ const Landing = () => {
                       <span className="text-sm">Multi-event type display</span>
                     </div>
                     <div className="flex items-center">
-                      <Bot className="h-4 w-4 text-blue-600 mr-2" />
+                      <Crown className="h-4 w-4 text-blue-600 mr-2" />
                       <span className="text-sm">Smart conflict resolution</span>
                     </div>
                     <div className="flex items-center">
@@ -179,14 +191,15 @@ const Landing = () => {
               <div className="flex flex-col bg-white rounded-xl p-6 shadow-sm border">
                 <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-neutral-900">
                   <div className="bg-gradient-to-r from-yellow-500 to-orange-500 p-2 rounded-lg">
-                    <Bot className="h-5 w-5 text-white" />
+                    <Crown className="h-5 w-5 text-white" />
                   </div>
                   Intelligent Task Scheduling
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-neutral-600">
                   <p className="flex-auto">
-                    AI automatically schedules your project tasks around habits and meetings. 
-                    Respects work hours, weekends, and generates billable work placeholders to meet revenue targets.
+                    AI automatically schedules your project tasks around habits and meetings.
+                    Respects work hours, weekends, and generates billable work placeholders to meet
+                    revenue targets.
                   </p>
                   <div className="mt-6 space-y-2">
                     <div className="flex items-center">
@@ -215,8 +228,9 @@ const Landing = () => {
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-neutral-600">
                   <p className="flex-auto">
-                    Smart habit scheduling with pull-back timing, conflict avoidance, and flexible duration management. 
-                    Skip, reschedule, or adjust habits without breaking your routine.
+                    Smart habit scheduling with pull-back timing, conflict avoidance, and flexible
+                    duration management. Skip, reschedule, or adjust habits without breaking your
+                    routine.
                   </p>
                   <div className="mt-6 space-y-2">
                     <div className="flex items-center">
@@ -247,8 +261,9 @@ const Landing = () => {
               Ready to master your time?
             </h2>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-neutral-600">
-              Join professionals and productivity enthusiasts using smart calendar scheduling to optimize their daily routines, 
-              track billable work, and achieve their goals with AI-powered time management.
+              Join professionals and productivity enthusiasts using smart calendar scheduling to
+              optimize their daily routines, track billable work, and achieve their goals with
+              AI-powered time management.
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link

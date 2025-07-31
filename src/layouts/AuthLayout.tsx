@@ -1,5 +1,5 @@
 import { Outlet, Link } from 'react-router-dom'
-import { Bot } from 'lucide-react'
+import { Crown } from 'lucide-react'
 
 const AuthLayout = () => {
   return (
@@ -8,8 +8,8 @@ const AuthLayout = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Bot className="h-8 w-8 text-primary-600" />
-              <span className="ml-2 text-xl font-semibold text-neutral-900">Cassian</span>
+              <Crown className="h-5 w-5 text-primary-600" />
+              <span className="ml-1 text-xl font-semibold text-neutral-900">Cassian</span>
             </div>
             <div>
               <Link
