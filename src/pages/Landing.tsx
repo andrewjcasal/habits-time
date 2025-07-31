@@ -13,6 +13,16 @@ import {
 } from 'lucide-react'
 
 const Landing = () => {
+  const scrollToDemo = () => {
+    const demoSection = document.getElementById('demo')
+    if (demoSection) {
+      demoSection.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }
+  }
+
   return (
     <div className="relative isolate bg-white">
       {/* Hero section */}
@@ -35,101 +45,61 @@ const Landing = () => {
               <div className="mt-10 flex items-center justify-center gap-x-6">
                 <Link
                   to="/login"
-                  className="rounded-md bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-3 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all duration-200"
+                  className="rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all duration-200"
                 >
                   Start Your Journey
-                  <ArrowRight className="ml-2 w-4 h-4 inline" />
                 </Link>
-                <a
-                  href="#features"
+                <button
+                  onClick={scrollToDemo}
                   className="text-sm font-semibold leading-6 text-neutral-900 hover:text-blue-600 transition-colors"
                 >
-                  Learn more <span aria-hidden="true">→</span>
-                </a>
+                  Learn more
+                </button>
               </div>
             </div>
 
-            {/* Visual Demo */}
-            <div className="mt-16 flow-root sm:mt-24">
+            {/* Product Demo Video */}
+            <div id="demo" className="mt-16 flow-root sm:mt-24">
               <div className="relative rounded-xl bg-neutral-900/5 p-2 ring-1 ring-inset ring-neutral-900/10 lg:rounded-2xl lg:p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Smart Calendar Demo */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm border">
-                    <div className="flex items-center mb-3">
-                      <Calendar className="w-5 h-5 text-blue-500 mr-2" />
-                      <span className="font-medium text-sm">Smart Calendar</span>
-                    </div>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-blue-600 font-medium">9:00 AM</span>
-                        <span className="bg-blue-100 px-2 py-1 rounded text-blue-800">
-                          Morning Exercise
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-purple-600 font-medium">10:00 AM</span>
-                        <span className="bg-purple-100 px-2 py-1 rounded text-purple-800">
-                          Client Work
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-yellow-600 font-medium">2:00 PM</span>
-                        <span className="bg-yellow-100 px-2 py-1 rounded text-yellow-800">
-                          Auto-scheduled Task
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-red-600 font-medium">3:30 PM</span>
-                        <span className="bg-red-100 px-2 py-1 rounded text-red-800">
-                          Team Meeting
-                        </span>
-                      </div>
-                    </div>
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                  <div className="p-6 text-center">
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                      See Cassian in Action
+                    </h3>
+                    <p className="text-sm text-neutral-600 mb-6">
+                      A quick 3-minute tour showing how Cassian helps you juggle everything with
+                      smart scheduling
+                    </p>
                   </div>
-
-                  {/* Intelligent Scheduling Demo */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm border">
-                    <div className="flex items-center mb-3">
-                      <Crown className="w-5 h-5 text-green-500 mr-2" />
-                      <span className="font-medium text-sm">Smart Scheduling</span>
-                    </div>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-600">Conflict Detection</span>
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-600">Auto-rescheduling</span>
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-600">Weekend Awareness</span>
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-green-600">AI optimizes your schedule</div>
+                  <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                    <iframe
+                      src="https://www.loom.com/embed/f48837fc769a4e78bae9e738fef5af56?sid=813c9e15-160a-4823-9801-5634649a0b15"
+                      frameBorder="0"
+                      allowFullScreen
+                      className="absolute top-0 left-0 w-full h-full"
+                      title="Cassian App Demo"
+                    ></iframe>
                   </div>
-
-                  {/* Work Tracking Demo */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm border">
-                    <div className="flex items-center mb-3">
-                      <TrendingUp className="w-5 h-5 text-purple-500 mr-2" />
-                      <span className="font-medium text-sm">Work Tracking</span>
-                    </div>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-600">Billable Hours</span>
-                        <span className="font-medium text-green-600">32/40h</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-600">Revenue Target</span>
-                        <span className="font-medium text-purple-600">$2,080</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-600">This Week</span>
-                        <span className="text-xs bg-green-100 px-2 py-1 rounded text-green-800">
-                          On Track
+                  <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                      <div className="flex flex-col items-center">
+                        <Calendar className="w-6 h-6 text-blue-600 mb-2" />
+                        <span className="text-sm font-medium text-neutral-900">Smart Calendar</span>
+                        <span className="text-xs text-neutral-600">
+                          Auto-scheduling & conflicts
                         </span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <Heart className="w-6 h-6 text-purple-600 mb-2" />
+                        <span className="text-sm font-medium text-neutral-900">Habit Tracking</span>
+                        <span className="text-xs text-neutral-600">ADHD-friendly design</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <TrendingUp className="w-6 h-6 text-green-600 mb-2" />
+                        <span className="text-sm font-medium text-neutral-900">
+                          Project Management
+                        </span>
+                        <span className="text-xs text-neutral-600">Freelancer focused</span>
                       </div>
                     </div>
                   </div>
@@ -268,7 +238,7 @@ const Landing = () => {
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link
                 to="/login"
-                className="rounded-md bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-3 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all duration-200"
+                className="rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all duration-200"
               >
                 Get started for free
               </Link>

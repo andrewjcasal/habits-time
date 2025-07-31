@@ -16,6 +16,8 @@ export const initPostHog = () => {
       person_profiles: 'identified_only',
       capture_pageview: false, // We'll handle this manually for better control
       capture_pageleave: true,
+      disable_session_recording: true,
+      toolbar: false, // Disable toolbar to avoid console noise
       loaded: posthog => {
         console.log('PostHog: Successfully loaded')
         if (import.meta.env.DEV) {
