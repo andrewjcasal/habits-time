@@ -274,8 +274,8 @@ const Settings = () => {
                 </p>
               </SettingsSection>
 
-              {/* Todoist Integration Section */}
-              <SettingsSection
+              {/* Todoist Integration Section - Hidden for now */}
+              {/* <SettingsSection
                 icon={Key}
                 title="Todoist Integration"
                 description="Connect your Todoist account to sync tasks and projects. You can find your API token in your Todoist settings under Integrations."
@@ -294,7 +294,7 @@ const Settings = () => {
                     sync with Todoist.
                   </p>
                 </>
-              </SettingsSection>
+              </SettingsSection> */}
 
               {/* Billable Hours Section */}
               <SettingsSection

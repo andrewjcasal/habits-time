@@ -640,6 +640,26 @@ const Calendar = () => {
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
+      {/* Calendar Setup Banner - shown when calendar is sparse */}
+      {!isDataLoading && meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
+        <div className="-mx-2 mb-2 px-4 py-2 bg-amber-50 border-b border-amber-100 sm:mx-0 sm:mb-0 sm:px-4 sm:py-3 sm:bg-amber-50 sm:border sm:border-amber-100 sm:rounded-lg sm:mx-0 sm:mt-0">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <Info className="w-3 h-3 mt-0.5 flex-shrink-0 text-amber-600" />
+            <p className="text-sm text-amber-700 leading-tight sm:leading-relaxed">
+              Your calendar looks empty! Visit the{' '}
+              <a href="/habits" className="font-medium underline hover:text-amber-800">
+                Habits
+              </a>
+              ,{' '}
+              <a href="/projects" className="font-medium underline hover:text-amber-800">
+                Projects
+              </a>
+              , or use the <span className="font-medium">+ button</span> above to add meetings and
+              fill out your schedule.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Top Bar with Navigation and Work Hours */}
       <div className="bg-neutral-100 border-b border-neutral-200 px-2 py-0.5 sm:px-0 sm:py-1">
         {/* Navigation, Work Hours Label, and Planned/Actual all on one line */}
@@ -838,21 +858,6 @@ const Calendar = () => {
         </div>
       </div>
 
-      {/* Calendar Setup Banner - shown when calendar is sparse */}
-      {!isDataLoading && meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
-        <div className="-mx-2 mb-2 px-4 py-2 bg-amber-50 border-b border-amber-100 sm:mx-0 sm:mb-0 sm:px-4 sm:py-3 sm:bg-amber-50 sm:border sm:border-amber-100 sm:rounded-lg sm:mx-2 sm:mt-2">
-          <div className="flex items-start gap-2 sm:gap-3">
-            <Info className="w-3 h-3 mt-0.5 flex-shrink-0 text-amber-600" />
-            <p className="text-sm text-amber-700 leading-tight sm:leading-relaxed">
-              Your calendar looks empty! Visit the{' '}
-              <a href="/habits" className="font-medium underline hover:text-amber-800">Habits</a>,{' '}
-              <a href="/projects" className="font-medium underline hover:text-amber-800">Projects</a>, or use the{' '}
-              <span className="font-medium">+ button</span> above to add meetings and fill out your schedule.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Headers */}
       <div
         className="grid border-b border-neutral-200 min-w-0"
@@ -912,9 +917,7 @@ const Calendar = () => {
                       }}
                     >
                       <div className="border-r border-neutral-200 py-0.5 px-1 sm:p-1 h-16 bg-neutral-50 flex items-start">
-                        <div className="font-mono text-neutral-600 text-xs">
-                          {hour.display}
-                        </div>
+                        <div className="font-mono text-neutral-600 text-xs">{hour.display}</div>
                       </div>
                       {dayColumns.map((column, columnIndex) => (
                         <div
