@@ -839,7 +839,7 @@ const Calendar = () => {
       </div>
 
       {/* Calendar Setup Banner - shown when calendar is sparse */}
-      {meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
+      {!isDataLoading && meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
         <div className="-mx-2 mb-2 px-4 py-2 bg-amber-50 border-b border-amber-100 sm:mx-0 sm:mb-0 sm:px-4 sm:py-3 sm:bg-amber-50 sm:border sm:border-amber-100 sm:rounded-lg sm:mx-2 sm:mt-2">
           <div className="flex items-start gap-2 sm:gap-3">
             <Info className="w-3 h-3 mt-0.5 flex-shrink-0 text-amber-600" />
