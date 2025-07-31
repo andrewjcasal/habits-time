@@ -11,6 +11,7 @@ import AuthLayout from './layouts/AuthLayout'
 // Pages
 import Landing from './pages/Landing'
 import Login from './pages/Login'
+import SignUp from './pages/SignUp'
 import Dashboard from './pages/Dashboard'
 import TimeTracker from './pages/TimeTracker'
 import Essentials from './pages/Essentials'
@@ -57,15 +58,19 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route element={<AuthLayout />}>
-          <Route path="/" element={!user ? <Landing /> : <Navigate to="/dashboard" replace />} />
-          <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/" element={!user ? <Landing /> : <Navigate to="/calendar" replace />} />
+          <Route path="/login" element={!user ? <Login /> : <Navigate to="/calendar" replace />} />
+          <Route
+            path="/sign-up"
+            element={!user ? <SignUp /> : <Navigate to="/calendar" replace />}
+          />
         </Route>
 
         {/* Protected routes */}
         {user ? (
           <Route path="/" element={<MainLayout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
+            <Route index element={<Navigate to="/calendar" replace />} />
+            <Route path="reflections" element={<Dashboard />} />
             <Route path="time-tracker" element={<TimeTracker />} />
             <Route path="essentials" element={<Essentials />} />
             <Route path="daily-overrides" element={<DailyOverrides />} />

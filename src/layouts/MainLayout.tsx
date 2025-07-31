@@ -21,6 +21,7 @@ import {
   Menu,
   X,
   Cat,
+  Notebook,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
@@ -34,15 +35,15 @@ const MainLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: Home },
-    { path: '/time-tracker', label: 'Time Tracker', icon: Clock },
-    { path: '/habits', label: 'Habits', icon: Heart },
-    { path: '/projects', label: 'Projects', icon: FolderOpen },
+    // { path: '/time-tracker', label: 'Time Tracker', icon: Clock },
     { path: '/calendar', label: 'Calendar', icon: Calendar },
-    { path: '/community', label: 'Community', icon: Users },
-    { path: '/todoist', label: 'Todoist', icon: CheckSquare },
-    { path: '/wins', label: 'Wins', icon: Trophy },
+    { path: '/projects', label: 'Projects', icon: FolderOpen },
+    // { path: '/community', label: 'Community', icon: Users },
+    // { path: '/todoist', label: 'Todoist', icon: CheckSquare },
+    { path: '/reflections', label: 'Reflections', icon: Notebook },
+    { path: '/habits', label: 'Habits', icon: Heart },
     { path: '/notes', label: 'Notes', icon: FileText },
+    { path: '/wins', label: 'Wins', icon: Trophy },
   ]
 
   const settingsItem = { path: '/settings', label: 'Settings', icon: Settings }
@@ -153,7 +154,7 @@ const MainLayout = () => {
               {/* Close button and first nav item on same line */}
               <div className="flex items-center justify-between p-0">
                 <NavLink
-                  to="/dashboard"
+                  to="/reflections"
                   onClick={() => setMobileMenuOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center rounded-md px-1 py-1 text-sm font-medium transition-colors ${

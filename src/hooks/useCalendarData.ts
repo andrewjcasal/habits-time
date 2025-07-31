@@ -375,7 +375,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         // Skip habit if it's marked as skipped for this date
         if (dailyLog?.is_skipped) return false
         
-        const effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
+        let effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
 
         if (!effectiveStartTime) return false
@@ -454,7 +454,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       .map(habit => {
         // Use the same effective start time and duration logic as in the filter
         const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
-        const effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
+        let effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
 
         // Additional safety check: if somehow the time is before 6 AM, force it to 6 AM

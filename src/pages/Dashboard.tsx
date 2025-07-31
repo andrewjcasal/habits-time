@@ -181,65 +181,6 @@ const Dashboard = () => {
             )}
           </div>
         </div>
-
-        {/* Sidebar - Behaviors */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-8">
-            <h2 className="text-xl font-medium text-gray-900 mb-4">Behaviors to Consider</h2>
-
-            {behaviorsLoading ? (
-              <div className="animate-pulse space-y-4">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="h-16 bg-gray-200 rounded"></div>
-                ))}
-              </div>
-            ) : behaviors.length > 0 ? (
-              <div className="space-y-4">
-                {Object.entries(groupedBehaviors).map(([category, categoryBehaviors]) => (
-                  <div key={category}>
-                    {category !== 'other' && (
-                      <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wide mb-3">
-                        {category}
-                      </h3>
-                    )}
-                    <div className="space-y-3">
-                      {categoryBehaviors.map(behavior => (
-                        <div
-                          key={behavior.id}
-                          className="bg-white border border-gray-200 rounded-lg p-4"
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <h4 className="font-medium text-gray-900">{behavior.name}</h4>
-                            {behavior.category && (
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(
-                                  behavior.category
-                                )}`}
-                              >
-                                <Tag className="w-3 h-3" />
-                                {behavior.category}
-                              </span>
-                            )}
-                          </div>
-                          {behavior.description && (
-                            <p className="text-sm text-gray-600">{behavior.description}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Tag className="w-8 h-8 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600 text-sm">
-                  No behaviors available. Add some behaviors to get personalized suggestions.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )

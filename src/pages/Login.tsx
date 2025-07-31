@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-type AuthView = 'sign_in' | 'sign_up' | 'forgot_password'
+type AuthView = 'sign_in' | 'forgot_password'
 
 const Login = () => {
   const [view, setView] = useState<AuthView>('sign_in')
@@ -26,23 +26,6 @@ const Login = () => {
     setLoading(false)
   }
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage('')
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-
-    if (error) {
-      setMessage(error.message)
-    } else {
-      setMessage('Check your email for the confirmation link!')
-    }
-    setLoading(false)
-  }
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,8 +44,6 @@ const Login = () => {
 
   const getTitle = () => {
     switch (view) {
-      case 'sign_up':
-        return 'Sign up'
       case 'forgot_password':
         return 'Forgot Password'
       default:
@@ -72,8 +53,6 @@ const Login = () => {
 
   const getButtonText = () => {
     switch (view) {
-      case 'sign_up':
-        return 'Sign up'
       case 'forgot_password':
         return 'Send reset email'
       default:
@@ -83,8 +62,6 @@ const Login = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     switch (view) {
-      case 'sign_up':
-        return handleSignUp(e)
       case 'forgot_password':
         return handleForgotPassword(e)
       default:
@@ -93,14 +70,14 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-4 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
-        <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
-          <div className="mb-6 text-center">
+        <div className="bg-white py-3 px-4 shadow-lg sm:rounded-lg sm:px-10">
+          <div className="mb-2 text-center">
             <h2 className="text-2xl font-bold text-neutral-900">{getTitle()}</h2>
           </div>
           
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-2">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-neutral-700">
                 Email address
@@ -130,7 +107,7 @@ const Login = () => {
                     id="password"
                     name="password"
                     type="password"
-                    autoComplete={view === 'sign_up' ? 'new-password' : 'current-password'}
+                    autoComplete="current-password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -158,7 +135,7 @@ const Login = () => {
             </div>
           </form>
 
-          <div className="mt-6">
+          <div className="mt-2">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-neutral-300" />
@@ -168,12 +145,12 @@ const Login = () => {
               </div>
             </div>
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-2 space-y-1">
               {view === 'sign_in' && (
                 <>
                   <button
                     type="button"
-                    onClick={() => setView('sign_up')}
+                    onClick={() => window.location.href = '/sign-up'}
                     className="w-full text-center text-sm text-blue-600 hover:text-blue-500"
                   >
                     Don't have an account? Sign up
@@ -186,16 +163,6 @@ const Login = () => {
                     Forgot your password?
                   </button>
                 </>
-              )}
-              
-              {view === 'sign_up' && (
-                <button
-                  type="button"
-                  onClick={() => setView('sign_in')}
-                  className="w-full text-center text-sm text-blue-600 hover:text-blue-500"
-                >
-                  Already have an account? Sign in
-                </button>
               )}
               
               {view === 'forgot_password' && (
