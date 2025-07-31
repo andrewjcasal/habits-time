@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { X } from 'lucide-react'
+import { useEffect } from 'react'
 import { Meeting } from '../types'
 
 interface MeetingModalProps {
@@ -32,6 +33,22 @@ const MeetingModal = ({
   editingMeeting,
   onDelete,
 }: MeetingModalProps) => {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown)
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   return (

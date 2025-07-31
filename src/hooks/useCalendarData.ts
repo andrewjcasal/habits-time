@@ -234,18 +234,63 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const addMeeting = async (meetingData: any) => {
     const data = await addMeetingUtil(meetingData)
     setMeetings(prev => [...prev, data])
+    
+    // After adding meeting (especially past meetings with rollover), 
+    // we need to refresh all affected data
+    await refreshCalendarData()
     return data
   }
 
   const updateMeeting = async (id: string, meetingData: any) => {
     const data = await updateMeetingUtil(id, meetingData)
     setMeetings(prev => prev.map(m => m.id === id ? data : m))
+    
+    // After updating meeting, refresh data in case of rollover changes
+    await refreshCalendarData()
     return data
   }
 
   const deleteMeeting = async (id: string) => {
     await deleteMeetingUtil(id)
     setMeetings(prev => prev.filter(m => m.id !== id))
+    
+    // After deleting meeting, refresh data
+    await refreshCalendarData()  
+  }
+
+  // Helper function to refresh all calendar data after meeting changes
+  const refreshCalendarData = async () => {
+    try {
+      console.log('🔄 Refreshing calendar data after meeting change...')
+      
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Re-fetch tasks and task daily logs to get updated hours
+      const [updatedTasks, updatedTasksDailyLogs] = await Promise.all([
+        fetchTasksForProjects(user.id, projects, sessions),
+        supabase
+          .from('tasks_daily_logs')
+          .select('*, tasks!inner(*, projects(*))')
+          .eq('user_id', user.id)
+          .then(({ data, error }) => {
+            if (error) {
+              console.error('Error fetching updated task daily logs:', error)
+              return tasksDailyLogs // Return current state on error
+            }
+            return data || []
+          })
+      ])
+
+      console.log('✅ Refreshed data - updating state...')
+      
+      // Update state with fresh data
+      setAllTasks(updatedTasks)
+      setTasksDailyLogs(updatedTasksDailyLogs)
+      
+    } catch (error) {
+      console.error('❌ Error refreshing calendar data:', error)
+    }
   }
 
 

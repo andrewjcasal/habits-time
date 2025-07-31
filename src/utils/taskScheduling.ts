@@ -314,8 +314,17 @@ export const scheduleAllTasks = async (
   // Create placeholder tasks if we need more billable hours
   let tasksToSchedule = [...unscheduledTasks]
   if (hoursNeeded > 0) {
+    // Generate a proper UUID for placeholder task
+    const crypto = window.crypto || window.msCrypto
+    const uuid = crypto.randomUUID ? crypto.randomUUID() : 
+      'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0
+        const v = c == 'x' ? r : (r & 0x3 | 0x8)
+        return v.toString(16)
+      })
+    
     const placeholderTask = {
-      id: `placeholder-billable-${Date.now()}`,
+      id: uuid,
       title: `Billable Work`,
       estimated_hours: hoursNeeded,
       status: 'todo',

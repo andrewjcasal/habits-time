@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { handleTaskRolloverForPastMeeting } from '../utils/meetingManager'
 
 export interface Meeting {
   id: string
@@ -84,6 +85,9 @@ export const useMeetings = (date?: Date) => {
 
       if (error) throw error
 
+      // Handle task rollover for past meetings
+      await handleTaskRolloverForPastMeeting(data, user.id)
+
       setMeetings(prev =>
         [...prev, data].sort(
           (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
@@ -99,6 +103,11 @@ export const useMeetings = (date?: Date) => {
 
   const updateMeeting = async (id: string, updates: Partial<Meeting>) => {
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
       const { data, error } = await supabase
         .from('meetings')
         .update(updates)
@@ -107,6 +116,11 @@ export const useMeetings = (date?: Date) => {
         .single()
 
       if (error) throw error
+
+      // Handle task rollover for past meetings if time/date changed
+      if (updates.start_time || updates.end_time) {
+        await handleTaskRolloverForPastMeeting(data, user.id)
+      }
 
       setMeetings(prev => prev.map(meeting => (meeting.id === id ? data : meeting)))
 
