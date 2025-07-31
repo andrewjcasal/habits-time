@@ -34,6 +34,11 @@ const Calendar = () => {
   )
   const [selectedTask, setSelectedTask] = useState<any>(null)
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null)
+  
+  // Drag-to-create meeting state
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState<{ time: string; date: Date; hourIndex: number; columnIndex: number; quarter: number } | null>(null)
+  const [dragEnd, setDragEnd] = useState<{ time: string; date: Date; hourIndex: number; columnIndex: number; quarter: number } | null>(null)
 
   // Initialize baseDate from URL parameter or current date
   const getInitialDate = () => {
@@ -350,6 +355,125 @@ const Calendar = () => {
     setSelectedTask(null)
     setSelectedHabit(null)
     setSelectedHabitDate(null)
+    setIsDragging(false)
+    setDragStart(null)
+    setDragEnd(null)
+  }
+
+  // Helper function to get quarter-hour from mouse position within a time slot
+  const getQuarterFromMousePosition = (event: React.MouseEvent, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect()
+    const y = event.clientY - rect.top
+    const quarterHeight = rect.height / 4
+    return Math.floor(y / quarterHeight)
+  }
+
+  // Helper function to convert hour index and quarter to time string
+  const quarterToTimeString = (hourIndex: number, quarter: number) => {
+    const hour = hourSlots[hourIndex]
+    if (!hour) return '09:00'
+    
+    const [hourStr] = hour.time.split(':')
+    const hourNum = parseInt(hourStr, 10)
+    const minutes = quarter * 15
+    
+    return `${hourNum.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+  }
+
+  // Drag handlers for creating meetings
+  const handleMouseDown = (event: React.MouseEvent, timeSlot: string, date: Date, hourIndex: number, columnIndex: number) => {
+    const quarter = getQuarterFromMousePosition(event, event.currentTarget as HTMLElement)
+    setIsDragging(true)
+    setDragStart({ time: timeSlot, date, hourIndex, columnIndex, quarter })
+    setDragEnd({ time: timeSlot, date, hourIndex, columnIndex, quarter })
+  }
+
+  const handleMouseEnter = (event: React.MouseEvent, timeSlot: string, date: Date, hourIndex: number, columnIndex: number) => {
+    if (isDragging && dragStart && columnIndex === dragStart.columnIndex) {
+      const quarter = getQuarterFromMousePosition(event, event.currentTarget as HTMLElement)
+      setDragEnd({ time: timeSlot, date, hourIndex, columnIndex, quarter })
+    }
+  }
+
+  const handleMouseMove = (event: React.MouseEvent, timeSlot: string, date: Date, hourIndex: number, columnIndex: number) => {
+    if (isDragging && dragStart && columnIndex === dragStart.columnIndex) {
+      const quarter = getQuarterFromMousePosition(event, event.currentTarget as HTMLElement)
+      setDragEnd({ time: timeSlot, date, hourIndex, columnIndex, quarter })
+    }
+  }
+
+  const handleMouseUp = () => {
+    if (isDragging && dragStart && dragEnd) {
+      // Calculate start and end times with quarter-hour precision
+      const startTotalQuarters = dragStart.hourIndex * 4 + dragStart.quarter
+      const endTotalQuarters = dragEnd.hourIndex * 4 + dragEnd.quarter
+      
+      const minQuarters = Math.min(startTotalQuarters, endTotalQuarters)
+      const maxQuarters = Math.max(startTotalQuarters, endTotalQuarters) + 1 // Add 1 for exclusive end
+      
+      const startHourIndex = Math.floor(minQuarters / 4)
+      const startQuarter = minQuarters % 4
+      const endHourIndex = Math.floor(maxQuarters / 4)
+      const endQuarter = maxQuarters % 4
+      
+      const startTime = quarterToTimeString(startHourIndex, startQuarter)
+      const endTime = quarterToTimeString(endHourIndex, endQuarter)
+      
+      // Set up the meeting with the dragged time range
+      setNewMeeting({
+        title: '',
+        description: '',
+        start_time: startTime,
+        end_time: endTime,
+        date: format(dragStart.date, 'yyyy-MM-dd'),
+        location: '',
+        meeting_type: 'general' as Meeting['meeting_type'],
+        priority: 'medium' as Meeting['priority'],
+      })
+      setSelectedTimeSlot({ time: startTime, date: dragStart.date })
+      setShowMeetingModal(true)
+    }
+    
+    setIsDragging(false)
+    setDragStart(null)
+    setDragEnd(null)
+  }
+
+  // Add global mouse up listener to handle mouse up outside the calendar
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        handleMouseUp()
+      }
+    }
+
+    document.addEventListener('mouseup', handleGlobalMouseUp)
+    return () => document.removeEventListener('mouseup', handleGlobalMouseUp)
+  }, [isDragging, dragStart, dragEnd])
+
+  // Helper function to check if a time slot is within the drag selection
+  const isInDragSelection = (hourIndex: number, columnIndex: number, quarter?: number) => {
+    if (!isDragging || !dragStart || !dragEnd || columnIndex !== dragStart.columnIndex) {
+      return false
+    }
+    
+    const startTotalQuarters = dragStart.hourIndex * 4 + dragStart.quarter
+    const endTotalQuarters = dragEnd.hourIndex * 4 + dragEnd.quarter
+    
+    const minQuarters = Math.min(startTotalQuarters, endTotalQuarters)
+    const maxQuarters = Math.max(startTotalQuarters, endTotalQuarters)
+    
+    if (quarter !== undefined) {
+      // Check specific quarter
+      const currentQuarters = hourIndex * 4 + quarter
+      return currentQuarters >= minQuarters && currentQuarters <= maxQuarters
+    } else {
+      // Check if any part of the hour overlaps with selection
+      const hourStartQuarters = hourIndex * 4
+      const hourEndQuarters = hourIndex * 4 + 3
+      
+      return !(hourEndQuarters < minQuarters || hourStartQuarters > maxQuarters)
+    }
   }
 
   // Close tooltips when clicking outside
@@ -435,7 +559,7 @@ const Calendar = () => {
             return (
               <div
                 key={`habit-${habit.id}`}
-                className={`absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-blue-50 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors`}
+                className={`absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-blue-100 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-200 transition-colors shadow-sm`}
                 style={getEventStyle(adjustedTopPosition, habitHeight)}
                 onClick={e => {
                   e.stopPropagation()
@@ -469,7 +593,7 @@ const Calendar = () => {
             return (
               <div
                 key={`session-${session.id}`}
-                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-purple-50 border-purple-400 text-purple-800"
+                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-purple-100 border-purple-400 text-purple-800 shadow-sm"
                 style={getEventStyle(adjustedTopPosition, sessionHeight, 10)}
               >
                 <div className="font-medium truncate flex-1">
@@ -517,8 +641,8 @@ const Calendar = () => {
             const taskHeight = (task.estimated_hours || 1) * 64
             const isPlaceholder = task.isPlaceholder || false
             const taskClassName = isPlaceholder 
-              ? "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-green-50 border-green-400 text-green-800 opacity-60 cursor-pointer hover:opacity-80"
-              : "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-50 border-yellow-400 text-yellow-800 opacity-75 cursor-pointer hover:opacity-100"
+              ? "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-green-100 border-green-400 text-green-800 cursor-pointer hover:bg-green-200 shadow-sm"
+              : "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-100 border-yellow-400 text-yellow-800 cursor-pointer hover:bg-yellow-200 shadow-sm"
 
             return (
               <div
@@ -553,7 +677,7 @@ const Calendar = () => {
             return (
               <div
                 key={`meeting-${meeting.id}`}
-                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-red-50 border-red-400 text-red-800"
+                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-red-100 border-red-400 text-red-800 shadow-sm"
                 style={getEventStyle(topPositionInSlot, meetingHeight, 15)}
                 onClick={e => {
                   e.stopPropagation()
@@ -577,7 +701,7 @@ const Calendar = () => {
             return (
               <div
                 key={`task-daily-log-${log.id}`}
-                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-50 border-yellow-400 text-yellow-800 cursor-pointer hover:opacity-100"
+                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-100 border-yellow-400 text-yellow-800 cursor-pointer hover:opacity-100 shadow-sm"
                 style={getEventStyle(log.topPosition, logHeight, 20)}
                 onClick={e => {
                   e.stopPropagation()
@@ -597,8 +721,8 @@ const Calendar = () => {
           {buffersInSlot.map(buffer => {
             const bufferHeight = (buffer.duration / 60) * 64
             const bufferClassName = buffer.isReduced 
-              ? "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-orange-50 border-orange-400 text-orange-800 opacity-80"
-              : "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-indigo-50 border-indigo-400 text-indigo-800"
+              ? "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-orange-100 border-orange-400 text-orange-800 opacity-80 shadow-sm"
+              : "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-indigo-100 border-indigo-400 text-indigo-800 shadow-sm"
 
             return (
               <div
@@ -640,6 +764,19 @@ const Calendar = () => {
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
+      {/* CSS for drag animation */}
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.5;
+            }
+          }
+        `}
+      </style>
       {/* Calendar Setup Banner - shown when calendar is sparse */}
       {!isDataLoading && meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
         <div className="-mx-2 mb-2 px-4 py-2 bg-amber-50 border-b border-amber-100 sm:mx-0 sm:mb-0 sm:px-4 sm:py-3 sm:bg-amber-50 sm:border sm:border-amber-100 sm:rounded-lg sm:mx-0 sm:mt-0">
@@ -910,25 +1047,50 @@ const Calendar = () => {
                   const timeSlotDiv = (
                     <div
                       key={hourIndex}
-                      className="grid border-b border-neutral-100"
+                      className="grid border-b border-neutral-300"
                       style={{
                         gridTemplateColumns: gridCols,
                         height: virtualizedCalendar.itemHeight,
                       }}
                     >
-                      <div className="border-r border-neutral-200 py-0.5 px-1 sm:p-1 h-16 bg-neutral-50 flex items-start">
+                      <div className="border-r border-neutral-300 py-0 px-1 sm:p-1 h-16 bg-neutral-50 flex items-start">
                         <div className="font-mono text-neutral-600 text-xs">{hour.display}</div>
                       </div>
-                      {dayColumns.map((column, columnIndex) => (
-                        <div
-                          key={columnIndex}
-                          className="border-r border-neutral-200 last:border-r-0 p-1 sm:p-0.5 h-16 text-sm sm:text-xs hover:bg-neutral-50 relative cursor-pointer"
-                          onClick={() => handleTimeSlotClick(hour.time, column.date)}
-                        >
-                          {/* Render calendar events */}
-                          {renderCalendarEvents(hour.time, column.date)}
-                        </div>
-                      ))}
+                      {dayColumns.map((column, columnIndex) => {
+                        const isInSelection = isInDragSelection(hourIndex, columnIndex)
+                        
+                        return (
+                          <div
+                            key={columnIndex}
+                            className={`border-r border-neutral-300 last:border-r-0 p-1 sm:p-0.5 h-16 text-sm sm:text-xs relative cursor-pointer select-none hover:bg-neutral-50`}
+                            onClick={() => !isDragging && handleTimeSlotClick(hour.time, column.date)}
+                            onMouseDown={(e) => handleMouseDown(e, hour.time, column.date, hourIndex, columnIndex)}
+                            onMouseEnter={(e) => handleMouseEnter(e, hour.time, column.date, hourIndex, columnIndex)}
+                            onMouseMove={(e) => handleMouseMove(e, hour.time, column.date, hourIndex, columnIndex)}
+                            style={{
+                              userSelect: 'none'
+                            }}
+                          >
+                            {/* Quarter-hour visual divisions */}
+                            <div className="absolute inset-0 pointer-events-none">
+                              {/* Quarter-hour dividing lines */}
+                              {[1, 2, 3].map(quarter => (
+                                <div
+                                  key={`divider-${quarter}`}
+                                  className="absolute left-0 right-0 h-px"
+                                  style={{
+                                    top: `${quarter * 25}%`,
+                                    borderTop: '1px solid rgba(0,0,0,0.05)'
+                                  }}
+                                />
+                              ))}
+                            </div>
+
+                            {/* Render calendar events */}
+                            {renderCalendarEvents(hour.time, column.date)}
+                          </div>
+                        )
+                      })}
                     </div>
                   )
 
@@ -945,6 +1107,47 @@ const Calendar = () => {
             ])}
           </div>
         </div>
+
+        {/* Unified Drag Selection Overlay */}
+        {isDragging && dragStart && dragEnd && (
+          <div className="absolute inset-0 pointer-events-none z-10">
+            {(() => {
+              const startTotalQuarters = dragStart.hourIndex * 4 + dragStart.quarter
+              const endTotalQuarters = dragEnd.hourIndex * 4 + dragEnd.quarter
+              const minQuarters = Math.min(startTotalQuarters, endTotalQuarters)
+              const maxQuarters = Math.max(startTotalQuarters, endTotalQuarters)
+              
+              // Calculate pixel positions
+              const startHourIndex = Math.floor(minQuarters / 4)
+              const startQuarter = minQuarters % 4
+              const endHourIndex = Math.floor(maxQuarters / 4)
+              const endQuarter = maxQuarters % 4
+              
+              const topPosition = (startHourIndex - virtualizedCalendar.visibleRange.start) * 64 + (startQuarter * 16)
+              const endPosition = (endHourIndex - virtualizedCalendar.visibleRange.start) * 64 + ((endQuarter + 1) * 16)
+              const height = endPosition - topPosition
+              
+              // Calculate column position
+              const timeColumnWidth = `calc((100% - ${gridCols.split(' ')[0]}) / ${dayColumns.length})`
+              const leftPosition = `calc(${gridCols.split(' ')[0]} + ${dragStart.columnIndex} * ${timeColumnWidth})`
+              
+              return (
+                <div
+                  className="absolute"
+                  style={{
+                    top: `${topPosition}px`,
+                    left: leftPosition,
+                    width: timeColumnWidth,
+                    height: `${height}px`,
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    animation: 'pulse 1s infinite',
+                    borderRadius: '2px'
+                  }}
+                />
+              )
+            })()}
+          </div>
+        )}
 
         {/* Current Time Line */}
         <div className="absolute inset-0 pointer-events-none">

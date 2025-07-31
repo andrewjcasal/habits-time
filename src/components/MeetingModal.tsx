@@ -70,6 +70,7 @@ const MeetingModal = ({
             value={meeting.title}
             onChange={e => onMeetingChange({ ...meeting, title: e.target.value })}
             className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
+            autoFocus
             required
           />
 
