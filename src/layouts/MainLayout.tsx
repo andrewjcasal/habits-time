@@ -22,6 +22,9 @@ import {
   X,
   Cat,
   Notebook,
+  Sparkles,
+  Zap,
+  Crown,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
@@ -60,7 +63,7 @@ const MainLayout = () => {
       <aside className="hidden md:flex w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
         <div className="p-4">
           <h1 className="text-lg font-semibold text-primary-700 flex items-center">
-            <Bot className="w-4 h-4 mr-2 text-primary-600" />
+            <Crown className="w-4 h-4 mr-2 text-primary-600" />
             Cassian
           </h1>
         </div>
@@ -122,7 +125,7 @@ const MainLayout = () => {
       {/* Mobile Header with Hamburger */}
       <header className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-neutral-200 px-1 py-1 z-30 flex items-center justify-between">
         <div className="flex items-center">
-          <Bot className="w-3 h-3 mr-1 text-primary-600" />
+          <Crown className="w-3 h-3 mr-1 text-primary-600" />
           <h1 className="text-base font-semibold text-primary-700">Cassian</h1>
         </div>
         <button
