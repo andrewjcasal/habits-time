@@ -11,6 +11,7 @@ import {
   Users,
   ArrowRight,
 } from 'lucide-react'
+import { posthog } from '../lib/posthog'
 
 const Landing = () => {
   const scrollToDemo = () => {
@@ -21,6 +22,14 @@ const Landing = () => {
         block: 'start',
       })
     }
+  }
+
+  const trackVideoEngagement = () => {
+    posthog?.capture('demo_video_engaged', {
+      video_type: 'loom',
+      video_title: 'Cassian Product Demo',
+      location: 'landing_page',
+    })
   }
 
   return (
@@ -71,12 +80,16 @@ const Landing = () => {
                       smart scheduling
                     </p>
                   </div>
-                  <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                  <div 
+                    className="relative w-full group" 
+                    style={{ paddingBottom: '56.25%' }}
+                    onMouseEnter={trackVideoEngagement}
+                  >
                     <iframe
                       src="https://www.loom.com/embed/f48837fc769a4e78bae9e738fef5af56?sid=813c9e15-160a-4823-9801-5634649a0b15"
                       frameBorder="0"
                       allowFullScreen
-                      className="absolute top-0 left-0 w-full h-full"
+                      className="absolute top-0 left-0 w-full h-full rounded-lg group-hover:shadow-lg transition-all duration-200"
                       title="Cassian App Demo"
                     ></iframe>
                   </div>
