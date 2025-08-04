@@ -26,7 +26,6 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
   // Track page views
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      console.log('PostHog: Tracking pageview for', location.pathname)
       posthog.capture('$pageview', { path: location.pathname })
     }
   }, [location.pathname])
@@ -34,29 +33,24 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
   // Identify user when they log in
   useEffect(() => {
     if (user?.id) {
-      console.log('PostHog: Identifying user', user.id)
       posthog.identify(user.id, {
         email: user.email,
         // Add any other user properties you want to track
       })
     } else {
-      console.log('PostHog: Resetting user session')
       posthog.reset()
     }
   }, [user])
 
   const track = (event: string, properties?: Record<string, any>) => {
-    console.log('PostHog: Tracking event', event, properties)
     posthog.capture(event, properties)
   }
 
   const identify = (userId: string, properties?: Record<string, any>) => {
-    console.log('PostHog: Identifying user', userId)
     posthog.identify(userId, properties)
   }
 
   const reset = () => {
-    console.log('PostHog: Resetting session')
     posthog.reset()
   }
 

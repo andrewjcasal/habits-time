@@ -9,7 +9,7 @@ export const initPostHog = () => {
       return
     }
     
-    console.log('PostHog: Initializing with key:', posthogKey.substring(0, 8) + '...')
+    
     
     posthog.init(posthogKey, {
       api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
@@ -19,7 +19,7 @@ export const initPostHog = () => {
       disable_session_recording: true,
       toolbar: false, // Disable toolbar to avoid console noise
       loaded: posthog => {
-        console.log('PostHog: Successfully loaded')
+        
         if (import.meta.env.DEV) {
           posthog.debug()
         }

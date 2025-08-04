@@ -128,9 +128,16 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform active:scale-95"
               >
-                {loading ? 'Loading...' : getButtonText()}
+                {loading ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    Loading...
+                  </div>
+                ) : (
+                  getButtonText()
+                )}
               </button>
             </div>
           </form>
@@ -151,14 +158,14 @@ const Login = () => {
                   <button
                     type="button"
                     onClick={() => window.location.href = '/sign-up'}
-                    className="w-full text-center text-sm text-blue-600 hover:text-blue-500"
+                    className="w-full text-center text-sm text-blue-600 hover:text-blue-500 py-2 px-4 rounded transition-all duration-200 hover:bg-blue-50 active:scale-95"
                   >
-                    Don't have an account? Sign up
+                    Don't have an account? <span className="font-medium">Sign up</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setView('forgot_password')}
-                    className="w-full text-center text-sm text-blue-600 hover:text-blue-500"
+                    className="w-full text-center text-sm text-blue-600 hover:text-blue-500 py-2 px-4 rounded transition-all duration-200 hover:bg-blue-50 active:scale-95"
                   >
                     Forgot your password?
                   </button>
@@ -169,9 +176,9 @@ const Login = () => {
                 <button
                   type="button"
                   onClick={() => setView('sign_in')}
-                  className="w-full text-center text-sm text-blue-600 hover:text-blue-500"
+                  className="w-full text-center text-sm text-blue-600 hover:text-blue-500 py-2 px-4 rounded transition-all duration-200 hover:bg-blue-50 active:scale-95"
                 >
-                  Back to sign in
+                  ← Back to sign in
                 </button>
               )}
             </div>

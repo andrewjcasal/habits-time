@@ -11,12 +11,18 @@ const AuthLayout = () => {
               <Crown className="h-5 w-5 text-primary-600" />
               <span className="ml-1 text-xl font-semibold text-neutral-900">Cassian</span>
             </div>
-            <div>
+            <div className="flex items-center space-x-4">
               <Link
                 to="/login"
-                className="text-sm font-semibold leading-6 text-neutral-900 hover:text-blue-600 transition-colors"
+                className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
               >
-                Sign in <span aria-hidden="true">&rarr;</span>
+                Sign in
+              </Link>
+              <Link
+                to="/sign-up"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-blue-500 hover:to-purple-500 transition-all duration-200 shadow-sm"
+              >
+                Get Started
               </Link>
             </div>
           </div>

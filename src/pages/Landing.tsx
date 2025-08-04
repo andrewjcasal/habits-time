@@ -44,17 +44,17 @@ const Landing = () => {
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
                 <Link
-                  to="/login"
+                  to="/sign-up"
                   className="rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all duration-200"
                 >
-                  Start Your Journey
+                  Get Started Free
                 </Link>
-                <button
-                  onClick={scrollToDemo}
+                <Link
+                  to="/login"
                   className="text-sm font-semibold leading-6 text-neutral-900 hover:text-blue-600 transition-colors"
                 >
-                  Learn more
-                </button>
+                  Already have an account? Sign in <ArrowRight className="inline w-4 h-4 ml-1" />
+                </Link>
               </div>
             </div>
 
@@ -237,10 +237,16 @@ const Landing = () => {
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link
-                to="/login"
+                to="/sign-up"
                 className="rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all duration-200"
               >
                 Get started for free
+              </Link>
+              <Link
+                to="/login"
+                className="text-sm font-semibold leading-6 text-neutral-900 hover:text-blue-600 transition-colors"
+              >
+                Sign in
               </Link>
             </div>
           </div>
