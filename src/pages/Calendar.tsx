@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plus, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Info } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
+import { useHabits } from '../hooks/useHabits'
 import { useSettings } from '../hooks/useSettings'
 import { useVirtualizedCalendar } from '../hooks/useVirtualizedCalendar'
 import { Meeting } from '../types'
@@ -93,7 +94,11 @@ const Calendar = () => {
     updateMeeting,
     deleteMeeting,
     isDataLoading,
+    refreshCalendarOnHabitChange,
   } = useCalendarData(windowWidth, baseDate)
+
+  // Use habits hook to enable immediate calendar updates when habit times change
+  useHabits(format(baseDate, 'yyyy-MM-dd'), refreshCalendarOnHabitChange)
 
   // Virtual scrolling for performance
   const virtualizedCalendar = useVirtualizedCalendar(hourSlots.length, {
@@ -834,18 +839,24 @@ const Calendar = () => {
 
             {/* Work Hours Label - desktop only */}
             <div className="hidden sm:block text-sm text-neutral-700 ml-2">
-              Work Hours (until{' '}
-              {settings?.week_ending_day?.charAt(0).toUpperCase() +
-                settings?.week_ending_day?.slice(1) || 'Sunday'}{' '}
-              {new Date(`1970-01-01T${settings?.week_ending_time || '20:30'}`).toLocaleTimeString(
-                'en-US',
-                {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true,
-                }
-              )}{' '}
-              {settings?.week_ending_timezone?.split('/')[1]?.replace('_', ' ') || 'ET'})
+              {settings ? (
+                <>
+                  Work Hours (until{' '}
+                  {settings.week_ending_day?.charAt(0).toUpperCase() +
+                    settings.week_ending_day?.slice(1) || 'Sunday'}{' '}
+                  {new Date(`1970-01-01T${settings.week_ending_time || '20:30'}`).toLocaleTimeString(
+                    'en-US',
+                    {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                    }
+                  )}{' '}
+                  {settings.week_ending_timezone?.split('/')[1]?.replace('_', ' ')})
+                </>
+              ) : (
+                <span className="text-neutral-400">Loading work hours...</span>
+              )}
             </div>
           </div>
 

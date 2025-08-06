@@ -161,9 +161,20 @@ const TasksList = ({
                       </div>
                     )}
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                        {task.priority}
-                      </span>
+                      <select
+                        value={task.priority}
+                        onChange={e => {
+                          e.stopPropagation()
+                          onUpdateTask(task.id, { priority: e.target.value })
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        onFocus={e => e.stopPropagation()}
+                        className={`text-xs font-medium border border-transparent rounded px-1 py-0.5 hover:border-neutral-300 focus:border-primary-500 focus:outline-none ${getPriorityColor(task.priority)} bg-transparent`}
+                      >
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                      </select>
                       <span className="text-xs text-neutral-500">
                         {task.created_at ? new Date(task.created_at).toLocaleDateString() : ''}
                       </span>

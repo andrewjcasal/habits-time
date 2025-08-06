@@ -51,7 +51,7 @@ export function useAutoReflection() {
                              (completedTasks && completedTasks.length > 0)
 
         if (hasCompletions) {
-          console.log('🎯 Auto-generating reflection due to completed habits/tasks in the last 3 days')
+          
           await generateReflection(today)
         }
 
