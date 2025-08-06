@@ -40,16 +40,11 @@ const Landing = () => {
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
             <div className="mx-auto max-w-4xl text-center">
               <h1 className="text-4xl font-bold tracking-tight text-neutral-900 sm:text-6xl">
-                Master Your Time with{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-                  Smart Calendar
-                </span>{' '}
-                Scheduling
+                Your brain isn’t broken. Your calendar just wasn’t built for it.
               </h1>
               <p className="mt-6 text-lg leading-8 text-neutral-600 max-w-2xl mx-auto">
-                Intelligently schedule habits, tasks, and meetings in one unified calendar. Track
-                billable hours, avoid conflicts, and get AI-powered insights to optimize your daily
-                routine.
+                Finally: a flexible, self-correcting planner that adjusts when life derails. Built
+                for solo workers with chaotic days and shifting energy.
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
                 <Link
@@ -80,8 +75,8 @@ const Landing = () => {
                       smart scheduling
                     </p>
                   </div>
-                  <div 
-                    className="relative w-full group" 
+                  <div
+                    className="relative w-full group"
                     style={{ paddingBottom: '56.25%' }}
                     onMouseEnter={trackVideoEngagement}
                   >
