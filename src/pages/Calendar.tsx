@@ -10,6 +10,7 @@ import { Meeting } from '../types'
 import MeetingModal from '../components/MeetingModal'
 import CalendarTaskModal from '../components/CalendarTaskModal'
 import HabitModal from '../components/HabitModal'
+import CalendarEvent from '../components/CalendarEvent'
 import {
   handleHabitTimeChange,
   handleHabitSkip,
@@ -17,6 +18,7 @@ import {
   handleDeleteTask,
 } from '../utils/calendarDatabaseOperations'
 import { calculateWorkHours } from '../utils/workHoursCalculation'
+
 
 const Calendar = () => {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -562,27 +564,18 @@ const Calendar = () => {
             const adjustedTopPosition = baseTopPosition + (verticalOffset / 64) * 100
 
             return (
-              <div
+              <CalendarEvent
                 key={`habit-${habit.id}`}
-                className={`absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-blue-100 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-200 transition-colors shadow-sm`}
+                type="habit"
                 style={getEventStyle(adjustedTopPosition, habitHeight)}
                 onClick={e => {
                   e.stopPropagation()
                   handleHabitClick(habit, date)
                 }}
-              >
-                <div className="font-medium truncate flex-1 flex items-center">
-                  {isRescheduled && (
-                    <Clock className="w-3 h-3 sm:w-2.5 sm:h-2.5 mr-1 flex-shrink-0" />
-                  )}
-                  {habit.name}
-                </div>
-                {effectiveDuration > 0 && (
-                  <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
-                    {effectiveDuration}min
-                  </div>
-                )}
-              </div>
+                eventTitle={habit.name}
+                duration={effectiveDuration > 0 ? `${effectiveDuration}min` : undefined}
+                icon={isRescheduled ? <Clock className="w-3 h-3 sm:w-2.5 sm:h-2.5" /> : undefined}
+              />
             )
           })}
 
@@ -596,18 +589,13 @@ const Calendar = () => {
             const adjustedTopPosition = baseTopPosition + (verticalOffset / 64) * 100
 
             return (
-              <div
+              <CalendarEvent
                 key={`session-${session.id}`}
-                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-purple-100 border-purple-400 text-purple-800 shadow-sm"
+                type="session"
                 style={getEventStyle(adjustedTopPosition, sessionHeight, 10)}
-              >
-                <div className="font-medium truncate flex-1">
-                  {session.projects?.name || 'Project Session'}
-                </div>
-                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
-                  {session.scheduled_hours}h
-                </div>
-              </div>
+                eventTitle={session.projects?.name || 'Project Session'}
+                duration={`${session.scheduled_hours}h`}
+              />
             )
           })}
 
@@ -645,28 +633,19 @@ const Calendar = () => {
 
             const taskHeight = (task.estimated_hours || 1) * 64
             const isPlaceholder = task.isPlaceholder || false
-            const taskClassName = isPlaceholder 
-              ? "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-green-100 border-green-400 text-green-800 cursor-pointer hover:bg-green-200 shadow-sm"
-              : "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-100 border-yellow-400 text-yellow-800 cursor-pointer hover:bg-yellow-200 shadow-sm"
 
             return (
-              <div
+              <CalendarEvent
                 key={`task-${task.id}`}
-                className={taskClassName}
+                type={isPlaceholder ? "placeholder" : "task"}
                 style={getEventStyle(topPositionInSlot, taskHeight, 5)}
                 onClick={e => {
                   e.stopPropagation()
                   handleTaskClick(task)
                 }}
-              >
-                <div className="font-medium truncate flex-1">
-                  {task.title}
-                  {isPlaceholder && <span className="text-xs ml-1 opacity-60">💰</span>}
-                </div>
-                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
-                  {task.estimated_hours}h
-                </div>
-              </div>
+                eventTitle={`${task.title}${isPlaceholder ? ' 💰' : ''}`}
+                duration={`${task.estimated_hours}h`}
+              />
             )
           })}
 
@@ -680,20 +659,17 @@ const Calendar = () => {
             const meetingHeight = (meetingDuration / 60) * 64
 
             return (
-              <div
+              <CalendarEvent
                 key={`meeting-${meeting.id}`}
-                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-red-100 border-red-400 text-red-800 shadow-sm"
+                type="meeting"
                 style={getEventStyle(topPositionInSlot, meetingHeight, 15)}
                 onClick={e => {
                   e.stopPropagation()
                   handleEditMeeting(meeting)
                 }}
-              >
-                <div className="font-medium truncate flex-1">{meeting.title}</div>
-                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
-                  {Math.round(meetingDuration)}min
-                </div>
-              </div>
+                eventTitle={meeting.title}
+                duration={`${Math.round(meetingDuration)}min`}
+              />
             )
           })}
 
@@ -704,46 +680,35 @@ const Calendar = () => {
             const logHeight = duration * 64
 
             return (
-              <div
+              <CalendarEvent
                 key={`task-daily-log-${log.id}`}
-                className="absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-yellow-100 border-yellow-400 text-yellow-800 cursor-pointer hover:opacity-100 shadow-sm"
+                type="tasklog"
                 style={getEventStyle(log.topPosition, logHeight, 20)}
                 onClick={e => {
                   e.stopPropagation()
                   handleTaskClick(log.tasks)
                 }}
-              >
-                <div className="font-medium truncate flex-1">
-                  {log.tasks?.title || 'Task Log'}
-                  <div className="text-xs opacity-75">{log.tasks?.projects?.name || 'Project'}</div>
-                </div>
-                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">{duration}h</div>
-              </div>
+                eventTitle={log.tasks?.title || 'Task Log'}
+                subtitle={log.tasks?.projects?.name || 'Project'}
+                duration={`${duration}h`}
+              />
             )
           })}
 
           {/* Buffer Time */}
           {buffersInSlot.map(buffer => {
             const bufferHeight = (buffer.duration / 60) * 64
-            const bufferClassName = buffer.isReduced 
-              ? "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-orange-100 border-orange-400 text-orange-800 opacity-80 shadow-sm"
-              : "absolute text-sm sm:text-xs p-1 sm:p-0.5 rounded border-l-2 flex items-start justify-between bg-indigo-100 border-indigo-400 text-indigo-800 shadow-sm"
 
             return (
-              <div
+              <CalendarEvent
                 key={`buffer-${buffer.id}`}
-                className={bufferClassName}
+                type={buffer.isReduced ? "reduced-buffer" : "buffer"}
                 style={getEventStyle(buffer.topPosition || 0, bufferHeight, 8)}
                 title={`${buffer.title} - ${buffer.duration} minutes${buffer.isReduced ? ' (reduced due to same day)' : ''}`}
-              >
-                <div className="font-medium truncate flex-1">
-                  {buffer.title}
-                  {buffer.isReduced && <span className="text-xs ml-1 opacity-60">⏰</span>}
-                </div>
-                <div className="text-sm sm:text-xs opacity-75 ml-1 flex-shrink-0">
-                  {buffer.duration}min
-                </div>
-              </div>
+                eventTitle={buffer.title}
+                duration={`${buffer.duration}min`}
+                icon={buffer.isReduced ? <span className="text-xs opacity-60">⏰</span> : undefined}
+              />
             )
           })}
         </>
@@ -1064,22 +1029,30 @@ const Calendar = () => {
                         height: virtualizedCalendar.itemHeight,
                       }}
                     >
-                      <div className="border-r border-neutral-300 py-0 px-1 sm:p-1 h-16 bg-neutral-50 flex items-start">
+                      <div className="border-r border-neutral-300 py-0 px-1 h-16 bg-neutral-50 flex items-start">
                         <div className="font-mono text-neutral-600 text-xs">{hour.display}</div>
                       </div>
                       {dayColumns.map((column, columnIndex) => {
                         const isInSelection = isInDragSelection(hourIndex, columnIndex)
-                        
+
                         return (
                           <div
                             key={columnIndex}
                             className={`border-r border-neutral-300 last:border-r-0 p-1 sm:p-0.5 h-16 text-sm sm:text-xs relative cursor-pointer select-none hover:bg-neutral-50`}
-                            onClick={() => !isDragging && handleTimeSlotClick(hour.time, column.date)}
-                            onMouseDown={(e) => handleMouseDown(e, hour.time, column.date, hourIndex, columnIndex)}
-                            onMouseEnter={(e) => handleMouseEnter(e, hour.time, column.date, hourIndex, columnIndex)}
-                            onMouseMove={(e) => handleMouseMove(e, hour.time, column.date, hourIndex, columnIndex)}
+                            onClick={() =>
+                              !isDragging && handleTimeSlotClick(hour.time, column.date)
+                            }
+                            onMouseDown={e =>
+                              handleMouseDown(e, hour.time, column.date, hourIndex, columnIndex)
+                            }
+                            onMouseEnter={e =>
+                              handleMouseEnter(e, hour.time, column.date, hourIndex, columnIndex)
+                            }
+                            onMouseMove={e =>
+                              handleMouseMove(e, hour.time, column.date, hourIndex, columnIndex)
+                            }
                             style={{
-                              userSelect: 'none'
+                              userSelect: 'none',
                             }}
                           >
                             {/* Quarter-hour visual divisions */}
@@ -1091,7 +1064,7 @@ const Calendar = () => {
                                   className="absolute left-0 right-0 h-px"
                                   style={{
                                     top: `${quarter * 25}%`,
-                                    borderTop: '1px solid rgba(0,0,0,0.05)'
+                                    borderTop: '1px solid rgba(0,0,0,0.05)',
                                   }}
                                 />
                               ))}
