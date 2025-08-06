@@ -4,6 +4,7 @@ import { Settings, Folder, Zap, Info } from 'lucide-react'
 import { useProjects, useTasks } from '../hooks/useProjects'
 import { useSessions } from '../hooks/useContracts'
 import { Project, Task } from '../types'
+import { supabase } from '../lib/supabase'
 import ProjectDropdown from '../components/ProjectDropdown'
 import NewProjectModal from '../components/NewProjectModal'
 import NewSessionModal from '../components/NewSessionModal'
@@ -37,6 +38,7 @@ const Projects = () => {
     loading: sessionsLoading,
     createSessionsWithContract,
     updateSession,
+    refetch: refetchSessions,
   } = useSessions(selectedProject?.id)
 
   // Modal states
@@ -97,6 +99,58 @@ const Projects = () => {
     }
   }
 
+  const handleCompleteSessionTasks = async (sessionId: string) => {
+    try {
+      // Find the session to get its assigned tasks
+      const session = sessionsToShow.find(s => s.id === sessionId)
+      if (!session || !session.assignedTasks) {
+        console.warn('Session not found or has no assigned tasks')
+        return
+      }
+
+      // Mark all assigned tasks as completed
+      for (const task of session.assignedTasks) {
+        await updateTask(task.id, { status: 'completed' })
+      }
+
+      // Create associations in session_tasks table
+      const sessionTasksData = session.assignedTasks.map(task => ({
+        session_id: sessionId,
+        task_id: task.id
+      }))
+
+      const { error: sessionTasksError } = await supabase
+        .from('session_tasks')
+        .upsert(sessionTasksData, { 
+          onConflict: 'session_id,task_id',
+          ignoreDuplicates: true 
+        })
+
+      if (sessionTasksError) {
+        console.error('Error creating session-task associations:', sessionTasksError)
+        // Don't throw here - tasks are still completed even if association fails
+      }
+
+      // Update session notes with completed tasks
+      const taskNames = session.assignedTasks.map(task => task.title).join(', ')
+      const updatedNotes = session.notes 
+        ? `${session.notes}\n\nCompleted tasks: ${taskNames}`
+        : `Completed tasks: ${taskNames}`
+
+      await updateSession(sessionId, { 
+        notes: updatedNotes,
+        status: 'completed'
+      })
+
+      // Refresh tasks and sessions to show updated status
+      await refetchTasks()
+      await refetchSessions()
+    } catch (error) {
+      console.error('Error completing session tasks:', error)
+      throw error // Re-throw so modal stays open on error
+    }
+  }
+
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task)
     setShowTaskModal(true)
@@ -142,18 +196,42 @@ const Projects = () => {
   const upcomingSessions = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const todayString = today.toISOString().split('T')[0]
+    
     return sessions.filter(session => {
       const sessionDate = new Date(session.scheduled_date + 'T00:00:00')
-      return sessionDate >= today && session.status === 'scheduled'
+      const hasSessionTasks = (session as any).session_tasks && (session as any).session_tasks.length > 0
+      const isAfterToday = sessionDate > today
+      const isTodayWithoutCompletion = session.scheduled_date === todayString && 
+        session.status !== 'completed' && !hasSessionTasks
+      
+      return isAfterToday || isTodayWithoutCompletion
+    }).sort((a, b) => {
+      // Sort by scheduled_date ascending (earliest first)
+      const dateA = new Date(a.scheduled_date + 'T00:00:00')
+      const dateB = new Date(b.scheduled_date + 'T00:00:00')
+      return dateA.getTime() - dateB.getTime()
     })
   }, [sessions])
 
   const pastSessions = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const todayString = today.toISOString().split('T')[0]
+    
     return sessions.filter(session => {
       const sessionDate = new Date(session.scheduled_date + 'T00:00:00')
-      return sessionDate < today || session.status === 'completed'
+      const isBeforeToday = sessionDate < today
+      const hasSessionTasks = (session as any).session_tasks && (session as any).session_tasks.length > 0
+      const isTodayWithCompletedTasks = session.scheduled_date === todayString && 
+        (session.status === 'completed' || hasSessionTasks)
+      
+      return isBeforeToday || isTodayWithCompletedTasks
+    }).sort((a, b) => {
+      // Sort by scheduled_date descending (most recent first)
+      const dateA = new Date(a.scheduled_date + 'T00:00:00')
+      const dateB = new Date(b.scheduled_date + 'T00:00:00')
+      return dateB.getTime() - dateA.getTime()
     })
   }, [sessions])
 
@@ -165,9 +243,12 @@ const Projects = () => {
       assignedTasks: [] as Task[],
     }))
 
+    console.log('🔄 Task Assignment Debug:')
+    console.log('📅 Sessions:', sessionsWithTasks.map(s => ({ date: s.scheduled_date, hours: s.scheduled_hours })))
+    console.log('📝 Incomplete Tasks:', incompleteTasks.map(t => ({ title: t.title, hours: t.estimated_hours })))
+
     let currentSessionIndex = 0
     let currentSessionHours = 0
-    const sessionCapacity = 2
 
     const sortedTasks = [...incompleteTasks].sort((a, b) => {
       const priorityOrder = { high: 3, medium: 2, low: 1 }
@@ -176,25 +257,117 @@ const Projects = () => {
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
 
+    console.log('🔀 Sorted Tasks:', sortedTasks.map(t => ({ title: t.title, hours: t.estimated_hours, priority: t.priority })))
+
     for (const task of sortedTasks) {
-      const taskHours = task.estimated_hours || 1
+      // If task has subtasks, assign subtasks individually; otherwise assign the task itself
+      if (task.subtasks && task.subtasks.length > 0) {
+        console.log(`\n🎯 Processing parent task: ${task.title} with ${task.subtasks.length} subtasks`)
+        
+        // Sort subtasks by priority and creation date (same as parent tasks)
+        const sortedSubtasks = [...task.subtasks]
+          .filter(subtask => subtask.status !== 'completed') // Only incomplete subtasks
+          .sort((a, b) => {
+            const priorityOrder = { high: 3, medium: 2, low: 1 }
+            const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority]
+            if (priorityDiff !== 0) return priorityDiff
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          })
 
-      if (
-        currentSessionHours + taskHours <= sessionCapacity &&
-        currentSessionIndex < sessionsWithTasks.length
-      ) {
-        sessionsWithTasks[currentSessionIndex].assignedTasks.push(task)
-        currentSessionHours += taskHours
+        for (const subtask of sortedSubtasks) {
+          const subtaskHours = subtask.estimated_hours || 1
+          let remainingSubtaskHours = subtaskHours
+          
+          console.log(`  🔹 Processing subtask: ${task.title} - ${subtask.title} (${subtaskHours}h)`)
+
+          // Assign this subtask to sessions
+          while (remainingSubtaskHours > 0 && currentSessionIndex < sessionsWithTasks.length) {
+            const currentSessionCapacity = sessionsWithTasks[currentSessionIndex].scheduled_hours
+            const availableCapacity = currentSessionCapacity - currentSessionHours
+            
+            console.log(`    📍 Session ${currentSessionIndex} (${sessionsWithTasks[currentSessionIndex].scheduled_date}): ${currentSessionHours}/${currentSessionCapacity}h used, ${availableCapacity}h available`)
+
+            if (availableCapacity > 0) {
+              // Add subtask to current session
+              if (!sessionsWithTasks[currentSessionIndex].assignedTasks.find(t => t.id === subtask.id)) {
+                // Create a modified subtask that shows parent task context
+                const subtaskWithContext = {
+                  ...subtask,
+                  title: `${task.title} - ${subtask.title}` // Show as "Production - test one"
+                }
+                sessionsWithTasks[currentSessionIndex].assignedTasks.push(subtaskWithContext)
+                console.log(`    ✅ Added subtask to session ${currentSessionIndex}`)
+              }
+              
+              // Use available capacity
+              const hoursToAllocate = Math.min(remainingSubtaskHours, availableCapacity)
+              currentSessionHours += hoursToAllocate
+              remainingSubtaskHours -= hoursToAllocate
+              console.log(`    ⏱️ Allocated ${hoursToAllocate}h, remaining: ${remainingSubtaskHours}h, session now: ${currentSessionHours}h`)
+            }
+
+            // If current session is full or subtask is fully allocated, move to next session
+            if (currentSessionHours >= currentSessionCapacity || remainingSubtaskHours <= 0) {
+              if (remainingSubtaskHours > 0) {
+                console.log(`    ➡️ Moving to next session (${remainingSubtaskHours}h remaining)`)
+                currentSessionIndex++
+                currentSessionHours = 0
+              }
+            }
+          }
+          
+          if (remainingSubtaskHours > 0) {
+            console.log(`    ⚠️ Subtask ${task.title} - ${subtask.title} has ${remainingSubtaskHours}h unallocated (no more sessions)`)
+          }
+        }
       } else {
-        currentSessionIndex++
-        currentSessionHours = 0
+        // Handle tasks without subtasks (original logic)
+        const taskHours = task.estimated_hours || 1
+        let remainingTaskHours = taskHours
+        console.log(`\n🎯 Processing task: ${task.title} (${remainingTaskHours}h)`)
 
-        if (currentSessionIndex < sessionsWithTasks.length) {
-          sessionsWithTasks[currentSessionIndex].assignedTasks.push(task)
-          currentSessionHours += taskHours
+        // Keep assigning this task across sessions until fully allocated
+        while (remainingTaskHours > 0 && currentSessionIndex < sessionsWithTasks.length) {
+          const currentSessionCapacity = sessionsWithTasks[currentSessionIndex].scheduled_hours
+          const availableCapacity = currentSessionCapacity - currentSessionHours
+          
+          console.log(`  📍 Session ${currentSessionIndex} (${sessionsWithTasks[currentSessionIndex].scheduled_date}): ${currentSessionHours}/${currentSessionCapacity}h used, ${availableCapacity}h available`)
+
+          if (availableCapacity > 0) {
+            // Add task to current session
+            if (!sessionsWithTasks[currentSessionIndex].assignedTasks.find(t => t.id === task.id)) {
+              sessionsWithTasks[currentSessionIndex].assignedTasks.push(task)
+              console.log(`  ✅ Added task to session ${currentSessionIndex}`)
+            }
+            
+            // Use available capacity
+            const hoursToAllocate = Math.min(remainingTaskHours, availableCapacity)
+            currentSessionHours += hoursToAllocate
+            remainingTaskHours -= hoursToAllocate
+            console.log(`  ⏱️ Allocated ${hoursToAllocate}h, remaining: ${remainingTaskHours}h, session now: ${currentSessionHours}h`)
+          }
+
+          // If current session is full or task is fully allocated, move to next session
+          if (currentSessionHours >= currentSessionCapacity || remainingTaskHours <= 0) {
+            if (remainingTaskHours > 0) {
+              console.log(`  ➡️ Moving to next session (${remainingTaskHours}h remaining)`)
+              currentSessionIndex++
+              currentSessionHours = 0
+            }
+          }
+        }
+        
+        if (remainingTaskHours > 0) {
+          console.log(`  ⚠️ Task ${task.title} has ${remainingTaskHours}h unallocated (no more sessions)`)
         }
       }
     }
+
+    console.log('\n📊 Final Results:')
+    sessionsWithTasks.forEach((session, index) => {
+      const taskTitles = session.assignedTasks.map(t => t.title).join(', ')
+      console.log(`  Session ${index} (${session.scheduled_date}): ${taskTitles || 'No tasks'}`)
+    })
 
     return sessionsWithTasks
   }, [upcomingSessions, tasks])
@@ -355,6 +528,7 @@ const Projects = () => {
         selectedProject={selectedProject}
         onAddTask={addTask}
         onUpdateTask={updateTask}
+        onDeleteTask={deleteTask}
         onRefetchTasks={refetchTasks}
         onToggleTaskStatus={handleToggleTaskStatus}
       />
@@ -380,6 +554,7 @@ const Projects = () => {
                 sessionsToShow={sessionsToShow}
                 onCopyToClipboard={handleCopyToClipboard}
                 onUpdateSession={updateSession}
+                onCompleteSessionTasks={handleCompleteSessionTasks}
               />
             )}
 

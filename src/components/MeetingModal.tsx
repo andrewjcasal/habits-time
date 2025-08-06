@@ -1,7 +1,8 @@
-import { format } from 'date-fns'
-import { X } from 'lucide-react'
-import { useEffect } from 'react'
+import { format, subWeeks } from 'date-fns'
+import { X, ChevronDown } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Meeting } from '../types'
+import { supabase } from '../lib/supabase'
 
 interface MeetingModalProps {
   isOpen: boolean
@@ -33,19 +34,111 @@ const MeetingModal = ({
   editingMeeting,
   onDelete,
 }: MeetingModalProps) => {
+  const [previousTitles, setPreviousTitles] = useState<{title: string, count: number, lastUsed: Date}[]>([])
+  const [showTitleDropdown, setShowTitleDropdown] = useState(false)
+
+  // Fetch previous meeting titles when modal opens (only for new meetings)
+  useEffect(() => {
+    if (isOpen && !editingMeeting) {
+      fetchPreviousTitles()
+    }
+  }, [isOpen, editingMeeting])
+
+  const fetchPreviousTitles = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const twoWeeksAgo = subWeeks(new Date(), 2)
+      
+      const { data: meetings, error } = await supabase
+        .from('meetings')
+        .select('title, start_time')
+        .eq('user_id', user.id)
+        .not('title', 'is', null)
+        .not('title', 'eq', '')
+        .order('start_time', { ascending: false })
+        .limit(100)
+
+      if (error) {
+        console.error('Error fetching previous meeting titles:', error)
+        return
+      }
+
+      // Group by title and calculate usage stats
+      const titleStats = new Map<string, {count: number, lastUsed: Date, recentCount: number}>()
+      
+      meetings?.forEach(meeting => {
+        const title = meeting.title.trim()
+        const startTime = new Date(meeting.start_time)
+        const isRecent = startTime >= twoWeeksAgo
+        
+        if (titleStats.has(title)) {
+          const stats = titleStats.get(title)!
+          stats.count++
+          if (startTime > stats.lastUsed) {
+            stats.lastUsed = startTime
+          }
+          if (isRecent) {
+            stats.recentCount++
+          }
+        } else {
+          titleStats.set(title, {
+            count: 1,
+            lastUsed: startTime,
+            recentCount: isRecent ? 1 : 0
+          })
+        }
+      })
+
+      // Convert to array and sort: recent usage first, then by total usage, then alphabetically
+      const sortedTitles = Array.from(titleStats.entries())
+        .map(([title, stats]) => ({
+          title,
+          count: stats.count,
+          lastUsed: stats.lastUsed,
+          recentCount: stats.recentCount
+        }))
+        .sort((a, b) => {
+          // First, prioritize titles used in the last 2 weeks
+          if (a.recentCount > 0 && b.recentCount === 0) return -1
+          if (b.recentCount > 0 && a.recentCount === 0) return 1
+          
+          // Within each group, sort by recent usage count, then total count, then alphabetically
+          if (a.recentCount !== b.recentCount) return b.recentCount - a.recentCount
+          if (a.count !== b.count) return b.count - a.count
+          return a.title.localeCompare(b.title)
+        })
+
+      setPreviousTitles(sortedTitles)
+    } catch (error) {
+      console.error('Error fetching previous meeting titles:', error)
+    }
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose()
+        setShowTitleDropdown(false)
+      }
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (!target.closest('.title-dropdown-container')) {
+        setShowTitleDropdown(false)
       }
     }
 
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown)
+      document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [isOpen, onClose])
 
@@ -64,15 +157,54 @@ const MeetingModal = ({
         </div>
 
         <form onSubmit={onSubmit} className="space-y-1">
-          <input
-            type="text"
-            placeholder="Meeting title"
-            value={meeting.title}
-            onChange={e => onMeetingChange({ ...meeting, title: e.target.value })}
-            className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
-            autoFocus
-            required
-          />
+          <div className="relative title-dropdown-container">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Meeting title"
+                value={meeting.title}
+                onChange={e => onMeetingChange({ ...meeting, title: e.target.value })}
+                onFocus={() => setShowTitleDropdown(!editingMeeting && previousTitles.length > 0)}
+                className="w-full px-1 py-1 pr-6 border border-neutral-300 rounded-md text-xs"
+                autoFocus
+                required
+              />
+              {!editingMeeting && previousTitles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowTitleDropdown(!showTitleDropdown)}
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                >
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            
+            {!editingMeeting && showTitleDropdown && previousTitles.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-md shadow-lg z-50 max-h-32 overflow-y-auto">
+                {previousTitles.slice(0, 10).map((titleData, index) => {
+                  const isRecent = titleData.recentCount > 0
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => {
+                        onMeetingChange({ ...meeting, title: titleData.title })
+                        setShowTitleDropdown(false)
+                      }}
+                      className="w-full text-left px-2 py-1 text-xs hover:bg-neutral-50 flex items-center justify-between"
+                    >
+                      <span className="truncate">{titleData.title}</span>
+                      <div className="flex items-center gap-1 text-neutral-400 flex-shrink-0">
+                        {isRecent && <span className="text-blue-500 text-xs">●</span>}
+                        <span className="text-xs">{titleData.count}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-1">
             <input
@@ -85,7 +217,27 @@ const MeetingModal = ({
             <input
               type="time"
               value={meeting.start_time}
-              onChange={e => onMeetingChange({ ...meeting, start_time: e.target.value })}
+              onChange={e => {
+                const newStartTime = e.target.value
+                
+                // Calculate current duration in minutes
+                const startTime = new Date(`1970-01-01T${meeting.start_time}:00`)
+                const endTime = new Date(`1970-01-01T${meeting.end_time}:00`)
+                const durationMs = endTime.getTime() - startTime.getTime()
+                
+                // Calculate new end time maintaining the same duration
+                const newStartDateTime = new Date(`1970-01-01T${newStartTime}:00`)
+                const newEndDateTime = new Date(newStartDateTime.getTime() + durationMs)
+                
+                // Format new end time back to HH:MM
+                const newEndTime = newEndDateTime.toTimeString().slice(0, 5)
+                
+                onMeetingChange({ 
+                  ...meeting, 
+                  start_time: newStartTime,
+                  end_time: newEndTime
+                })
+              }}
               className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
               required
             />

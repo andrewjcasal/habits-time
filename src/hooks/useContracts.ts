@@ -177,7 +177,11 @@ export function useSessions(projectId?: string) {
 
       let query = supabase
         .from('sessions')
-        .select('*, projects(name, color)')
+        .select(`
+          *, 
+          projects(name, color),
+          session_tasks(id, task_id, tasks(id, title, status))
+        `)
         .eq('user_id', user.id)
 
       if (projectId) {
