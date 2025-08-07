@@ -4,7 +4,8 @@ export const calculateWorkHours = (
   scheduledTasksCache: Map<string, any[]>,
   allTasks: any[],
   tasksScheduled: boolean,
-  settings: any
+  settings: any,
+  tasksDailyLogs: any[] = []
 ) => {
   const now = new Date()
 
@@ -26,6 +27,10 @@ export const calculateWorkHours = (
   const [hours, minutes] = weekEndingTime.split(':').map(Number)
   weekEndDate.setHours(hours, minutes, 0, 0)
 
+  // Calculate the last week end date (7 days before current week end)
+  const lastWeekEndDate = new Date(weekEndDate)
+  lastWeekEndDate.setDate(weekEndDate.getDate() - 7)
+
   let plannedHours = 0
   let actualHours = 0
   const actualHoursBreakdown: Array<{
@@ -44,6 +49,7 @@ export const calculateWorkHours = (
     isCompleted: boolean
   }> = []
 
+  // Process scheduled tasks cache
   scheduledTasksCache.forEach((chunks, dateKey) => {
     const chunkDate = new Date(dateKey + 'T00:00:00')
 
@@ -65,6 +71,7 @@ export const calculateWorkHours = (
       // Include chunks that start before the cutoff (partial or full)
       if (chunkDateTime < weekEndDate) {
         const task = allTasks.find(t => t.id === originalTaskId)
+        
         if (task && task.is_billable) {
           // Calculate actual hours to include (partial if chunk crosses cutoff)
           let hoursToInclude = chunk.estimated_hours
@@ -107,6 +114,49 @@ export const calculateWorkHours = (
         }
       }
     })
+  })
+
+  // Process tasks daily logs for planned hours (only since last week ended)
+  tasksDailyLogs.forEach(log => {
+    const task = log.tasks
+    if (task && task.is_billable) {
+      const logDate = new Date(log.log_date + 'T00:00:00')
+      const [startHour, startMinute] = log.scheduled_start_time.split(':').map(Number)
+      const logDateTime = new Date(logDate)
+      logDateTime.setHours(startHour, startMinute, 0, 0)
+
+      // Include logs that are after last week end and before current week end
+      if (logDateTime > lastWeekEndDate && logDateTime < weekEndDate) {
+        const hoursToInclude = Number(log.estimated_hours) || 0
+        
+        // Only include tasks with hourly rates > 0 in planned hours
+        if (task.projects?.hourly_rate && Number(task.projects.hourly_rate) > 0) {
+          plannedHours += hoursToInclude
+        }
+
+        // Add to planned breakdown
+        plannedHoursBreakdown.push({
+          sessionName: `${task.title} (${log.scheduled_start_time})`,
+          projectName: task.projects?.name || 'Project',
+          hours: hoursToInclude,
+          dueDate: log.log_date,
+          hourlyRate: task.projects?.hourly_rate || 0,
+          isCompleted: task.is_complete,
+        })
+
+        // Count actual hours for completed work
+        if (task.is_complete) {
+          actualHours += hoursToInclude
+          actualHoursBreakdown.push({
+            sessionName: `${task.title} (${log.scheduled_start_time})`,
+            projectName: task.projects?.name || 'Project',
+            hours: hoursToInclude,
+            date: log.log_date,
+            hourlyRate: task.projects?.hourly_rate || 0,
+          })
+        }
+      }
+    }
   })
 
   return { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown }

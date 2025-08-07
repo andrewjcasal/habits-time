@@ -783,8 +783,9 @@ const Calendar = () => {
   )
 
   const { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown } = useMemo(
-    () => calculateWorkHours(scheduledTasksCache, allTasks, tasksScheduled, settings),
-    [scheduledTasksCache, allTasks, tasksScheduled, settings]
+    () =>
+      calculateWorkHours(scheduledTasksCache, allTasks, tasksScheduled, settings, tasksDailyLogs),
+    [scheduledTasksCache, allTasks, tasksScheduled, settings, tasksDailyLogs]
   )
 
   return (
@@ -922,45 +923,82 @@ const Calendar = () => {
                 )
               </span>
               {showPlannedHoursTooltip && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-neutral-200 shadow-lg rounded-md p-3 z-50">
-                  <div className="text-sm font-medium text-neutral-900 mb-2">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-neutral-200 shadow-lg rounded-md p-2 z-50">
+                  <div className="text-sm font-medium text-neutral-900">
                     Planned Hours Breakdown
                   </div>
                   {plannedHoursBreakdown.filter(
                     item => item.hourlyRate && Number(item.hourlyRate) > 0
                   ).length > 0 ? (
-                    <div className="space-y-1">
-                      {plannedHoursBreakdown
-                        .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
-                        .map((item, index) => (
-                          <div key={index} className="flex justify-between items-center text-xs">
-                            <div className="flex-1">
-                              <div className="font-medium text-neutral-900 flex items-center">
-                                {item.projectName}
-                                {item.isCompleted && (
-                                  <span className="ml-2 text-green-600 text-xs">✓</span>
-                                )}
-                              </div>
-                              <div className="text-neutral-600 truncate">{item.sessionName}</div>
-                              <div className="text-neutral-600">
-                                Due: {format(new Date(item.dueDate), 'MMM d')}
-                              </div>
-                              {item.hourlyRate && Number(item.hourlyRate) > 0 && (
-                                <div className="text-neutral-500">
-                                  ${Number(item.hourlyRate)}/hr
+                    <div className="space-y-2">
+                      {(() => {
+                        // Group by project
+                        const groupedByProject = plannedHoursBreakdown
+                          .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
+                          .reduce((acc, item) => {
+                            const existingProject = acc.find(
+                              group => group.projectName === item.projectName
+                            )
+                            if (existingProject) {
+                              existingProject.sessions.push(item)
+                              existingProject.totalHours += item.hours
+                              existingProject.totalValue += item.hours * Number(item.hourlyRate)
+                            } else {
+                              acc.push({
+                                projectName: item.projectName,
+                                hourlyRate: item.hourlyRate,
+                                totalHours: item.hours,
+                                totalValue: item.hours * Number(item.hourlyRate),
+                                sessions: [item],
+                              })
+                            }
+                            return acc
+                          }, [])
+
+                        return groupedByProject.map((project, projectIndex) => (
+                          <div
+                            key={projectIndex}
+                            className="border-b border-neutral-100 last:border-b-0 pb-2 last:pb-0"
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <div className="flex items-center gap-2">
+                                <div className="font-medium text-neutral-900">
+                                  {project.projectName}
                                 </div>
-                              )}
-                            </div>
-                            <div className="text-neutral-900 font-medium">
-                              {item.hours.toFixed(1)}h
-                              {item.hourlyRate && Number(item.hourlyRate) > 0 && (
+                                <div className="text-neutral-500 text-xs">
+                                  ${Number(project.hourlyRate)}/hr
+                                </div>
+                              </div>
+                              <div className="text-neutral-900 font-medium">
+                                {project.totalHours.toFixed(1)}h
                                 <div className="text-blue-600 text-xs">
-                                  ${(item.hours * Number(item.hourlyRate)).toFixed(0)}
+                                  ${project.totalValue.toFixed(0)}
                                 </div>
-                              )}
+                              </div>
+                            </div>
+                            <div className="space-y-0.5 ml-2">
+                              {project.sessions.map((session, sessionIndex) => (
+                                <div
+                                  key={sessionIndex}
+                                  className="flex justify-between items-center text-xs"
+                                >
+                                  <div className="flex-1">
+                                    <div className="text-neutral-600 truncate flex items-center">
+                                      {session.sessionName}
+                                      {session.isCompleted && (
+                                        <span className="ml-2 text-green-600">✓</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-neutral-600">
+                                    {session.hours.toFixed(1)}h
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
-                        ))}
+                        ))
+                      })()}
                       <div className="border-t border-neutral-200 pt-1 mt-2">
                         <div className="flex justify-between items-center text-sm font-medium">
                           <span>Total</span>
