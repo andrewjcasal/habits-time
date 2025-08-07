@@ -362,3 +362,55 @@ export function useSessions(projectId?: string) {
     refetch: fetchSessions,
   }
 }
+
+export function usePublicSessions(projectId?: string) {
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSessions([])
+    fetchPublicSessions()
+  }, [projectId])
+
+  const fetchPublicSessions = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      if (!projectId) {
+        setLoading(false)
+        return
+      }
+
+      let query = supabase
+        .from('sessions')
+        .select(`
+          *, 
+          projects(name, color),
+          session_tasks(id, task_id, tasks(id, title, status))
+        `)
+        .eq('project_id', projectId)
+
+      const { data, error: fetchError } = await query.order('scheduled_date', { ascending: true })
+
+      if (fetchError) {
+        setError(fetchError.message)
+        return
+      }
+
+      setSessions(data || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return {
+    sessions,
+    loading,
+    error,
+    refetch: fetchPublicSessions,
+  }
+}

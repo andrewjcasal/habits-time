@@ -293,7 +293,6 @@ export const scheduleAllTasks = async (
       const completedHours = log.actual_duration || log.scheduled_duration || log.estimated_hours || 0
       const currentCompleted = completedHoursByTask.get(log.task_id) || 0
       completedHoursByTask.set(log.task_id, currentCompleted + completedHours)
-      console.log(`⏱️ Task ${log.task_id} completed: ${completedHours}h (total: ${currentCompleted + completedHours}h)`)
     }
   })
   
@@ -307,9 +306,7 @@ export const scheduleAllTasks = async (
     return total
   }, 0)
   
-  console.log(`💰 Billable hours calculation: ${existingBillableHours}h remaining billable work, ${targetHours}h target`)
   const hoursNeeded = Math.max(0, targetHours - existingBillableHours)
-  console.log(`🎯 Hours needed: ${hoursNeeded}h`)
   
   // Create placeholder tasks if we need more billable hours
   let tasksToSchedule = [...unscheduledTasks]
@@ -346,12 +343,6 @@ export const scheduleAllTasks = async (
   let remainingTasks = tasksToSchedule.map(task => {
     const completedHours = completedHoursByTask.get(task.id) || 0
     const remainingHours = Math.max(0, task.estimated_hours - completedHours)
-    
-    if (task.isPlaceholder) {
-      console.log(`🏷️ Placeholder task: ${task.title} - ${remainingHours}h remaining`)
-    } else {
-      console.log(`📋 Regular task: ${task.title} - ${task.estimated_hours}h estimated, ${completedHours}h completed, ${remainingHours}h remaining`)
-    }
     
     return {
       ...task,

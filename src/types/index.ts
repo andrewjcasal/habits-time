@@ -189,6 +189,7 @@ export interface Project {
   color?: string
   hourly_rate?: number
   has_sessions?: boolean
+  is_shareable?: boolean
   created_at: string
   updated_at: string
 }
@@ -311,6 +312,7 @@ export interface Meeting {
   meeting_type: 'general' | 'work' | 'personal' | 'appointment'
   priority: 'low' | 'medium' | 'high'
   status: 'scheduled' | 'completed' | 'cancelled'
+  category_id?: string
   created_at: string
   updated_at: string
 }

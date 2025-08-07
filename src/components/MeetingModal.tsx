@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react'
 import { Meeting } from '../types'
 import { supabase } from '../lib/supabase'
 
+interface Category {
+  id: string
+  name: string
+  color: string
+}
+
 interface MeetingModalProps {
   isOpen: boolean
   onClose: () => void
@@ -16,6 +22,7 @@ interface MeetingModalProps {
     location: string
     meeting_type: Meeting['meeting_type']
     priority: Meeting['priority']
+    category_id?: string
   }
   onMeetingChange: (meeting: any) => void
   onSubmit: (e: React.FormEvent) => void
@@ -36,6 +43,7 @@ const MeetingModal = ({
 }: MeetingModalProps) => {
   const [previousTitles, setPreviousTitles] = useState<{title: string, count: number, lastUsed: Date}[]>([])
   const [showTitleDropdown, setShowTitleDropdown] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
 
   // Fetch previous meeting titles when modal opens (only for new meetings)
   useEffect(() => {
@@ -43,6 +51,35 @@ const MeetingModal = ({
       fetchPreviousTitles()
     }
   }, [isOpen, editingMeeting])
+
+  // Fetch categories when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchCategories()
+    }
+  }, [isOpen])
+
+  const fetchCategories = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('meeting_categories')
+        .select('id, name, color')
+        .eq('user_id', user.id)
+        .order('name')
+
+      if (error) {
+        console.error('Error fetching categories:', error)
+        return
+      }
+
+      setCategories(data || [])
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
+  }
 
   const fetchPreviousTitles = async () => {
     try {
@@ -277,6 +314,26 @@ const MeetingModal = ({
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={meeting.category_id || ''}
+              onChange={e =>
+                onMeetingChange({ 
+                  ...meeting, 
+                  category_id: e.target.value || undefined 
+                })
+              }
+              className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
+            >
+              <option value="">No category</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
             </select>
           </div>
 

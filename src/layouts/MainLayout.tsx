@@ -25,6 +25,7 @@ import {
   Sparkles,
   Zap,
   Crown,
+  Tag,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
@@ -45,6 +46,7 @@ const MainLayout = () => {
     // { path: '/time-tracker', label: 'Time Tracker', icon: Clock },
     { path: '/calendar', label: 'Calendar', icon: Calendar },
     { path: '/projects', label: 'Projects', icon: FolderOpen },
+    { path: '/categories', label: 'Categories', icon: Tag },
     // { path: '/community', label: 'Community', icon: Users },
     // { path: '/todoist', label: 'Todoist', icon: CheckSquare },
     { path: '/reflections', label: 'Reflections', icon: Notebook },

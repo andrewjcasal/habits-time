@@ -19,13 +19,14 @@ const ProjectSettingsModal = ({
   onProjectSelect,
   projects,
 }: ProjectSettingsModalProps) => {
-  const [projectSettings, setProjectSettings] = useState({ hourly_rate: 0, has_sessions: false })
+  const [projectSettings, setProjectSettings] = useState({ hourly_rate: 0, has_sessions: false, is_shareable: false })
 
   useEffect(() => {
     if (selectedProject) {
       setProjectSettings({ 
         hourly_rate: selectedProject.hourly_rate || 0,
-        has_sessions: selectedProject.has_sessions || false
+        has_sessions: selectedProject.has_sessions || false,
+        is_shareable: selectedProject.is_shareable || false
       })
     }
   }, [selectedProject])
@@ -37,6 +38,7 @@ const ProjectSettingsModal = ({
       await onUpdateProject(selectedProject.id, {
         hourly_rate: projectSettings.hourly_rate,
         has_sessions: projectSettings.has_sessions,
+        is_shareable: projectSettings.is_shareable,
       })
       onClose()
     } catch (error) {
@@ -115,6 +117,23 @@ const ProjectSettingsModal = ({
                 className="w-3 h-3"
               />
               <span className="text-xs font-medium text-neutral-700">Has Sessions</span>
+            </label>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={projectSettings.is_shareable}
+                onChange={e =>
+                  setProjectSettings({
+                    ...projectSettings,
+                    is_shareable: e.target.checked,
+                  })
+                }
+                className="w-3 h-3"
+              />
+              <span className="text-xs font-medium text-neutral-700">Is Shareable</span>
             </label>
           </div>
 

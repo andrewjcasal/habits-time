@@ -18,20 +18,6 @@ export function useHabits(selectedDate?: string) {
       setLoading(true)
       setError(null)
 
-      // Use selected date or local date instead of UTC date
-      const now = new Date()
-      const today =
-        selectedDate ||
-        new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0]
-      console.log(
-        'Fetching habits for user:',
-        user.id,
-        'local date:',
-        today,
-        'UTC would be:',
-        new Date().toISOString().split('T')[0]
-      )
-
       // Check if we should auto-uncheck habits based on sleep start time
       await checkAndResetHabitsAfterSleep()
 

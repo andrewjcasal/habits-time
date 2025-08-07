@@ -118,6 +118,131 @@ export function useProjects() {
   }
 }
 
+export function usePublicProject(projectName?: string) {
+  const [project, setProject] = useState<Project | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isShareable, setIsShareable] = useState(false)
+
+  useEffect(() => {
+    if (projectName) {
+      fetchPublicProject(projectName)
+    }
+  }, [projectName])
+
+  const fetchPublicProject = async (name: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Decode the URL parameter to handle spaces and special characters
+      const decodedProjectName = decodeURIComponent(name.replace(/\+/g, ' '))
+
+      // Query for the project by name and check if it's shareable
+      const { data, error: fetchError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('name', decodedProjectName)
+        .eq('is_shareable', true)
+        .eq('status', 'active')
+        .single()
+
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          // No rows returned - project doesn't exist or isn't shareable
+          setError('Project not found or not publicly accessible')
+          setIsShareable(false)
+        } else {
+          setError(fetchError.message)
+        }
+        return
+      }
+
+      setProject(data)
+      setIsShareable(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      setIsShareable(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return {
+    project,
+    loading,
+    error,
+    isShareable,
+    refetch: () => projectName && fetchPublicProject(projectName),
+  }
+}
+
+export function usePublicTasks(projectId?: string) {
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (projectId) {
+      setTasks([])
+      fetchPublicTasks()
+    } else {
+      setTasks([])
+    }
+  }, [projectId])
+
+  const fetchPublicTasks = async () => {
+    if (!projectId) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Fetch all tasks for the project (public access, no user_id filter)
+      const { data, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+
+      if (fetchError) {
+        setError(fetchError.message)
+        return
+      }
+
+      // Group tasks by parent/child relationship
+      const allTasks = data || []
+      const taskMap = new Map(allTasks.map(task => [task.id, { ...task, subtasks: [] }]))
+      const topLevelTasks: Task[] = []
+
+      allTasks.forEach(task => {
+        if (task.parent_task_id) {
+          const parentTask = taskMap.get(task.parent_task_id)
+          if (parentTask) {
+            parentTask.subtasks = parentTask.subtasks || []
+            parentTask.subtasks.push(taskMap.get(task.id)!)
+          }
+        } else {
+          topLevelTasks.push(taskMap.get(task.id)!)
+        }
+      })
+
+      setTasks(topLevelTasks)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return {
+    tasks,
+    loading,
+    error,
+    refetch: fetchPublicTasks,
+  }
+}
+
 export function useTasks(projectId?: string) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)

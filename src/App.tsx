@@ -24,6 +24,7 @@ import Community from './pages/Community'
 import PersonDetail from './pages/PersonDetail'
 import Projects from './pages/Projects'
 import Calendar from './pages/Calendar'
+import Categories from './pages/Categories'
 import Settings from './pages/Settings'
 
 // Components
@@ -77,6 +78,7 @@ function App() {
             <Route path="habits" element={<Habits />} />
             <Route path="projects" element={<Projects />} />
             <Route path="calendar" element={<Calendar />} />
+            <Route path="categories" element={<Categories />} />
             <Route path="todoist" element={<Todoist />} />
             <Route path="wins" element={<Wins />} />
             <Route path="notes" element={<Notes />} />
@@ -85,7 +87,11 @@ function App() {
             <Route path="settings" element={<Settings />} />
           </Route>
         ) : (
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <>
+            {/* Public project route - accessible without authentication */}
+            <Route path="/projects" element={<Projects />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
         )}
       </Routes>
     </>

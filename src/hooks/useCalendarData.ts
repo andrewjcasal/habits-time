@@ -73,8 +73,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setTasksDailyLogs(fetchedTasksDailyLogs)
         setIsDataLoading(false) // Show partial data immediately
         
-        
-
         // Create work hours range function using fetched settings
         const getWorkHoursRangeFromSettings = () => {
           if (!fetchedSettings) {
@@ -261,7 +259,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   // Helper function to refresh all calendar data after meeting changes
   const refreshCalendarData = async () => {
     try {
-      console.log('🔄 Refreshing calendar data after meeting change...')
+      
       
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -282,7 +280,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           })
       ])
 
-      console.log('✅ Refreshed data - updating state...')
+      
       
       // Update state with fresh data
       setAllTasks(updatedTasks)
@@ -430,13 +428,12 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         // Hide anything before 6 AM - enforce minimum time regardless of source
         if (habitStartHour < 6) {
-          console.log(`🚫 Filtering out habit ${habit.name} starting at ${effectiveStartTime} (before 6 AM)`)
           return false
         }
 
         // Additional safety check: if somehow the time is before 6 AM, force it to 6 AM
         if (habitStartHour < 6) {
-          console.log(`⚠️ Forcing habit ${habit.name} from ${effectiveStartTime} to 06:00`)
+          
           effectiveStartTime = '06:00'
         }
 
