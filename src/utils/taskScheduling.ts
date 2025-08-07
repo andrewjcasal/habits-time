@@ -146,6 +146,16 @@ export const scheduleTaskInAvailableSlots = (
   return scheduledChunks
 }
 
+// Priority sorting function
+const sortTasksByPriority = (tasks: any[]) => {
+  const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2, 'placeholder': 3 }
+  return tasks.sort((a, b) => {
+    const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 1
+    const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 1
+    return aPriority - bPriority
+  })
+}
+
 // Helper function for scheduling without billable hours logic
 const scheduleTasksWithoutBillableLogic = async (
   tasksToSchedule: any[],
@@ -178,6 +188,9 @@ const scheduleTasksWithoutBillableLogic = async (
       remainingHours,
     }
   }).filter(task => task.remainingHours > 0)
+
+  // Sort tasks by priority (high > medium > low)
+  remainingTasks = sortTasksByPriority(remainingTasks)
 
   for (const dayColumn of dayColumns) {
     if (remainingTasks.length === 0) break
@@ -308,8 +321,9 @@ export const scheduleAllTasks = async (
   
   const hoursNeeded = Math.max(0, targetHours - existingBillableHours)
   
-  // Create placeholder tasks if we need more billable hours
-  let tasksToSchedule = [...unscheduledTasks]
+  // Sort tasks by priority first, then add placeholder tasks
+  let tasksToSchedule = sortTasksByPriority([...unscheduledTasks])
+  
   if (hoursNeeded > 0) {
     // Generate a proper UUID for placeholder task
     const crypto = window.crypto || window.msCrypto
@@ -325,7 +339,7 @@ export const scheduleAllTasks = async (
       title: `Billable Work`,
       estimated_hours: hoursNeeded,
       status: 'todo',
-      priority: 'medium',
+      priority: 'placeholder',
       projects: {
         id: 'placeholder-project',
         name: 'Billable Work',
@@ -334,7 +348,12 @@ export const scheduleAllTasks = async (
       },
       isPlaceholder: true
     }
+    
+    // Add placeholder task - it will be sorted to the end by priority
     tasksToSchedule.push(placeholderTask)
+    
+    // Re-sort to ensure placeholder comes after all real tasks
+    tasksToSchedule = sortTasksByPriority(tasksToSchedule)
   }
 
   if (tasksToSchedule.length === 0) return new Map()
@@ -349,6 +368,8 @@ export const scheduleAllTasks = async (
       remainingHours,
     }
   }).filter(task => task.remainingHours > 0) // Only schedule tasks with remaining work
+
+  // Tasks are already sorted by priority from above
 
   for (const dayColumn of dayColumns) {
     if (remainingTasks.length === 0) break
