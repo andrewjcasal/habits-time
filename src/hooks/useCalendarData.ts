@@ -372,8 +372,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       // Hide anything before 6 AM
       if (taskStartHour < 6) return false
       
-      return taskStartHour === currentHour
+      const matches = taskStartHour === currentHour
+      return matches
     })
+
 
     return filteredTasks
   }

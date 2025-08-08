@@ -661,6 +661,7 @@ const Calendar = () => {
             // Calculate position within the starting hour slot
             const minutesIntoHour = (taskStartTime - currentHour) * 60
             let topPositionInSlot = (minutesIntoHour / 60) * 100
+            
 
             // Check if there are habits in this slot that would end during this hour
             habitsInSlot.forEach(habit => {
@@ -675,8 +676,10 @@ const Calendar = () => {
               const habitStartTime = habitHour + habitMinute / 60
               const habitEndTime = habitStartTime + effectiveDuration / 60
 
-              // If habit ends in this time slot and after task start time, adjust task position
-              if (habitEndTime > taskStartTime && habitStartTime <= currentHour + 1) {
+
+              // If habit ends in this time slot and task actually conflicts with the habit, adjust task position
+              // Only adjust if the task starts during or after the habit starts (not before)
+              if (habitEndTime > taskStartTime && habitStartTime <= taskStartTime && habitStartTime <= currentHour + 1) {
                 const habitEndMinutes = (habitEndTime - currentHour) * 60
                 const habitEndPosition = (habitEndMinutes / 60) * 100
                 if (habitEndPosition > topPositionInSlot) {
@@ -687,12 +690,15 @@ const Calendar = () => {
 
             const taskHeight = (task.estimated_hours || 1) * 64
             const isPlaceholder = task.isPlaceholder || false
+            
+            const finalStyle = getEventStyle(topPositionInSlot, taskHeight, 5)
+            
 
             return (
               <CalendarEvent
                 key={`task-${task.id}`}
                 type={isPlaceholder ? 'placeholder' : 'task'}
-                style={getEventStyle(topPositionInSlot, taskHeight, 5)}
+                style={finalStyle}
                 onClick={e => {
                   e.stopPropagation()
                   handleTaskClick(task)

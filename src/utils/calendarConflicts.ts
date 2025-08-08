@@ -14,6 +14,9 @@ export const computeConflictMaps = (
   const meetingConflicts = new Map()
   const tasksDailyLogsConflicts = new Map()
   const bufferConflicts = new Map()
+  
+  // Get valid date strings for current view to filter conflicts
+  const validDateStrs = new Set(dayColumns.map(({ dateStr }) => dateStr))
 
   // Pre-compute habit conflicts (exclude non-calendar habits and skipped habits)
   habitsData.filter(habit => habit.habits_types?.scheduling_rule !== 'non_calendar').forEach(habit => {
@@ -78,11 +81,12 @@ export const computeConflictMaps = (
         
         
         // Mark all affected time slots in 15-minute increments
-        // Use Math.round to avoid floating point precision issues
-        const startSlot = Math.floor(adjustedStartTime * 4) / 4
-        const endSlot = Math.ceil(adjustedEndTime * 4) / 4
+        // Round to nearest 15-minute boundary for precise conflict detection
+        const startSlot = Math.round(adjustedStartTime * 4) / 4
+        const endSlot = Math.round(adjustedEndTime * 4) / 4
         for (let time = startSlot; time < endSlot; time += 0.25) {
-          const key = `${dateStr}-${time}`
+          const normalizedTime = Math.round(time * 4) / 4
+          const key = `${dateStr}-${normalizedTime}`
           habitConflicts.set(key, habit)
           
         }
@@ -90,9 +94,12 @@ export const computeConflictMaps = (
     })
   })
   
-  // Pre-compute session conflicts
+  // Pre-compute session conflicts (only for dates in current view)
   sessionsData.forEach(session => {
     if (session.actual_start_time && session.scheduled_date) {
+      // Only process sessions for dates in current view
+      if (!validDateStrs.has(session.scheduled_date)) return
+      
       // Handle timezone-aware time formats like "13:00:00+00" or "13:00:00-05"
       const timeOnly = session.actual_start_time.split(/[+-]/)[0] // Remove timezone part
       const [hours, minutes] = timeOnly.split(':').map(Number)
@@ -100,31 +107,39 @@ export const computeConflictMaps = (
       const duration = session.session_duration || 2 // Default to 2 hours based on your data
       const endTimeInHours = startTimeInHours + duration
       
-      for (let time = Math.floor(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
-        const key = `${session.scheduled_date}-${time}`
+      for (let time = Math.round(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
+        const normalizedTime = Math.round(time * 4) / 4
+        const key = `${session.scheduled_date}-${normalizedTime}`
         sessionConflicts.set(key, session)
       }
     }
   })
   
-  // Pre-compute meeting conflicts
+  // Pre-compute meeting conflicts (only for dates in current view)
   meetingsData.forEach(meeting => {
     const meetingStart = new Date(meeting.start_time)
     const meetingEnd = new Date(meeting.end_time)
     const dateStr = format(meetingStart, 'yyyy-MM-dd')
     
+    // Only process meetings for dates in current view
+    if (!validDateStrs.has(dateStr)) return
+    
     const startTimeInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
     const endTimeInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
     
-    for (let time = Math.floor(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
-      const key = `${dateStr}-${time}`
+    for (let time = Math.round(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
+      const normalizedTime = Math.round(time * 4) / 4
+      const key = `${dateStr}-${normalizedTime}`
       meetingConflicts.set(key, meeting)
     }
   })
   
-  // Pre-compute task daily logs conflicts
+  // Pre-compute task daily logs conflicts (only for dates in current view)
   tasksDailyLogsData.forEach(log => {
     if (log.log_date) {
+      // Only process logs for dates in current view
+      if (!validDateStrs.has(log.log_date)) return
+      
       // Use actual_start_time if available, otherwise fall back to scheduled_start_time
       const startTime = log.actual_start_time || log.scheduled_start_time
       if (startTime) {
@@ -134,8 +149,9 @@ export const computeConflictMaps = (
         const duration = log.actual_duration || log.scheduled_duration || log.estimated_hours || 1
         const endTimeInHours = startTimeInHours + duration
         
-        for (let time = Math.floor(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
-          const key = `${log.log_date}-${time}`
+        for (let time = Math.round(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
+          const normalizedTime = Math.round(time * 4) / 4
+          const key = `${log.log_date}-${normalizedTime}`
           tasksDailyLogsConflicts.set(key, log)
         }
       }
@@ -152,8 +168,9 @@ export const computeConflictMaps = (
       const endTimeInHours = startTimeInHours + durationInHours
       
       // Mark all affected time slots in 15-minute increments
-      for (let time = Math.floor(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
-        const key = `${dateStr}-${time}`
+      for (let time = Math.round(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
+        const normalizedTime = Math.round(time * 4) / 4
+        const key = `${dateStr}-${normalizedTime}`
         bufferConflicts.set(key, buffer)
       }
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Settings, Folder, Zap, Info, Crown } from 'lucide-react'
+import { Settings, Folder, Zap, Info, Crown, Calendar } from 'lucide-react'
 import { useProjects, useTasks, usePublicProject, usePublicTasks } from '../hooks/useProjects'
 import { useSessions, usePublicSessions } from '../hooks/useContracts'
 import { useAuth } from '../hooks/useAuth'
@@ -12,6 +12,7 @@ import NewSessionModal from '../components/NewSessionModal'
 import ProjectSettingsModal from '../components/ProjectSettingsModal'
 import TaskModal from '../components/TaskModal'
 import NewTaskModal from '../components/NewTaskModal'
+import DayViewModal from '../components/DayViewModal'
 import SessionsList from '../components/SessionsList'
 import TasksList from '../components/TasksList'
 
@@ -77,6 +78,7 @@ const Projects = () => {
   const [showNewTaskForm, setShowNewTaskForm] = useState(false)
   const [showNewSessionForm, setShowNewSessionForm] = useState(false)
   const [showProjectSettings, setShowProjectSettings] = useState(false)
+  const [showDayView, setShowDayView] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [showProjectDropdown, setShowProjectDropdown] = useState(false)
 
@@ -527,13 +529,23 @@ const Projects = () => {
 
             {/* Project Settings Button */}
             {selectedProject && (
-              <button
-                onClick={() => setShowProjectSettings(true)}
-                className="flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
-              >
-                <Settings className="w-2 h-2" />
-                <span>Project Settings</span>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowProjectSettings(true)}
+                  className="flex items-center gap-1 px-2 py-1 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
+                >
+                  <Settings className="w-3 h-3" />
+                  <span>Project Settings</span>
+                </button>
+                
+                <button
+                  onClick={() => setShowDayView(true)}
+                  className="flex items-center gap-1 px-2 py-1 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
+                >
+                  <Calendar className="w-3 h-3" />
+                  <span>Day View</span>
+                </button>
+              </div>
             )}
           </div>
         </nav>
@@ -631,6 +643,11 @@ const Projects = () => {
             onClose={() => setShowNewTaskForm(false)}
             selectedProject={selectedProject}
             onCreateTask={addTask}
+          />
+
+          <DayViewModal
+            isOpen={showDayView}
+            onClose={() => setShowDayView(false)}
           />
         </>
       )}

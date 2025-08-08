@@ -30,7 +30,9 @@ export const getAvailableTimeBlocks = (
       const timeSlot = hour.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0')
 
       // Use pre-computed conflict maps for O(1) lookups
-      const conflictKey = `${dateStr}-${timeInHours}`
+      // Round to avoid floating point precision issues
+      const normalizedTime = Math.round(timeInHours * 4) / 4
+      const conflictKey = `${dateStr}-${normalizedTime}`
       const habitConflict = conflictMaps.habitConflicts.get(conflictKey)
       const sessionConflict = conflictMaps.sessionConflicts.get(conflictKey)
       const meetingConflict = conflictMaps.meetingConflicts.get(conflictKey)
@@ -104,7 +106,7 @@ export const scheduleTaskInAvailableSlots = (
         const adjustedChunkHours = chunkEndTime > end ? end - currentChunkStart : chunkHours
         
         if (adjustedChunkHours > 0) {
-          scheduledChunks.push({
+          const chunk = {
             ...taskInfo,
             id: `${taskInfo.id}-chunk-${scheduledChunks.length}`,
             title: `${taskInfo.title}${scheduledChunks.length > 0 ? ` (${scheduledChunks.length + 1})` : ''}`,
@@ -112,7 +114,9 @@ export const scheduleTaskInAvailableSlots = (
             startHour: Math.floor(currentChunkStart),
             estimated_hours: adjustedChunkHours,
             topPosition: 0,
-          })
+          }
+          
+          scheduledChunks.push(chunk)
           remainingHours -= adjustedChunkHours
         }
         currentChunkStart = null
@@ -130,7 +134,7 @@ export const scheduleTaskInAvailableSlots = (
     const adjustedChunkHours = chunkEndTime > end ? end - currentChunkStart : chunkHours
     
     if (adjustedChunkHours > 0) {
-      scheduledChunks.push({
+      const chunk = {
         ...taskInfo,
         id: `${taskInfo.id}-chunk-${scheduledChunks.length}`,
         title: `${taskInfo.title}${scheduledChunks.length > 0 ? ` (${scheduledChunks.length + 1})` : ''}`,
@@ -138,7 +142,9 @@ export const scheduleTaskInAvailableSlots = (
         startHour: Math.floor(currentChunkStart),
         estimated_hours: adjustedChunkHours,
         topPosition: 0,
-      })
+      }
+      
+      scheduledChunks.push(chunk)
     }
   }
 
