@@ -3,6 +3,7 @@ import { X, ChevronDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Meeting } from '../types'
 import { supabase } from '../lib/supabase'
+import TaskDailyLogModal from './TaskDailyLogModal'
 
 interface Category {
   id: string
@@ -29,6 +30,7 @@ interface MeetingModalProps {
   selectedTimeSlot: { time: string; date: Date } | null
   editingMeeting: Meeting | null
   onDelete?: () => void
+  onTaskLogCreated?: () => void
 }
 
 const MeetingModal = ({
@@ -40,10 +42,12 @@ const MeetingModal = ({
   selectedTimeSlot,
   editingMeeting,
   onDelete,
+  onTaskLogCreated,
 }: MeetingModalProps) => {
   const [previousTitles, setPreviousTitles] = useState<{title: string, count: number, lastUsed: Date}[]>([])
   const [showTitleDropdown, setShowTitleDropdown] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
+  const [showTaskLogModal, setShowTaskLogModal] = useState(false)
 
   // Fetch previous meeting titles when modal opens (only for new meetings)
   useEffect(() => {
@@ -372,6 +376,13 @@ const MeetingModal = ({
                 Cancel
               </button>
               <button
+                type="button"
+                onClick={() => setShowTaskLogModal(true)}
+                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+              >
+                + Task Log
+              </button>
+              <button
                 type="submit"
                 className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700"
               >
@@ -381,6 +392,19 @@ const MeetingModal = ({
           </div>
         </form>
       </div>
+
+      <TaskDailyLogModal
+        isOpen={showTaskLogModal}
+        onClose={() => setShowTaskLogModal(false)}
+        selectedDate={selectedTimeSlot?.date || new Date(meeting.date)}
+        selectedTimeSlot={selectedTimeSlot}
+        onTaskLogCreated={() => {
+          setShowTaskLogModal(false)
+          if (onTaskLogCreated) {
+            onTaskLogCreated()
+          }
+        }}
+      />
     </div>
   )
 }

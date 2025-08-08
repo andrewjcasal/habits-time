@@ -1,21 +1,20 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Tag } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { Plus, Edit2, Trash2, Tag, Clock, Users, Calendar, ChevronDown } from 'lucide-react'
+import { format } from 'date-fns'
+import { useMeetingCategories } from '../hooks/useMeetingCategories'
+import { Tabs } from '../components/Tabs'
+import { getTimeRangeByPeriod, formatTimeRange } from '../utils/timeRanges'
+import { formatHours, getTotalHoursAcrossCategories } from '../utils/meetingHoursCalculation'
+import { MeetingCategory } from '../types'
 
-interface Category {
-  id: string
-  name: string
-  description?: string
-  color: string
-  created_at: string
-  updated_at: string
-}
+type TimePeriod = 'thisWeek' | 'lastWeek' | 'last7Days'
 
 const Categories = () => {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
+  const { categories, loading, error, getCategoryMeetingData, addCategory, updateCategory, deleteCategory } = useMeetingCategories()
+  const [activeTab, setActiveTab] = useState<TimePeriod>('thisWeek')
   const [showModal, setShowModal] = useState(false)
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [editingCategory, setEditingCategory] = useState<MeetingCategory | null>(null)
+  const [expandedUncategorized, setExpandedUncategorized] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -33,84 +32,46 @@ const Categories = () => {
     { name: 'Pink', value: '#c2185b' },
   ]
 
-  useEffect(() => {
-    fetchCategories()
-  }, [])
+  const tabs = [
+    { id: 'thisWeek', label: 'This Week' },
+    { id: 'lastWeek', label: 'Last Week' },
+    { id: 'last7Days', label: 'Last 7 Days' },
+  ]
 
-  const fetchCategories = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('meeting_categories')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name')
-
-      if (error) {
-        console.error('Error fetching categories:', error)
-        return
-      }
-
-      setCategories(data || [])
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Get the data for the current time period
+  const timeRange = getTimeRangeByPeriod(activeTab)
+  const categoryData = getCategoryMeetingData(timeRange)
+  const totalHours = getTotalHoursAcrossCategories(categoryData)
+  const uncategorizedData = categoryData.find(c => c.id === null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
       if (editingCategory) {
-        // Update existing category
-        const { error } = await supabase
-          .from('meeting_categories')
-          .update({
-            name: formData.name,
-            description: formData.description || null,
-            color: formData.color
-          })
-          .eq('id', editingCategory.id)
-
-        if (error) {
-          console.error('Error updating category:', error)
-          return
-        }
+        await updateCategory(editingCategory.id, {
+          name: formData.name,
+          description: formData.description || undefined,
+          color: formData.color
+        })
       } else {
-        // Create new category
-        const { error } = await supabase
-          .from('meeting_categories')
-          .insert({
-            user_id: user.id,
-            name: formData.name,
-            description: formData.description || null,
-            color: formData.color
-          })
-
-        if (error) {
-          console.error('Error creating category:', error)
-          return
-        }
+        await addCategory({
+          name: formData.name,
+          description: formData.description || undefined,
+          color: formData.color
+        })
       }
 
-      // Reset form and refresh data
+      // Reset form and close modal
       setFormData({ name: '', description: '', color: '#6b7280' })
       setEditingCategory(null)
       setShowModal(false)
-      fetchCategories()
     } catch (error) {
       console.error('Error saving category:', error)
     }
   }
 
-  const handleEdit = (category: Category) => {
+  const handleEdit = (category: MeetingCategory) => {
     setEditingCategory(category)
     setFormData({
       name: category.name,
@@ -126,17 +87,7 @@ const Categories = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('meeting_categories')
-        .delete()
-        .eq('id', categoryId)
-
-      if (error) {
-        console.error('Error deleting category:', error)
-        return
-      }
-
-      fetchCategories()
+      await deleteCategory(categoryId)
     } catch (error) {
       console.error('Error deleting category:', error)
     }
@@ -156,14 +107,22 @@ const Categories = () => {
     )
   }
 
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-red-500">Error: {error}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen bg-neutral-50 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-neutral-200 px-4 py-3 sm:px-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
             <Tag className="w-5 h-5 text-neutral-600 mr-2" />
-            <h1 className="text-lg font-semibold text-neutral-900">Categories</h1>
+            <h1 className="text-lg font-semibold text-neutral-900">Meeting Categories</h1>
           </div>
           <button
             onClick={() => setShowModal(true)}
@@ -173,6 +132,21 @@ const Categories = () => {
             Add Category
           </button>
         </div>
+        
+        {/* Summary Stats */}
+        <div className="flex items-center justify-between text-sm text-neutral-600 mb-4">
+          <div className="flex items-center space-x-4">
+            <span>Total: {formatHours(totalHours)}</span>
+            <span className="text-neutral-300">•</span>
+            <span>{formatTimeRange(timeRange)}</span>
+          </div>
+          <div className="text-xs text-neutral-500">
+            {categories.length} categories
+          </div>
+        </div>
+        
+        {/* Tabs */}
+        <Tabs tabs={tabs} activeTab={activeTab} onChange={(tab) => setActiveTab(tab as TimePeriod)} />
       </div>
 
       {/* Content */}
@@ -191,11 +165,63 @@ const Categories = () => {
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {categories.map((category) => (
+          <div className="space-y-3">
+            {/* Categories with meetings */}
+            {categoryData.filter(c => c.id !== null).map((category) => {
+              const originalCategory = categories.find(c => c.id === category.id)
+              return (
+                <div
+                  key={category.id}
+                  className="bg-white rounded-lg border border-neutral-200 p-4 hover:shadow-sm transition-shadow"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <h3 className="text-sm font-medium text-neutral-900">{category.name}</h3>
+                          <div className="flex items-center text-xs text-neutral-500 space-x-2">
+                            <Clock className="w-3 h-3" />
+                            <span className="font-medium text-neutral-700">{formatHours(category.totalHours)}</span>
+                            <span className="text-neutral-300">•</span>
+                            <Users className="w-3 h-3" />
+                            <span>{category.meetings.length} meeting{category.meetings.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                        {originalCategory?.description && (
+                          <p className="text-xs text-neutral-500 mt-1">{originalCategory.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => originalCategory && handleEdit(originalCategory)}
+                        className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded transition-colors"
+                        title="Edit category"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => category.id && handleDelete(category.id)}
+                        className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Delete category"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Categories without meetings in this period */}
+            {categories.filter(cat => !categoryData.some(c => c.id === cat.id)).map((category) => (
               <div
                 key={category.id}
-                className="bg-white rounded-lg border border-neutral-200 p-4 hover:shadow-sm transition-shadow"
+                className="bg-white rounded-lg border border-neutral-200 p-4 opacity-50 hover:opacity-75 hover:shadow-sm transition-all"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -203,8 +229,17 @@ const Categories = () => {
                       className="w-4 h-4 rounded-full flex-shrink-0"
                       style={{ backgroundColor: category.color }}
                     />
-                    <div>
-                      <h3 className="text-sm font-medium text-neutral-900">{category.name}</h3>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <h3 className="text-sm font-medium text-neutral-900">{category.name}</h3>
+                        <div className="flex items-center text-xs text-neutral-400 space-x-2">
+                          <Clock className="w-3 h-3" />
+                          <span>0h</span>
+                          <span className="text-neutral-300">•</span>
+                          <Users className="w-3 h-3" />
+                          <span>0 meetings</span>
+                        </div>
+                      </div>
                       {category.description && (
                         <p className="text-xs text-neutral-500 mt-1">{category.description}</p>
                       )}
@@ -229,6 +264,70 @@ const Categories = () => {
                 </div>
               </div>
             ))}
+
+            {/* Uncategorized meetings */}
+            {uncategorizedData && uncategorizedData.totalHours > 0 && (
+              <div className="bg-neutral-50 rounded-lg border border-neutral-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 flex-1">
+                    <div className="w-4 h-4 rounded-full bg-neutral-400 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <h3 className="text-sm font-medium text-neutral-900">Uncategorized</h3>
+                        <div className="flex items-center text-xs text-neutral-500 space-x-2">
+                          <Clock className="w-3 h-3" />
+                          <span className="font-medium text-neutral-700">{formatHours(uncategorizedData.totalHours)}</span>
+                          <span className="text-neutral-300">•</span>
+                          <Users className="w-3 h-3" />
+                          <span>{uncategorizedData.meetings.length} meeting{uncategorizedData.meetings.length !== 1 ? 's' : ''}</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-neutral-500 mt-1">Meetings without assigned categories</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setExpandedUncategorized(!expandedUncategorized)}
+                    className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded transition-colors"
+                    title="Show meetings"
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${
+                      expandedUncategorized ? 'rotate-180' : ''
+                    }`} />
+                  </button>
+                </div>
+                
+                {/* Expanded uncategorized meetings */}
+                {expandedUncategorized && (
+                  <div className="mt-3 pt-3 border-t border-neutral-200 space-y-2">
+                    {uncategorizedData.meetings.map((meeting) => (
+                      <div key={meeting.id} className="bg-white rounded p-3 text-sm">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium text-neutral-900">{meeting.title}</h4>
+                            <div className="flex items-center text-xs text-neutral-500 mt-1 space-x-3">
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="w-3 h-3" />
+                                <span>{format(new Date(meeting.start_time), 'MMM d, yyyy')}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Clock className="w-3 h-3" />
+                                <span>
+                                  {format(new Date(meeting.start_time), 'h:mm a')} - 
+                                  {format(new Date(meeting.end_time), 'h:mm a')}
+                                </span>
+                              </div>
+                              <span className="font-medium">
+                                ({formatHours((new Date(meeting.end_time).getTime() - new Date(meeting.start_time).getTime()) / (1000 * 60 * 60))})
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

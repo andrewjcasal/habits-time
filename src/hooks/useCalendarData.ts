@@ -33,7 +33,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   })
 
   const { settings, getWorkHoursRange } = useSettings()
-  const { saveTaskChunks, clearTaskLogsForDate } = useTaskDailyLogs()
+  const { saveTaskChunks, clearTaskLogsForDate, clearTaskLogsFromTimeForward } = useTaskDailyLogs()
 
   // Don't reset on date changes - keep cached tasks
 
@@ -114,8 +114,18 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           
           setDataHash(newDataHash)
 
-          // Clear today's task logs only when regenerating
-          await clearTaskLogsForDate(user.id, today)
+          // Clear today's task logs from current time forward only when regenerating
+          const now = new Date()
+          const isToday = format(today, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd')
+          
+          if (isToday) {
+            // Only clear logs from current time forward for today
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+            await clearTaskLogsFromTimeForward(user.id, today, currentTime)
+          } else {
+            // For other dates, clear all logs (future dates)
+            await clearTaskLogsForDate(user.id, today)
+          }
 
           try {
             // Schedule tasks - use filtered data consistent with conflict computation
@@ -126,7 +136,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               getWorkHoursRangeFromSettings,
               scheduleTaskInAvailableSlots,
               saveTaskChunks,
-              clearTaskLogsForDate,
+              clearTaskLogsFromTimeForward,
               user.id,
               filteredTasksDailyLogs,
               fetchedSettings?.weekend_days || ['saturday', 'sunday'],
@@ -309,9 +319,19 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
           setDataHash(newDataHash)
           
-          // Clear today's task logs and regenerate
+          // Clear today's task logs from current time forward and regenerate
           const today = new Date()
-          await clearTaskLogsForDate(user.id, today)
+          const now = new Date()
+          const isToday = format(today, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd')
+          
+          if (isToday) {
+            // Only clear logs from current time forward for today
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+            await clearTaskLogsFromTimeForward(user.id, today, currentTime)
+          } else {
+            // For other dates, clear all logs (future dates)
+            await clearTaskLogsForDate(user.id, today)
+          }
           
           // Filter out today's task logs for conflict computation
           const todayStr = format(today, 'yyyy-MM-dd')
@@ -334,7 +354,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               getWorkHoursRange,
               scheduleTaskInAvailableSlots,
               saveTaskChunks,
-              clearTaskLogsForDate,
+              clearTaskLogsFromTimeForward,
               user.id,
               filteredTasksDailyLogs,
               settings?.weekend_days || ['saturday', 'sunday'],
@@ -354,7 +374,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       
       regenerateTasks()
     }
-  }, [habits, sessions, meetings, allTasks, tasksDailyLogs, dataHash, tasksScheduled, dayColumns, getWorkHoursRange, saveTaskChunks, clearTaskLogsForDate])
+  }, [habits, sessions, meetings, allTasks, tasksDailyLogs, dataHash, tasksScheduled, dayColumns, getWorkHoursRange, saveTaskChunks, clearTaskLogsFromTimeForward])
 
   // Get tasks for a specific time slot
   const getTasksForTimeSlot = (timeSlot: string, date: Date) => {

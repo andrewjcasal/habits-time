@@ -1311,6 +1311,10 @@ const Calendar = () => {
         selectedTimeSlot={selectedTimeSlot}
         editingMeeting={editingMeeting}
         onDelete={handleDeleteMeeting}
+        onTaskLogCreated={async () => {
+          // Refresh calendar data when a task log is created
+          window.location.reload()
+        }}
       />
 
       <CalendarTaskModal
