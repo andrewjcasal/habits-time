@@ -581,11 +581,12 @@ const Calendar = () => {
       const meetingsInSlot = getMeetingsForTimeSlot(timeSlot, date)
       const buffersInSlot = getBuffersForCalendarTimeSlot(timeSlot, date)
 
-      // For past dates: only show task daily logs
+      // For past dates and today: show task daily logs
       // For today and future: show auto-generated tasks
       const tasksInSlot =
         (isToday || isFuture) && tasksScheduled ? getTasksForTimeSlot(timeSlot, date) : []
-      const tasksDailyLogsInSlot = isPast ? getTasksDailyLogsForTimeSlot(timeSlot, date) : []
+      const tasksDailyLogsInSlot =
+        isPast || isToday ? getTasksDailyLogsForTimeSlot(timeSlot, date) : []
 
       // Log performance data for each time slot with blocks
       const totalBlocks =
@@ -661,7 +662,6 @@ const Calendar = () => {
             // Calculate position within the starting hour slot
             const minutesIntoHour = (taskStartTime - currentHour) * 60
             let topPositionInSlot = (minutesIntoHour / 60) * 100
-            
 
             // Check if there are habits in this slot that would end during this hour
             habitsInSlot.forEach(habit => {
@@ -676,10 +676,13 @@ const Calendar = () => {
               const habitStartTime = habitHour + habitMinute / 60
               const habitEndTime = habitStartTime + effectiveDuration / 60
 
-
               // If habit ends in this time slot and task actually conflicts with the habit, adjust task position
               // Only adjust if the task starts during or after the habit starts (not before)
-              if (habitEndTime > taskStartTime && habitStartTime <= taskStartTime && habitStartTime <= currentHour + 1) {
+              if (
+                habitEndTime > taskStartTime &&
+                habitStartTime <= taskStartTime &&
+                habitStartTime <= currentHour + 1
+              ) {
                 const habitEndMinutes = (habitEndTime - currentHour) * 60
                 const habitEndPosition = (habitEndMinutes / 60) * 100
                 if (habitEndPosition > topPositionInSlot) {
@@ -690,9 +693,8 @@ const Calendar = () => {
 
             const taskHeight = (task.estimated_hours || 1) * 64
             const isPlaceholder = task.isPlaceholder || false
-            
+
             const finalStyle = getEventStyle(topPositionInSlot, taskHeight, 5)
-            
 
             return (
               <CalendarEvent
@@ -794,6 +796,7 @@ const Calendar = () => {
     [scheduledTasksCache, allTasks, tasksScheduled, settings, tasksDailyLogs]
   )
 
+  console.log('123 plannedhoursbreakdown', plannedHoursBreakdown)
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       {/* CSS for drag animation */}

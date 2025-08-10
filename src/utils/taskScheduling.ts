@@ -1,4 +1,6 @@
 import { format } from 'date-fns'
+import { calculateWorkHours } from './workHoursCalculation'
+import { supabase } from '../lib/supabase'
 
 export const getAvailableTimeBlocks = (
   date: Date, 
@@ -280,7 +282,9 @@ export const scheduleAllTasks = async (
   userId: string,
   tasksDailyLogsData: any[] = [],
   weekendDays: string[] = [],
-  userSettings: any = null
+  userSettings: any = null,
+  allTasks: any[] = [],
+  scheduledTasksCache: Map<string, any[]> = new Map()
 ) => {
   const unscheduledTasks = tasksData.filter(
     task =>
@@ -290,11 +294,49 @@ export const scheduleAllTasks = async (
       task.estimated_hours > 0
   )
 
-  // Calculate total billable hours from existing tasks (only count remaining work from Sunday 8:30pm onwards)
+  // Calculate total billable revenue from existing tasks and completed work
   const billableHoursEnabled = userSettings?.billable_hours_enabled || false
   const TARGET_REVENUE = userSettings?.weekly_revenue_target || 1000
   const DEFAULT_HOURLY_RATE = userSettings?.default_hourly_rate || 65
-  const targetHours = Math.ceil(TARGET_REVENUE / DEFAULT_HOURLY_RATE) // Round up: 15.4 -> 16
+
+  // Calculate already completed billable revenue this week using proven workHoursCalculation logic
+  let completedBillableRevenueThisWeek = 0
+  if (billableHoursEnabled) {
+    // Use the exact same logic as the UI for consistency
+    // Note: The UI uses unfiltered tasksDailyLogs, but scheduling gets filtered ones
+    // We need to get the unfiltered logs for accurate revenue calculation
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return new Map()
+    
+    const { data: unfilteredTasksDailyLogs } = await supabase
+      .from('tasks_daily_logs')
+      .select('*, tasks!inner(*, projects(*))')
+      .eq('user_id', user.id)
+    
+    const { plannedHoursBreakdown } = calculateWorkHours(
+      scheduledTasksCache,
+      allTasks.length > 0 ? allTasks : unscheduledTasks,
+      true, // tasksScheduled
+      userSettings,
+      unfilteredTasksDailyLogs || []
+    )
+    
+    // Calculate total revenue from planned hours breakdown (same as UI)
+    // This includes all task daily logs regardless of completion status
+    completedBillableRevenueThisWeek = plannedHoursBreakdown
+      .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
+      .reduce((total, entry) => {
+        const revenue = entry.hours * Number(entry.hourlyRate)
+        return total + revenue
+      }, 0)
+    
+      console.log('123', plannedHoursBreakdown)
+    console.log('📊 Using workHoursCalculation logic (plannedHoursBreakdown):', {
+      plannedHoursBreakdown: plannedHoursBreakdown.length,
+      billableEntries: plannedHoursBreakdown.filter(item => item.hourlyRate && Number(item.hourlyRate) > 0).length,
+      completedBillableRevenueThisWeek
+    })
+  }
   
   // Skip billable hours logic if disabled
   if (!billableHoursEnabled) {
@@ -315,17 +357,31 @@ export const scheduleAllTasks = async (
     }
   })
   
-  const existingBillableHours = unscheduledTasks.reduce((total, task) => {
+  // Calculate existing billable revenue from remaining tasks
+  const existingBillableRevenue = unscheduledTasks.reduce((total, task) => {
     const hourlyRate = task.projects?.hourly_rate || 0
     if (hourlyRate > 0) {
       const completedHours = completedHoursByTask.get(task.id) || 0
       const remainingHours = Math.max(0, task.estimated_hours - completedHours)
-      return total + remainingHours
+      return total + (remainingHours * hourlyRate)
     }
     return total
   }, 0)
   
-  const hoursNeeded = Math.max(0, targetHours - existingBillableHours)
+  // Calculate remaining revenue needed
+  const revenueNeeded = Math.max(0, TARGET_REVENUE - existingBillableRevenue - completedBillableRevenueThisWeek)
+  
+  // Convert revenue needed to hours using default hourly rate for placeholder task
+  const hoursNeeded = revenueNeeded > 0 ? Math.ceil(revenueNeeded / DEFAULT_HOURLY_RATE) : 0
+  
+  console.log('📊 Billable revenue calculation:', {
+    TARGET_REVENUE,
+    existingBillableRevenue,
+    completedBillableRevenueThisWeek,
+    revenueNeeded,
+    hoursNeeded,
+    DEFAULT_HOURLY_RATE
+  })
   
   // Sort tasks by priority first, then add placeholder tasks
   let tasksToSchedule = sortTasksByPriority([...unscheduledTasks])

@@ -140,7 +140,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               user.id,
               filteredTasksDailyLogs,
               fetchedSettings?.weekend_days || ['saturday', 'sunday'],
-              fetchedSettings
+              fetchedSettings,
+              fetchedTasks, // allTasks
+              new Map() // scheduledTasksCache - empty during initial scheduling
             )
             setScheduledTasksCache(scheduledTasksResult)
             setTasksScheduled(true)
@@ -358,7 +360,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               user.id,
               filteredTasksDailyLogs,
               settings?.weekend_days || ['saturday', 'sunday'],
-              settings
+              settings,
+              allTasks, // allTasks
+              scheduledTasksCache // Pass existing scheduledTasksCache for regeneration
             )
             setScheduledTasksCache(scheduledTasksResult)
             
