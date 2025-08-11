@@ -1166,7 +1166,7 @@ const Calendar = () => {
                         return (
                           <div
                             key={columnIndex}
-                            className={`border-r border-neutral-300 last:border-r-0 p-1 sm:p-0.5 h-16 text-sm sm:text-xs relative cursor-pointer select-none hover:bg-neutral-50`}
+                            className={`border-r border-neutral-300 last:border-r-0 p-1 sm:p-0.5 h-16 text-sm sm:text-xs relative cursor-pointer select-none`}
                             onClick={() =>
                               !isDragging && handleTimeSlotClick(hour.time, column.date)
                             }
@@ -1183,19 +1183,32 @@ const Calendar = () => {
                               userSelect: 'none',
                             }}
                           >
-                            {/* Quarter-hour visual divisions */}
-                            <div className="absolute inset-0 pointer-events-none">
-                              {/* Quarter-hour dividing lines */}
-                              {[1, 2, 3].map(quarter => (
+                            {/* Quarter-hour visual divisions with hover states */}
+                            <div className="absolute inset-0">
+                              {/* Quarter-hour hover zones */}
+                              {[0, 1, 2, 3].map(quarter => (
                                 <div
-                                  key={`divider-${quarter}`}
-                                  className="absolute left-0 right-0 h-px"
+                                  key={`quarter-${quarter}`}
+                                  className="absolute left-0 right-0 hover:bg-neutral-50"
                                   style={{
                                     top: `${quarter * 25}%`,
-                                    borderTop: '1px solid rgba(0,0,0,0.05)',
+                                    height: '25%',
                                   }}
                                 />
                               ))}
+                              {/* Quarter-hour dividing lines */}
+                              <div className="absolute inset-0 pointer-events-none">
+                                {[1, 2, 3].map(quarter => (
+                                  <div
+                                    key={`divider-${quarter}`}
+                                    className="absolute left-0 right-0 h-px"
+                                    style={{
+                                      top: `${quarter * 25}%`,
+                                      borderTop: '1px solid rgba(0,0,0,0.05)',
+                                    }}
+                                  />
+                                ))}
+                              </div>
                             </div>
 
                             {/* Render calendar events */}
