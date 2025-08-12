@@ -249,7 +249,6 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
                   onChange={e => {
                     const newTitle = e.target.value
                     setLocalTitle(newTitle)
-                    setNewMeeting({ ...meeting, title: newTitle })
                     // Show/hide dropdown based on title length
                     if (newTitle.length > 3) {
                       setShowTitleDropdown(false)

@@ -19,6 +19,7 @@
     "@supabase/supabase-js": "^2.39.7",
     "@tauri-apps/api": "^2.5.0",
     "classnames": "^2.5.1",
+    "clsx": "^2.1.1",
     "date-fns": "^3.3.1",
     "framer-motion": "^11.0.8",
     "lucide-react": "^0.344.0",
@@ -26,6 +27,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.6.2",
+    "tailwind-merge": "^3.3.1",
     "zustand": "^4.5.2"
   },
   "devDependencies": {

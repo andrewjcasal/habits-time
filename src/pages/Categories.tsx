@@ -5,12 +5,21 @@ import { useMeetingCategories } from '../hooks/useMeetingCategories'
 import { Tabs } from '../components/Tabs'
 import { getTimeRangeByPeriod, formatTimeRange } from '../utils/timeRanges'
 import { formatHours, getTotalHoursAcrossCategories } from '../utils/meetingHoursCalculation'
-import { MeetingCategory } from '../types'
+import { MeetingCategory, Meeting } from '../types'
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '../components/ui/table'
+import { supabase } from '../lib/supabase'
 
 type TimePeriod = 'thisWeek' | 'lastWeek' | 'last7Days'
 
 const Categories = () => {
-  const { categories, loading, error, getCategoryMeetingData, addCategory, updateCategory, deleteCategory } = useMeetingCategories()
+  const { categories, meetings, loading, error, getCategoryMeetingData, addCategory, updateCategory, deleteCategory, refetch } = useMeetingCategories()
   const [activeTab, setActiveTab] = useState<TimePeriod>('thisWeek')
   const [showModal, setShowModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<MeetingCategory | null>(null)
@@ -99,6 +108,22 @@ const Categories = () => {
     setFormData({ name: '', description: '', color: '#6b7280' })
   }
 
+  const updateMeetingCategory = async (meetingId: string, categoryId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('meetings')
+        .update({ category_id: categoryId })
+        .eq('id', meetingId)
+
+      if (error) throw error
+
+      // Refresh the data to update the UI
+      await refetch()
+    } catch (error) {
+      console.error('Error updating meeting category:', error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -165,169 +190,174 @@ const Categories = () => {
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* Categories with meetings */}
-            {categoryData.filter(c => c.id !== null).map((category) => {
-              const originalCategory = categories.find(c => c.id === category.id)
-              return (
-                <div
-                  key={category.id}
-                  className="bg-white rounded-lg border border-neutral-200 p-4 hover:shadow-sm transition-shadow"
-                >
+          <div className="space-y-6">
+            {/* Uncategorized Table */}
+            {uncategorizedData && uncategorizedData.totalHours > 0 && (
+              <div className="bg-white rounded-lg border border-neutral-200">
+                <div className="px-4 py-3 border-b border-neutral-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div
-                        className="w-4 h-4 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <h3 className="text-sm font-medium text-neutral-900">{category.name}</h3>
-                          <div className="flex items-center text-xs text-neutral-500 space-x-2">
-                            <Clock className="w-3 h-3" />
-                            <span className="font-medium text-neutral-700">{formatHours(category.totalHours)}</span>
-                            <span className="text-neutral-300">•</span>
-                            <Users className="w-3 h-3" />
-                            <span>{category.meetings.length} meeting{category.meetings.length !== 1 ? 's' : ''}</span>
-                          </div>
-                        </div>
-                        {originalCategory?.description && (
-                          <p className="text-xs text-neutral-500 mt-1">{originalCategory.description}</p>
-                        )}
+                      <div className="w-4 h-4 rounded-full bg-neutral-400 flex-shrink-0" />
+                      <h3 className="text-sm font-medium text-neutral-900">Uncategorized</h3>
+                      <div className="flex items-center text-xs text-neutral-500 space-x-2">
+                        <Clock className="w-3 h-3" />
+                        <span className="font-medium text-neutral-700">{formatHours(uncategorizedData.totalHours)}</span>
+                        <span className="text-neutral-300">•</span>
+                        <Users className="w-3 h-3" />
+                        <span>{uncategorizedData.meetings.length} meeting{uncategorizedData.meetings.length !== 1 ? 's' : ''}</span>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => originalCategory && handleEdit(originalCategory)}
-                        className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded transition-colors"
-                        title="Edit category"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => category.id && handleDelete(category.id)}
-                        className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Delete category"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
                   </div>
-                </div>
-              )
-            })}
-
-            {/* Categories without meetings in this period */}
-            {categories.filter(cat => !categoryData.some(c => c.id === cat.id)).map((category) => (
-              <div
-                key={category.id}
-                className="bg-white rounded-lg border border-neutral-200 p-4 opacity-50 hover:opacity-75 hover:shadow-sm transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-4 h-4 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: category.color }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <h3 className="text-sm font-medium text-neutral-900">{category.name}</h3>
-                        <div className="flex items-center text-xs text-neutral-400 space-x-2">
-                          <Clock className="w-3 h-3" />
-                          <span>0h</span>
-                          <span className="text-neutral-300">•</span>
-                          <Users className="w-3 h-3" />
-                          <span>0 meetings</span>
-                        </div>
-                      </div>
-                      {category.description && (
-                        <p className="text-xs text-neutral-500 mt-1">{category.description}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleEdit(category)}
-                      className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded transition-colors"
-                      title="Edit category"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(category.id)}
-                      className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="Delete category"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Uncategorized meetings */}
-            {uncategorizedData && uncategorizedData.totalHours > 0 && (
-              <div className="bg-neutral-50 rounded-lg border border-neutral-200 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 flex-1">
-                    <div className="w-4 h-4 rounded-full bg-neutral-400 flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <h3 className="text-sm font-medium text-neutral-900">Uncategorized</h3>
-                        <div className="flex items-center text-xs text-neutral-500 space-x-2">
-                          <Clock className="w-3 h-3" />
-                          <span className="font-medium text-neutral-700">{formatHours(uncategorizedData.totalHours)}</span>
-                          <span className="text-neutral-300">•</span>
-                          <Users className="w-3 h-3" />
-                          <span>{uncategorizedData.meetings.length} meeting{uncategorizedData.meetings.length !== 1 ? 's' : ''}</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-neutral-500 mt-1">Meetings without assigned categories</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setExpandedUncategorized(!expandedUncategorized)}
-                    className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded transition-colors"
-                    title="Show meetings"
-                  >
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${
-                      expandedUncategorized ? 'rotate-180' : ''
-                    }`} />
-                  </button>
                 </div>
                 
-                {/* Expanded uncategorized meetings */}
-                {expandedUncategorized && (
-                  <div className="mt-3 pt-3 border-t border-neutral-200 space-y-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Meeting</TableHead>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Category</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {uncategorizedData.meetings.map((meeting) => (
-                      <div key={meeting.id} className="bg-white rounded p-3 text-sm">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium text-neutral-900">{meeting.title}</h4>
-                            <div className="flex items-center text-xs text-neutral-500 mt-1 space-x-3">
-                              <div className="flex items-center space-x-1">
-                                <Calendar className="w-3 h-3" />
-                                <span>{format(new Date(meeting.start_time), 'MMM d, yyyy')}</span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <Clock className="w-3 h-3" />
-                                <span>
-                                  {format(new Date(meeting.start_time), 'h:mm a')} - 
-                                  {format(new Date(meeting.end_time), 'h:mm a')}
-                                </span>
-                              </div>
-                              <span className="font-medium">
-                                ({formatHours((new Date(meeting.end_time).getTime() - new Date(meeting.start_time).getTime()) / (1000 * 60 * 60))})
-                              </span>
+                      <TableRow key={meeting.id}>
+                        <TableCell className="font-medium">{meeting.title}</TableCell>
+                        <TableCell>
+                          <div className="text-xs text-neutral-600">
+                            <div>{format(new Date(meeting.start_time), 'MMM d, yyyy')}</div>
+                            <div>
+                              {format(new Date(meeting.start_time), 'h:mm a')} - 
+                              {format(new Date(meeting.end_time), 'h:mm a')}
                             </div>
                           </div>
-                        </div>
-                      </div>
+                        </TableCell>
+                        <TableCell>
+                          {formatHours((new Date(meeting.end_time).getTime() - new Date(meeting.start_time).getTime()) / (1000 * 60 * 60))}
+                        </TableCell>
+                        <TableCell>
+                          <select
+                            value={meeting.category_id || ''}
+                            onChange={(e) => updateMeetingCategory(meeting.id, e.target.value || null)}
+                            className="text-xs border border-neutral-300 rounded px-2 py-1 min-w-32"
+                          >
+                            <option value="">Select category</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </div>
-                )}
+                  </TableBody>
+                </Table>
               </div>
             )}
+
+            {/* Categories Table */}
+            <div className="bg-white rounded-lg border border-neutral-200">
+              <div className="px-4 py-3 border-b border-neutral-200">
+                <h3 className="text-sm font-medium text-neutral-900">Categories</h3>
+              </div>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Hours</TableHead>
+                    <TableHead>Meetings</TableHead>
+                    <TableHead className="w-20">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* Categories with meetings */}
+                  {categoryData.filter(c => c.id !== null).map((category) => {
+                    const originalCategory = categories.find(c => c.id === category.id)
+                    return (
+                      <TableRow key={category.id}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: category.color }}
+                            />
+                            <span className="font-medium">{category.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-neutral-500">
+                          {originalCategory?.description || '-'}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {formatHours(category.totalHours)}
+                        </TableCell>
+                        <TableCell>
+                          {category.meetings.length} meeting{category.meetings.length !== 1 ? 's' : ''}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => originalCategory && handleEdit(originalCategory)}
+                              className="p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded"
+                              title="Edit category"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => category.id && handleDelete(category.id)}
+                              className="p-1 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded"
+                              title="Delete category"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                  
+                  {/* Categories without meetings in this period */}
+                  {categories.filter(cat => !categoryData.some(c => c.id === cat.id)).map((category) => (
+                    <TableRow key={category.id} className="opacity-50">
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <span className="font-medium">{category.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-neutral-500">
+                        {category.description || '-'}
+                      </TableCell>
+                      <TableCell className="text-neutral-400">0h</TableCell>
+                      <TableCell className="text-neutral-400">0 meetings</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={() => handleEdit(category)}
+                            className="p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded"
+                            title="Edit category"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(category.id)}
+                            className="p-1 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Delete category"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </div>
