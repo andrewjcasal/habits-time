@@ -444,20 +444,8 @@ const CalendarContent = ({ onSetCreateHandler, onSetDeleteHandler }: CalendarCon
       const startTime = quarterToTimeString(startHourIndex, startQuarter)
       const endTime = quarterToTimeString(endHourIndex, endQuarter)
 
-      // Set up the meeting with the dragged time range
-      setNewMeeting({
-        title: '',
-        description: '',
-        start_time: startTime,
-        end_time: endTime,
-        date: format(dragStart.date, 'yyyy-MM-dd'),
-        location: '',
-        meeting_type: 'general' as Meeting['meeting_type'],
-        priority: 'medium' as Meeting['priority'],
-        category_id: undefined,
-      })
-      setSelectedTimeSlot({ time: startTime, date: dragStart.date })
-      setShowMeetingModal(true)
+      // Use the modal provider to open the meeting modal with the dragged time range
+      openMeetingModal({ time: startTime, date: dragStart.date, endTime: endTime })
     }
 
     setIsDragging(false)

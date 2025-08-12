@@ -34,7 +34,7 @@ interface ModalState {
 
 interface ModalActions {
   // Meeting actions
-  openMeetingModal: (timeSlot?: { time: string; date: Date }, editing?: Meeting) => void
+  openMeetingModal: (timeSlot?: { time: string; date: Date; endTime?: string }, editing?: Meeting) => void
   closeMeetingModal: () => void
   setNewMeeting: (meeting: any) => void
   handleCreateMeeting: (e: React.FormEvent, updatedMeeting: typeof modalState.newMeeting) => Promise<void>
@@ -98,7 +98,7 @@ interface ModalProviderProps {
 export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: ModalProviderProps) => {
   const [modalState, setModalState] = useState<ModalState>(initialModalState)
 
-  const openMeetingModal = (timeSlot?: { time: string; date: Date }, editing?: Meeting) => {
+  const openMeetingModal = (timeSlot?: { time: string; date: Date; endTime?: string }, editing?: Meeting) => {
     if (editing) {
       const startTime = new Date(editing.start_time)
       const endTime = new Date(editing.end_time)
@@ -123,12 +123,18 @@ export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: Mo
       const [hour, minute] = timeSlot.time.split(':')
       const startTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`
       
-      // Add 15 minutes to start time for single clicks
-      const startMinutes = parseInt(hour) * 60 + parseInt(minute)
-      const endMinutes = startMinutes + 15
-      const endHour = Math.floor(endMinutes / 60)
-      const endMinute = endMinutes % 60
-      const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`
+      // Use provided endTime or calculate default 15-minute duration
+      let endTime: string
+      if (timeSlot.endTime) {
+        endTime = timeSlot.endTime
+      } else {
+        // Add 15 minutes to start time for single clicks
+        const startMinutes = parseInt(hour) * 60 + parseInt(minute)
+        const endMinutes = startMinutes + 15
+        const endHour = Math.floor(endMinutes / 60)
+        const endMinute = endMinutes % 60
+        endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`
+      }
 
       setModalState(prev => ({
         ...prev,
