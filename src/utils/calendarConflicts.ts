@@ -104,7 +104,7 @@ export const computeConflictMaps = (
       const timeOnly = session.actual_start_time.split(/[+-]/)[0] // Remove timezone part
       const [hours, minutes] = timeOnly.split(':').map(Number)
       const startTimeInHours = hours + minutes / 60
-      const duration = session.session_duration || 2 // Default to 2 hours based on your data
+      const duration = session.scheduled_hours || 2 // Use scheduled_hours to match the UI
       const endTimeInHours = startTimeInHours + duration
       
       for (let time = Math.round(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {

@@ -19,6 +19,7 @@ import { Meeting } from '../types'
 import MeetingModal from '../components/MeetingModal'
 import CalendarTaskModal from '../components/CalendarTaskModal'
 import HabitModal from '../components/HabitModal'
+import SessionEditModal from '../components/SessionEditModal'
 import CalendarEvent from '../components/CalendarEvent'
 import {
   handleHabitTimeChange,
@@ -27,8 +28,15 @@ import {
   handleDeleteTask,
 } from '../utils/calendarDatabaseOperations'
 import { calculateWorkHours } from '../utils/workHoursCalculation'
+import { ModalProvider, useModal } from '../contexts/ModalContext'
 
-const Calendar = () => {
+interface CalendarContentProps {
+  onSetCreateHandler: (handler: (e: React.FormEvent, updatedMeeting: any) => Promise<void>) => void
+  onSetDeleteHandler: (handler: () => Promise<void>) => void
+}
+
+const CalendarContent = ({ onSetCreateHandler, onSetDeleteHandler }: CalendarContentProps) => {
+  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal } = useModal()
   const [searchParams, setSearchParams] = useSearchParams()
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [containerHeight, setContainerHeight] = useState(600)
@@ -41,6 +49,8 @@ const Calendar = () => {
   const [showHabitModal, setShowHabitModal] = useState(false)
   const [selectedHabit, setSelectedHabit] = useState<any>(null)
   const [selectedHabitDate, setSelectedHabitDate] = useState<Date | null>(null)
+  const [showSessionModal, setShowSessionModal] = useState(false)
+  const [selectedSession, setSelectedSession] = useState<any>(null)
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ time: string; date: Date } | null>(
     null
   )
@@ -206,83 +216,38 @@ const Calendar = () => {
   }, [])
 
   const handleTimeSlotClick = (timeSlot: string, date: Date) => {
-    setEditingMeeting(null)
-    setSelectedTimeSlot({ time: timeSlot, date })
-    const [hour, minute] = timeSlot.split(':')
-    const startTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`
-    const endHour = parseInt(hour) + 1
-    const endTime = `${endHour.toString().padStart(2, '0')}:${minute.padStart(2, '0')}`
-    setNewMeeting({
-      title: '',
-      description: '',
-      start_time: startTime,
-      end_time: endTime,
-      date: format(date, 'yyyy-MM-dd'),
-      location: '',
-      meeting_type: 'general',
-      priority: 'medium',
-      category_id: undefined,
-    })
-    setShowMeetingModal(true)
+    openMeetingModal({ time: timeSlot, date })
   }
 
   const handleAddMeeting = () => {
-    setEditingMeeting(null)
-    setNewMeeting({
-      title: '',
-      description: '',
-      start_time: '',
-      end_time: '',
-      date: format(new Date(), 'yyyy-MM-dd'),
-      location: '',
-      meeting_type: 'general',
-      priority: 'medium',
-      category_id: undefined,
-    })
-    setShowMeetingModal(true)
-    setSelectedTimeSlot(null)
+    openMeetingModal()
   }
 
   const handleEditMeeting = (meeting: Meeting) => {
-    setEditingMeeting(meeting)
-    const startTime = new Date(meeting.start_time)
-    const endTime = new Date(meeting.end_time)
-    setNewMeeting({
-      title: meeting.title,
-      description: meeting.description || '',
-      start_time: startTime.toTimeString().slice(0, 5),
-      end_time: endTime.toTimeString().slice(0, 5),
-      date: format(startTime, 'yyyy-MM-dd'),
-      location: meeting.location || '',
-      meeting_type: meeting.meeting_type,
-      priority: meeting.priority,
-      category_id: meeting.category_id,
-    })
-    setShowMeetingModal(true)
-    setSelectedTimeSlot(null)
+    openMeetingModal(undefined, meeting)
   }
 
-  const handleCreateMeeting = async (e: React.FormEvent) => {
+  const handleCreateMeeting = async (e: React.FormEvent, updatedMeeting: typeof newMeeting) => {
     e.preventDefault()
     try {
       // Parse the date string and create local date objects
-      const [year, month, day] = newMeeting.date.split('-').map(Number)
-      const [startHour, startMinute] = newMeeting.start_time.split(':').map(Number)
-      const [endHour, endMinute] = newMeeting.end_time.split(':').map(Number)
+      const [year, month, day] = updatedMeeting.date.split('-').map(Number)
+      const [startHour, startMinute] = updatedMeeting.start_time.split(':').map(Number)
+      const [endHour, endMinute] = updatedMeeting.end_time.split(':').map(Number)
 
       // Create dates in local timezone (not UTC)
       const startTime = new Date(year, month - 1, day, startHour, startMinute)
       const endTime = new Date(year, month - 1, day, endHour, endMinute)
 
       const meetingData = {
-        title: newMeeting.title,
-        description: newMeeting.description,
+        title: updatedMeeting.title,
+        description: updatedMeeting.description,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
-        location: newMeeting.location,
-        meeting_type: newMeeting.meeting_type,
-        priority: newMeeting.priority,
-        category_id: newMeeting.category_id || null,
+        location: updatedMeeting.location,
+        meeting_type: updatedMeeting.meeting_type,
+        priority: updatedMeeting.priority,
+        category_id: updatedMeeting.category_id || null,
         status: 'scheduled' as const,
       }
 
@@ -341,14 +306,15 @@ const Calendar = () => {
   }
 
   const handleTaskClick = (task: any) => {
-    setSelectedTask(task)
-    setShowTaskModal(true)
+    openTaskModal(task)
   }
 
   const handleHabitClick = (habit: any, date: Date) => {
-    setSelectedHabit(habit)
-    setSelectedHabitDate(date)
-    setShowHabitModal(true)
+    openHabitModal(habit, date)
+  }
+
+  const handleSessionClick = (session: any) => {
+    openSessionModal(session)
   }
 
   const handleHabitTimeChangeWithReset = async (
@@ -389,11 +355,13 @@ const Calendar = () => {
     setShowMeetingModal(false)
     setShowTaskModal(false)
     setShowHabitModal(false)
+    setShowSessionModal(false)
     setSelectedTimeSlot(null)
     setEditingMeeting(null)
     setSelectedTask(null)
     setSelectedHabit(null)
     setSelectedHabitDate(null)
+    setSelectedSession(null)
     setIsDragging(false)
     setDragStart(null)
     setDragEnd(null)
@@ -648,6 +616,10 @@ const Calendar = () => {
                 key={`session-${session.id}`}
                 type="session"
                 style={getEventStyle(adjustedTopPosition, sessionHeight, 10)}
+                onClick={e => {
+                  e.stopPropagation()
+                  handleSessionClick(session)
+                }}
                 eventTitle={session.projects?.name || 'Project Session'}
                 duration={`${session.scheduled_hours}h`}
               />
@@ -795,6 +767,12 @@ const Calendar = () => {
       calculateWorkHours(scheduledTasksCache, allTasks, tasksScheduled, settings, tasksDailyLogs),
     [scheduledTasksCache, allTasks, tasksScheduled, settings, tasksDailyLogs]
   )
+
+  // Set the handlers for the modal provider
+  useEffect(() => {
+    onSetCreateHandler(handleCreateMeeting)
+    onSetDeleteHandler(handleDeleteMeeting)
+  }, [handleCreateMeeting, handleDeleteMeeting, onSetCreateHandler, onSetDeleteHandler])
 
   console.log('123 plannedhoursbreakdown', plannedHoursBreakdown)
   return (
@@ -1319,18 +1297,15 @@ const Calendar = () => {
       </div>
 
       <MeetingModal
-        isOpen={showMeetingModal}
-        onClose={closeModal}
-        meeting={newMeeting}
-        onMeetingChange={setNewMeeting}
-        onSubmit={handleCreateMeeting}
-        selectedTimeSlot={selectedTimeSlot}
-        editingMeeting={editingMeeting}
-        onDelete={handleDeleteMeeting}
         onTaskLogCreated={async () => {
           // Refresh calendar data when a task log is created
           window.location.reload()
         }}
+        onBackToTask={selectedTask ? () => {
+          // Go back to task modal from meeting modal
+          setShowMeetingModal(false)
+          setShowTaskModal(true)
+        } : undefined}
       />
 
       <CalendarTaskModal
@@ -1339,17 +1314,76 @@ const Calendar = () => {
         task={selectedTask}
         onComplete={handleCompleteTaskWrapper}
         onDelete={handleDeleteTaskWrapper}
+        onAddMeeting={() => {
+          // Extract time slot info from the selected task and open meeting modal
+          if (selectedTask) {
+            const taskDate = new Date(selectedTask.startTime ? selectedTask.startTime * 60 * 60 * 1000 : Date.now())
+            const timeSlot = selectedTask.startTime ? 
+              `${Math.floor(selectedTask.startTime).toString().padStart(2, '0')}:${((selectedTask.startTime % 1) * 60).toString().padStart(2, '0')}` :
+              '09:00'
+            
+            setSelectedTimeSlot({ time: timeSlot, date: taskDate })
+            setNewMeeting({
+              title: '',
+              description: '',
+              start_time: timeSlot,
+              end_time: timeSlot,
+              date: format(taskDate, 'yyyy-MM-dd'),
+              location: '',
+              meeting_type: 'general',
+              priority: 'medium',
+              category_id: undefined,
+            })
+            setShowTaskModal(false)
+            setShowMeetingModal(true)
+          }
+        }}
       />
 
       <HabitModal
-        isOpen={showHabitModal}
-        onClose={closeModal}
-        habit={selectedHabit}
-        selectedDate={selectedHabitDate}
         onTimeChange={handleHabitTimeChangeWithReset}
         onSkip={handleHabitSkipWithReset}
       />
+
+      {selectedSession && (
+        <SessionEditModal
+          isOpen={showSessionModal}
+          onClose={closeModal}
+          session={selectedSession}
+          onUpdateSession={async (sessionId: string, updates: any) => {
+            // This would typically call a function from useCalendarData
+            // For now, we'll add a placeholder
+            console.log('Update session:', sessionId, updates)
+            closeModal()
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+const Calendar = () => {
+  let createMeetingHandler: (e: React.FormEvent, updatedMeeting: any) => Promise<void>
+  let deleteMeetingHandler: () => Promise<void>
+
+  return (
+    <ModalProvider
+      onCreateMeeting={async (e: React.FormEvent, updatedMeeting: any) => {
+        if (createMeetingHandler) {
+          return await createMeetingHandler(e, updatedMeeting)
+        }
+      }}
+      onDeleteMeeting={async () => {
+        if (deleteMeetingHandler) {
+          return await deleteMeetingHandler()
+        }
+      }}
+    >
+      <CalendarContent 
+        onSetCreateHandler={(handler) => { createMeetingHandler = handler }}
+        onSetDeleteHandler={(handler) => { deleteMeetingHandler = handler }}
+      />
+    </ModalProvider>
   )
 }
 
