@@ -228,11 +228,20 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   }
 
   const getHourSlots = () => {
-    const { end } = getWorkHoursRange()
     const hours = []
-    for (let i = 6; i <= end; i++) {
+    // Go from 6am to 4am next day (22 hours total)
+    // 6am-11pm (6-23), then 12am-4am (0-4)
+    for (let i = 6; i <= 23; i++) {
       const hour12 = i > 12 ? i - 12 : i === 0 ? 12 : i
       const ampm = i >= 12 ? 'PM' : 'AM'
+      const hourStr = hour12.toString() + ':00 ' + ampm
+      const timeValue = i.toString().padStart(2, '0') + ':00'
+      hours.push({ display: hourStr, time: timeValue })
+    }
+    // Add 12am-4am (0-4)
+    for (let i = 0; i <= 4; i++) {
+      const hour12 = i === 0 ? 12 : i
+      const ampm = 'AM'
       const hourStr = hour12.toString() + ':00 ' + ampm
       const timeValue = i.toString().padStart(2, '0') + ':00'
       hours.push({ display: hourStr, time: timeValue })
@@ -480,16 +489,13 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const habitStartHour = parseInt(effectiveStartTime.split(':')[0])
         const habitStartMinute = parseInt(effectiveStartTime.split(':')[1])
 
-        // Hide anything before 6 AM - enforce minimum time regardless of source
-        if (habitStartHour < 6) {
+        // Allow early morning hours (0-4am) to show in calendar since we extended it
+        // Only hide hours 5am since calendar starts at 6am
+        if (habitStartHour === 5) {
           return false
         }
 
-        // Additional safety check: if somehow the time is before 6 AM, force it to 6 AM
-        if (habitStartHour < 6) {
-          
-          effectiveStartTime = '06:00'
-        }
+        // Allow early morning hours (0-4am) to remain as-is since calendar now shows them
 
         // Check for meeting conflicts and rescheduling
         const conflictingMeeting = meetings.find(meeting => {
@@ -557,13 +563,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         let effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
 
-        // Additional safety check: if somehow the time is before 6 AM, force it to 6 AM
-        if (effectiveStartTime) {
-          const checkHour = parseInt(effectiveStartTime.split(':')[0])
-          if (checkHour < 6) {
-            effectiveStartTime = '06:00'
-          }
-        }
+        // Allow early morning hours since calendar now shows 0-4am
 
         const habitStartHour = parseInt(effectiveStartTime!.split(':')[0])
         const habitStartMinute = parseInt(effectiveStartTime!.split(':')[1])
@@ -686,8 +686,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         if (!startTime) return false
         const logStartHour = parseInt(startTime.split(':')[0])
         
-        // Hide anything before 6 AM
-        if (logStartHour < 6) return false
+        // Allow early morning hours (0-4am) to show in calendar since we extended it
+        // Only hide 5am since calendar starts at 6am
+        if (logStartHour === 5) return false
         
         return logStartHour === currentHour
       })

@@ -35,8 +35,9 @@ export const calculatePullBackTime = (habit: any, dateKey: string, baseStartTime
   // Pull back 15 minutes for each day forward
   totalMinutes -= (daysDifference * 15)
   
-  // Ensure minimum time is 6:00 AM (360 minutes from midnight)
-  totalMinutes = Math.max(totalMinutes, 360)
+  // Allow early morning hours since calendar now shows 0-4am
+  // Ensure minimum time is 12:00 AM (0 minutes from midnight)
+  totalMinutes = Math.max(totalMinutes, 0)
   
   // Convert back to HH:MM format
   const newHours = Math.floor(totalMinutes / 60)

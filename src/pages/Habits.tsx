@@ -15,7 +15,6 @@ import { useAuth } from '../hooks/useAuth'
 import HabitDetailTabs from '../components/HabitDetailTabs'
 import LoadingSpinner from '../components/LoadingSpinner'
 import CreateHabitModal from '../components/CreateHabitModal'
-import HabitsTopbar from '../components/HabitsTopbar'
 import HabitsLast7Days from '../components/HabitsLast7Days'
 import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
 
@@ -40,7 +39,6 @@ const Habits = () => {
   const [routineLogs, setRoutineLogs] = useState<any[]>([])
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'today' | 'last7days'>('today')
 
   // Helper function to get the display text and time for habit scheduling
   const getHabitScheduleDisplay = (habit: any, dailyLog: any) => {
@@ -255,7 +253,6 @@ const Habits = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <HabitsTopbar activeTab={activeTab} onTabChange={setActiveTab} />
       
       {/* Info Banner - show when no habits exist */}
       {habits.length === 0 && !loading && (
@@ -273,7 +270,7 @@ const Habits = () => {
         </div>
       )}
       
-      {activeTab === 'today' ? (
+      {
         <div
           className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-0"
           style={{ minHeight: 'calc(100vh - 200px)' }}
@@ -471,9 +468,9 @@ const Habits = () => {
             })()}
         </div>
         </div>
-      ) : (
-        <HabitsLast7Days />
-      )}
+      }
+
+      <HabitsLast7Days />
 
       <CreateHabitModal
         isOpen={showCreateModal}

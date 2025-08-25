@@ -2,23 +2,36 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Project, Task } from '../types'
 
-export function useProjects() {
+// Unified hook that handles both authenticated user projects and public projects
+export function useProjects(user?: any, projectName?: string) {
   const [projects, setProjects] = useState<Project[]>([])
+  const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isShareable, setIsShareable] = useState(false)
 
   useEffect(() => {
-    fetchProjects()
-  }, [])
+    if (user) {
+      fetchUserProjects()
+    } else if (projectName && user === undefined) {
+      // Only fetch public project if user is explicitly undefined (not authenticated)
+      // If user is null, don't fetch anything (prevents duplicate calls)
+      fetchPublicProject(projectName)
+    } else {
+      // No user and no project name, or user is null - don't fetch anything
+      setLoading(false)
+      setProjects([])
+      setProject(null)
+      setError(null)
+      setIsShareable(false)
+    }
+  }, [user, projectName])
 
-  const fetchProjects = async (includeArchived = false) => {
+  const fetchUserProjects = async (includeArchived = false) => {
     try {
       setLoading(true)
       setError(null)
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
       if (!user) {
         setError('User not authenticated')
         return
@@ -42,6 +55,35 @@ export function useProjects() {
       }
 
       setProjects(data || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchPublicProject = async (name: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const decodedProjectName = decodeURIComponent(name.replace(/\+/g, ' '))
+
+      const { data, error: fetchError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('name', decodedProjectName)
+        .eq('is_shareable', true)
+        .eq('status', 'active')
+        .single()
+
+      if (fetchError) {
+        setError('Project not found or not shareable')
+        return
+      }
+
+      setProject(data)
+      setIsShareable(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -107,75 +149,21 @@ export function useProjects() {
   }
 
   return {
+    // For authenticated users
     projects,
+    // For public projects
+    project,
+    isShareable,
     loading,
     error,
     addProject,
     updateProject,
     deleteProject,
-    refetch: fetchProjects,
-    fetchProjects,
+    refetch: user ? fetchUserProjects : (projectName ? () => fetchPublicProject(projectName) : undefined),
+    fetchProjects: fetchUserProjects,
   }
 }
 
-export function usePublicProject(projectName?: string) {
-  const [project, setProject] = useState<Project | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isShareable, setIsShareable] = useState(false)
-
-  useEffect(() => {
-    if (projectName) {
-      fetchPublicProject(projectName)
-    }
-  }, [projectName])
-
-  const fetchPublicProject = async (name: string) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Decode the URL parameter to handle spaces and special characters
-      const decodedProjectName = decodeURIComponent(name.replace(/\+/g, ' '))
-
-      // Query for the project by name and check if it's shareable
-      const { data, error: fetchError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('name', decodedProjectName)
-        .eq('is_shareable', true)
-        .eq('status', 'active')
-        .single()
-
-      if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          // No rows returned - project doesn't exist or isn't shareable
-          setError('Project not found or not publicly accessible')
-          setIsShareable(false)
-        } else {
-          setError(fetchError.message)
-        }
-        return
-      }
-
-      setProject(data)
-      setIsShareable(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      setIsShareable(false)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return {
-    project,
-    loading,
-    error,
-    isShareable,
-    refetch: () => projectName && fetchPublicProject(projectName),
-  }
-}
 
 export function usePublicTasks(projectId?: string) {
   const [tasks, setTasks] = useState<Task[]>([])

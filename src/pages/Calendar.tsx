@@ -1234,9 +1234,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
               const endQuarter = maxQuarters % 4
 
               const topPosition =
-                (startHourIndex - virtualizedCalendar.visibleRange.start) * 64 + startQuarter * 16
+                startHourIndex * 64 + startQuarter * 16 - virtualizedCalendar.offsetY
               const endPosition =
-                (endHourIndex - virtualizedCalendar.visibleRange.start) * 64 + (endQuarter + 1) * 16
+                endHourIndex * 64 + (endQuarter + 1) * 16 - virtualizedCalendar.offsetY
               const height = endPosition - topPosition
 
               // Calculate column position

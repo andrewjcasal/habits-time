@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CheckCircle2, Circle, Clock } from 'lucide-react'
+import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useHabits } from '../hooks/useHabits'
@@ -17,16 +18,17 @@ interface HabitLog {
   }
 }
 
-interface DayData {
-  date: string
-  displayDate: string
-  habits: { [habitId: string]: HabitLog | null }
+interface WeekData {
+  weekStart: Date
+  weekEnd: Date
+  displayWeek: string
+  habits: { [habitId: string]: HabitLog[] }
 }
 
 const HabitsLast7Days = () => {
   const { user } = useAuth()
   const { habits } = useHabits()
-  const [weekData, setWeekData] = useState<DayData[]>([])
+  const [weekData, setWeekData] = useState<WeekData[]>([])
   const [loading, setLoading] = useState(true)
 
   const formatTime = (time: string | null) => {
@@ -38,51 +40,33 @@ const HabitsLast7Days = () => {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
-  const formatDateDisplay = (dateString: string) => {
-    const date = new Date(dateString)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    const todayString = today.toISOString().split('T')[0]
-    const yesterdayString = yesterday.toISOString().split('T')[0]
-
-    if (dateString === todayString) {
-      return 'Today'
-    } else if (dateString === yesterdayString) {
-      return 'Yesterday'
-    } else {
-      return date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      })
-    }
+  const formatWeekDisplay = (weekStart: Date, weekEnd: Date) => {
+    return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}`
   }
 
-  const fetchLast7DaysData = async () => {
+  const fetchWeeksData = async () => {
     if (!user) return
 
     try {
       setLoading(true)
 
-      // Generate last 7 days
-      const days: DayData[] = []
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-        const dateString = date.toISOString().split('T')[0]
+      // Generate last 4 weeks
+      const weeks: WeekData[] = []
+      for (let i = 3; i >= 0; i--) {
+        const weekStart = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 })
+        const weekEnd = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 })
         
-        days.push({
-          date: dateString,
-          displayDate: formatDateDisplay(dateString),
+        weeks.push({
+          weekStart,
+          weekEnd,
+          displayWeek: formatWeekDisplay(weekStart, weekEnd),
           habits: {},
         })
       }
 
-      // Get all habit logs for the last 7 days
-      const startDate = days[0].date
-      const endDate = days[days.length - 1].date
+      // Get all habit logs for the last 4 weeks
+      const startDate = format(weeks[0].weekStart, 'yyyy-MM-dd')
+      const endDate = format(weeks[weeks.length - 1].weekEnd, 'yyyy-MM-dd')
 
       const { data: logs, error } = await supabase
         .from('habits_daily_logs')
@@ -105,32 +89,35 @@ const HabitsLast7Days = () => {
 
       if (error) throw error
 
-      // Organize logs by date and habit
-      days.forEach(day => {
+      // Organize logs by week and habit
+      weeks.forEach(week => {
         habits.forEach(habit => {
-          const log = logs?.find(l => 
-            l.log_date === day.date && l.habits.id === habit.id
-          )
-          day.habits[habit.id] = log || null
+          const weekLogs = logs?.filter(l => {
+            const logDate = new Date(l.log_date)
+            return l.habits.id === habit.id && 
+                   logDate >= week.weekStart && 
+                   logDate <= week.weekEnd
+          }) || []
+          week.habits[habit.id] = weekLogs
         })
       })
 
-      setWeekData(days)
+      setWeekData(weeks)
     } catch (err) {
-      console.error('Error fetching last 7 days data:', err)
+      console.error('Error fetching weeks data:', err)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchLast7DaysData()
+    fetchWeeksData()
   }, [user, habits])
 
   if (loading) {
     return (
       <div className="p-6 text-center">
-        <p className="text-gray-500">Loading last 7 days data...</p>
+        <p className="text-gray-500">Loading weeks data...</p>
       </div>
     )
   }
@@ -153,9 +140,9 @@ const HabitsLast7Days = () => {
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-900 sticky left-0 bg-gray-50 z-10">
                   Habit
                 </th>
-                {weekData.map(day => (
-                  <th key={day.date} className="px-3 py-3 text-center text-sm font-medium text-gray-900 min-w-[120px]">
-                    {day.displayDate}
+                {weekData.map(week => (
+                  <th key={week.weekStart.getTime()} className="px-3 py-3 text-center text-sm font-medium text-gray-900 min-w-[120px]">
+                    {week.displayWeek}
                   </th>
                 ))}
               </tr>
@@ -172,25 +159,27 @@ const HabitsLast7Days = () => {
                       </div>
                     </div>
                   </td>
-                  {weekData.map(day => {
-                    const log = day.habits[habit.id]
-                    const isCompleted = log?.is_completed || false
+                  {weekData.map(week => {
+                    const weekLogs = week.habits[habit.id] || []
+                    const completedDays = weekLogs.filter(log => log.is_completed).length
+                    const totalDaysInWeek = Math.ceil((week.weekEnd.getTime() - week.weekStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                    const completionRate = totalDaysInWeek > 0 ? Math.round((completedDays / totalDaysInWeek) * 100) : 0
                     
                     return (
-                      <td key={`${habit.id}-${day.date}`} className="px-3 py-3 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="flex items-center justify-center">
-                            {isCompleted ? (
-                              <CheckCircle2 className="w-5 h-5 text-green-600" />
-                            ) : (
-                              <Circle className="w-5 h-5 text-gray-300" />
-                            )}
+                      <td key={`${habit.id}-${week.weekStart.getTime()}`} className="px-3 py-3 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="text-lg font-semibold text-gray-900">
+                            {completedDays}/{totalDaysInWeek}
                           </div>
-                          {log?.actual_start_time && (
-                            <div className="text-xs text-gray-600">
-                              {formatTime(log.actual_start_time)}
-                            </div>
-                          )}
+                          <div className="text-xs text-gray-600">
+                            {completionRate}%
+                          </div>
+                          <div className="w-12 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${completionRate}%` }}
+                            />
+                          </div>
                         </div>
                       </td>
                     )
@@ -202,16 +191,20 @@ const HabitsLast7Days = () => {
         </div>
       </div>
 
-      {/* Summary Stats */}
+      {/* Summary Stats for Current Week */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         {habits.map(habit => {
-          const completedDays = weekData.filter(day => day.habits[habit.id]?.is_completed).length
-          const completionRate = Math.round((completedDays / 7) * 100)
+          const currentWeek = weekData[weekData.length - 1] // Last week is current week
+          const currentWeekLogs = currentWeek?.habits[habit.id] || []
+          const completedDays = currentWeekLogs.filter(log => log.is_completed).length
+          const totalDaysInWeek = 7
+          const completionRate = Math.round((completedDays / totalDaysInWeek) * 100)
           
           return (
             <div key={habit.id} className="bg-white p-4 rounded-lg border border-gray-200">
               <h3 className="font-medium text-gray-900 mb-2">{habit.name}</h3>
-              <div className="text-2xl font-bold text-blue-600 mb-1">{completedDays}/7</div>
+              <div className="text-sm text-gray-500 mb-1">Current Week</div>
+              <div className="text-2xl font-bold text-blue-600 mb-1">{completedDays}/{totalDaysInWeek}</div>
               <div className="text-sm text-gray-500">
                 {completionRate}% completion rate
               </div>

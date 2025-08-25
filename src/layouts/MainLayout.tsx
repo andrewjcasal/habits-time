@@ -28,19 +28,21 @@ import {
   Tag,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAuth } from '../hooks/useAuth'
+import { useUserContext } from '../contexts/UserContext'
+import { supabase } from '../lib/supabase'
 import FeedbackButton from '../components/FeedbackButton'
-import { useAutoReflection } from '../hooks/useAutoReflection'
+// import { useAutoReflection } from '../hooks/useAutoReflection'
 
 const MainLayout = () => {
   const location = useLocation()
-  const { signOut } = useAuth()
+  const { user } = useUserContext()
+  const signOut = () => supabase.auth.signOut()
 
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Auto-generate reflection when habits or tasks are completed
-  useAutoReflection()
+  // useAutoReflection() // Disabled to reduce API calls
 
   const navItems = [
     // { path: '/time-tracker', label: 'Time Tracker', icon: Clock },

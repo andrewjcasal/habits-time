@@ -2,7 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 
 // Auth
-import { useAuth } from './hooks/useAuth'
+import { useUserContext } from './contexts/UserContext'
 
 // Layouts
 import MainLayout from './layouts/MainLayout'
@@ -31,7 +31,7 @@ import Settings from './pages/Settings'
 import { WelcomeModal } from './components/WelcomeModal'
 
 function App() {
-  const { user, isLoading } = useAuth()
+  const { user, loading: isLoading } = useUserContext()
   const location = useLocation()
   const [showWelcome, setShowWelcome] = useState(false)
 

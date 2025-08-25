@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { CheckCircle2, Circle, Clock, ChevronDown, ChevronRight } from 'lucide-react'
-import { Task } from '../types'
-import SectionHeader from './SectionHeader'
+import { CheckCircle2, Circle, Clock, ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
+import { Task, Project } from '../types'
 
 interface TasksListProps {
   tasks: Task[]
   tasksLoading: boolean
   fullWidth?: boolean
-  onShowNewTaskForm: () => void
+  selectedProject: Project | null
+  onShowNewTaskForm?: () => void
+  onAddTask: (taskData: any) => Promise<void>
   onTaskClick: (task: Task) => void
   onToggleTaskStatus: (task: Task) => void
   onUpdateTask: (taskId: string, data: any) => Promise<void>
@@ -17,13 +18,21 @@ const TasksList = ({
   tasks,
   tasksLoading,
   fullWidth = false,
+  selectedProject,
   onShowNewTaskForm,
+  onAddTask,
   onTaskClick,
   onToggleTaskStatus,
   onUpdateTask,
 }: TasksListProps) => {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
   const [showCompletedTasks, setShowCompletedTasks] = useState<boolean>(false)
+  const [showInlineForm, setShowInlineForm] = useState<boolean>(false)
+  const [newTaskTitle, setNewTaskTitle] = useState<string>('')
+  const [newTaskDescription, setNewTaskDescription] = useState<string>('')
+  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium')
+  const [newTaskEstimatedHours, setNewTaskEstimatedHours] = useState<number>(1)
+  const [isSaving, setIsSaving] = useState<boolean>(false)
 
   const getPriorityColor = (priority: string) => {
     const colors = {
@@ -55,6 +64,39 @@ const TasksList = ({
       }
       return newSet
     })
+  }
+
+  const handleShowInlineForm = () => {
+    setShowInlineForm(true)
+  }
+
+  const handleCancelInlineForm = () => {
+    setShowInlineForm(false)
+    setNewTaskTitle('')
+    setNewTaskDescription('')
+    setNewTaskPriority('medium')
+    setNewTaskEstimatedHours(1)
+  }
+
+  const handleSaveTask = async () => {
+    if (!newTaskTitle.trim() || !selectedProject) return
+
+    setIsSaving(true)
+    try {
+      await onAddTask({
+        title: newTaskTitle.trim(),
+        description: newTaskDescription.trim() || undefined,
+        priority: newTaskPriority,
+        estimated_hours: newTaskEstimatedHours,
+        status: 'todo',
+        project_id: selectedProject.id
+      })
+      handleCancelInlineForm()
+    } catch (error) {
+      console.error('Error saving task:', error)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   // Separate completed and non-completed tasks
@@ -168,13 +210,79 @@ const TasksList = ({
     </div>
   )
 
+  const renderInlineTaskForm = () => (
+    <div className="py-3 px-2 border-b border-neutral-200 bg-neutral-50">
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          value={newTaskTitle}
+          onChange={(e) => setNewTaskTitle(e.target.value)}
+          placeholder="Task title"
+          className="flex-1 px-2 py-1.5 text-sm border border-neutral-300 rounded focus:outline-none focus:border-primary-500"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              handleSaveTask()
+            }
+            if (e.key === 'Escape') {
+              handleCancelInlineForm()
+            }
+          }}
+        />
+
+        <select
+          value={newTaskPriority}
+          onChange={(e) => setNewTaskPriority(e.target.value as 'low' | 'medium' | 'high')}
+          className="px-2 py-1.5 text-sm border border-neutral-300 rounded focus:outline-none focus:border-primary-500"
+        >
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            value={newTaskEstimatedHours}
+            onChange={(e) => setNewTaskEstimatedHours(Number(e.target.value) || 1)}
+            min="0.25"
+            step="0.25"
+            className="w-16 px-2 py-1.5 text-sm border border-neutral-300 rounded focus:outline-none focus:border-primary-500"
+          />
+          <span className="text-xs text-neutral-600">h</span>
+        </div>
+
+        <button
+          onClick={handleSaveTask}
+          disabled={!newTaskTitle.trim() || isSaving}
+          className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isSaving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div className={`${fullWidth ? 'w-full' : 'w-1/2'} flex flex-col`}>
-      <SectionHeader
-        title="Tasks"
-        onAddClick={onShowNewTaskForm}
-        className="border-b border-neutral-200 bg-white"
-      />
+      {/* Custom Header with Add Button */}
+      <div className="px-2 py-1 flex items-center justify-between border-b border-neutral-200 bg-white">
+        <h3 className="text-md font-medium text-neutral-900">Tasks</h3>
+        {!showInlineForm && (
+          <button
+            onClick={handleShowInlineForm}
+            className="flex items-center gap-1 px-2 py-1 text-sm text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Add</span>
+          </button>
+        )}
+      </div>
+
+      {/* Inline Form */}
+      {showInlineForm && renderInlineTaskForm()}
+
       <div className="flex-1 overflow-y-auto">
         {tasksLoading ? (
           <div className="flex items-center justify-center py-8">
