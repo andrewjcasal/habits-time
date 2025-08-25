@@ -279,7 +279,7 @@ export function useSessions(projectId?: string) {
   const createSessionsWithContract = async (
     contractName: string,
     projectId: string,
-    sessionData: Array<{ date: Date; hours: number }>
+    sessionData: Array<{ date: Date; hours: number; startTime?: string }>
   ) => {
     try {
       const {
@@ -314,11 +314,12 @@ export function useSessions(projectId?: string) {
       }
 
       // Create sessions
-      const sessionsToInsert = sessionData.map(({ date, hours }) => ({
+      const sessionsToInsert = sessionData.map(({ date, hours, startTime }) => ({
         project_id: projectId,
         user_id: user.id,
         scheduled_date: date.toISOString().split('T')[0],
         scheduled_hours: hours,
+        actual_start_time: startTime || null, // Set the start time if provided
         status: 'scheduled' as const,
       }))
 

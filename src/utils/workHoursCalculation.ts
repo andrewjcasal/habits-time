@@ -49,6 +49,9 @@ export const calculateWorkHours = (
     isCompleted: boolean
   }> = []
 
+  // Track processed tasks to avoid duplicates
+  const processedTaskSessions = new Set<string>()
+
   // Process scheduled tasks cache
   scheduledTasksCache.forEach((chunks, dateKey) => {
     const chunkDate = new Date(dateKey + 'T00:00:00')
@@ -73,6 +76,15 @@ export const calculateWorkHours = (
         const task = allTasks.find(t => t.id === originalTaskId)
         
         if (task && task.is_billable) {
+          // Create unique identifier for this task session
+          const sessionId = `${originalTaskId}-${dateKey}-${chunkStartHour}:${chunkStartMinute.toString().padStart(2, '0')}`
+          
+          // Skip if already processed (from tasksDailyLogs)
+          if (processedTaskSessions.has(sessionId)) {
+            return
+          }
+          processedTaskSessions.add(sessionId)
+
           // Calculate actual hours to include (partial if chunk crosses cutoff)
           let hoursToInclude = chunk.estimated_hours
           if (chunkEndTime > weekEndDate) {
@@ -127,6 +139,15 @@ export const calculateWorkHours = (
 
       // Include logs that are after last week end and before current week end
       if (logDateTime > lastWeekEndDate && logDateTime < weekEndDate) {
+        // Create unique identifier for this task session (matching format from chunks)
+        const sessionId = `${task.id}-${log.log_date}-${startHour}:${startMinute.toString().padStart(2, '0')}`
+        
+        // Skip if already processed (from scheduledTasksCache)
+        if (processedTaskSessions.has(sessionId)) {
+          return
+        }
+        processedTaskSessions.add(sessionId)
+
         const hoursToInclude = Number(log.estimated_hours) || 0
         
         // Only include tasks with hourly rates > 0 in planned hours
@@ -134,9 +155,9 @@ export const calculateWorkHours = (
           plannedHours += hoursToInclude
         }
 
-        // Add to planned breakdown
+        // Add to planned breakdown with normalized time format
         plannedHoursBreakdown.push({
-          sessionName: `${task.title} (${log.scheduled_start_time})`,
+          sessionName: `${task.title} (${startHour}:${startMinute.toString().padStart(2, '0')})`,
           projectName: task.projects?.name || 'Project',
           hours: hoursToInclude,
           dueDate: log.log_date,
@@ -148,7 +169,7 @@ export const calculateWorkHours = (
         if (task.is_complete) {
           actualHours += hoursToInclude
           actualHoursBreakdown.push({
-            sessionName: `${task.title} (${log.scheduled_start_time})`,
+            sessionName: `${task.title} (${startHour}:${startMinute.toString().padStart(2, '0')})`,
             projectName: task.projects?.name || 'Project',
             hours: hoursToInclude,
             date: log.log_date,

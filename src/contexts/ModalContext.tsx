@@ -37,8 +37,8 @@ interface ModalActions {
   openMeetingModal: (timeSlot?: { time: string; date: Date; endTime?: string }, editing?: Meeting) => void
   closeMeetingModal: () => void
   setNewMeeting: (meeting: any) => void
-  handleCreateMeeting: (e: React.FormEvent, updatedMeeting: typeof modalState.newMeeting) => Promise<void>
-  handleDeleteMeeting: () => Promise<void>
+  handleSaveMeeting: (e: React.FormEvent, updatedMeeting: typeof modalState.newMeeting, editingMeeting?: Meeting) => Promise<void>
+  handleDeleteMeeting: (meeting: Meeting) => Promise<void>
 
   // Habit actions
   openHabitModal: (habit: any, date: Date) => void
@@ -91,19 +91,34 @@ const initialModalState: ModalState = {
 interface ModalProviderProps {
   children: ReactNode
   // Inject the actual handlers from Calendar
-  onCreateMeeting: (e: React.FormEvent, meeting: any) => Promise<void>
-  onDeleteMeeting: () => Promise<void>
+  onSaveMeeting: (e: React.FormEvent, meeting: any, editingMeeting?: Meeting) => Promise<void>
+  onDeleteMeeting: (meeting: Meeting) => Promise<void>
 }
 
-export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: ModalProviderProps) => {
+export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: ModalProviderProps) => {
   const [modalState, setModalState] = useState<ModalState>(initialModalState)
+
+  // Helper function to close all modals and reset their state
+  const getClosedModalState = (prevState: ModalState) => ({
+    ...prevState,
+    showMeetingModal: false,
+    showHabitModal: false,
+    showTaskModal: false,
+    showSessionModal: false,
+    selectedTimeSlot: null,
+    editingMeeting: null,
+    selectedHabit: null,
+    selectedHabitDate: null,
+    selectedTask: null,
+    selectedSession: null,
+  })
 
   const openMeetingModal = (timeSlot?: { time: string; date: Date; endTime?: string }, editing?: Meeting) => {
     if (editing) {
       const startTime = new Date(editing.start_time)
       const endTime = new Date(editing.end_time)
       setModalState(prev => ({
-        ...prev,
+        ...getClosedModalState(prev),
         showMeetingModal: true,
         editingMeeting: editing,
         newMeeting: {
@@ -117,7 +132,6 @@ export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: Mo
           priority: editing.priority,
           category_id: editing.category_id,
         },
-        selectedTimeSlot: null,
       }))
     } else if (timeSlot) {
       const [hour, minute] = timeSlot.time.split(':')
@@ -137,9 +151,8 @@ export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: Mo
       }
 
       setModalState(prev => ({
-        ...prev,
+        ...getClosedModalState(prev),
         showMeetingModal: true,
-        editingMeeting: null,
         selectedTimeSlot: timeSlot,
         newMeeting: {
           title: '',
@@ -155,10 +168,8 @@ export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: Mo
       }))
     } else {
       setModalState(prev => ({
-        ...prev,
+        ...getClosedModalState(prev),
         showMeetingModal: true,
-        editingMeeting: null,
-        selectedTimeSlot: null,
         newMeeting: {
           title: '',
           description: '',
@@ -192,7 +203,7 @@ export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: Mo
 
   const openHabitModal = (habit: any, date: Date) => {
     setModalState(prev => ({
-      ...prev,
+      ...getClosedModalState(prev),
       showHabitModal: true,
       selectedHabit: habit,
       selectedHabitDate: date,
@@ -210,7 +221,7 @@ export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: Mo
 
   const openTaskModal = (task: any) => {
     setModalState(prev => ({
-      ...prev,
+      ...getClosedModalState(prev),
       showTaskModal: true,
       selectedTask: task,
     }))
@@ -226,7 +237,7 @@ export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: Mo
 
   const openSessionModal = (session: any) => {
     setModalState(prev => ({
-      ...prev,
+      ...getClosedModalState(prev),
       showSessionModal: true,
       selectedSession: session,
     }))
@@ -274,13 +285,17 @@ export const ModalProvider = ({ children, onCreateMeeting, onDeleteMeeting }: Mo
     openMeetingModal,
     closeMeetingModal,
     setNewMeeting,
-    handleCreateMeeting: async (e: React.FormEvent, updatedMeeting: any) => {
-      // Handle meeting creation here or delegate to a callback
-      await onCreateMeeting(e, updatedMeeting)
+    handleSaveMeeting: async (e: React.FormEvent, updatedMeeting: any) => {
+      // Handle meeting save (create/update) here or delegate to a callback
+      await onSaveMeeting(e, updatedMeeting, modalState.editingMeeting || undefined)
+      closeMeetingModal()
     },
     handleDeleteMeeting: async () => {
       // Handle meeting deletion here or delegate to a callback
-      await onDeleteMeeting()
+      if (modalState.editingMeeting) {
+        await onDeleteMeeting(modalState.editingMeeting)
+        closeMeetingModal()
+      }
     },
     openHabitModal,
     closeHabitModal,

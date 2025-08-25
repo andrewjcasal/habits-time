@@ -27,7 +27,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
     editingMeeting,
     closeMeetingModal,
     setNewMeeting,
-    handleCreateMeeting,
+    handleSaveMeeting,
     handleDeleteMeeting,
   } = useModal()
   const [previousTitles, setPreviousTitles] = useState<
@@ -38,6 +38,12 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
   const [showTaskLogModal, setShowTaskLogModal] = useState(false)
   const [localTitle, setLocalTitle] = useState(meeting.title)
   const [showTaskLogForm, setShowTaskLogForm] = useState(false)
+  const [tasks, setTasks] = useState<{id: string, title: string, estimated_hours: number}[]>([])
+  const [taskLogForm, setTaskLogForm] = useState({
+    task_id: '',
+    hours: 1,
+    notes: ''
+  })
 
   // Sync local title with meeting prop when modal opens
   useEffect(() => {
@@ -46,6 +52,13 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       setShowTaskLogForm(false) // Reset task log form state
     }
   }, [showMeetingModal, meeting.title])
+
+  // Fetch tasks when task log form is shown
+  useEffect(() => {
+    if (showTaskLogForm) {
+      fetchTasks()
+    }
+  }, [showTaskLogForm])
 
   // Fetch previous meeting titles when modal opens (only for new meetings)
   useEffect(() => {
@@ -82,6 +95,78 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       setCategories(data || [])
     } catch (error) {
       console.error('Error fetching categories:', error)
+    }
+  }
+
+  const fetchTasks = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('id, title, estimated_hours')
+        .eq('user_id', user.id)
+        .eq('status', 'todo')
+        .order('title')
+
+      if (error) {
+        console.error('Error fetching tasks:', error)
+        return
+      }
+
+      setTasks(data || [])
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
+    }
+  }
+
+  const handleCreateTaskLog = async () => {
+    if (!taskLogForm.task_id || !selectedTimeSlot) return
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Calculate end time
+      const [startHour, startMinute] = selectedTimeSlot.time.split(':').map(Number)
+      const startTimeInMinutes = startHour * 60 + startMinute
+      const endTimeInMinutes = startTimeInMinutes + (taskLogForm.hours * 60)
+      const endHour = Math.floor(endTimeInMinutes / 60)
+      const endMinute = endTimeInMinutes % 60
+      const scheduled_end_time = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`
+
+      const { error } = await supabase
+        .from('tasks_daily_logs')
+        .insert({
+          task_id: taskLogForm.task_id,
+          user_id: user.id,
+          log_date: format(selectedTimeSlot.date, 'yyyy-MM-dd'),
+          scheduled_start_time: `${selectedTimeSlot.time}:00`,
+          scheduled_end_time,
+          estimated_hours: taskLogForm.hours,
+          notes: taskLogForm.notes.trim() || null
+        })
+
+      if (error) {
+        console.error('Error creating task log:', error)
+        return
+      }
+
+      // Reset form
+      setTaskLogForm({
+        task_id: '',
+        hours: 1,
+        notes: ''
+      })
+
+      // Close the task log form and notify parent if needed
+      setShowTaskLogForm(false)
+      if (onTaskLogCreated) {
+        onTaskLogCreated()
+      }
+    } catch (error) {
+      console.error('Error creating task log:', error)
     }
   }
 
@@ -235,8 +320,8 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
               // Update the meeting with the local title and submit
               const updatedMeeting = { ...meeting, title: localTitle }
               setNewMeeting(updatedMeeting)
-              // Pass the updated meeting data to handleCreateMeeting
-              handleCreateMeeting(e, updatedMeeting)
+              // Pass the updated meeting data to handleSaveMeeting
+              handleSaveMeeting(e, updatedMeeting)
             }}
             className="space-y-1"
           >
@@ -476,10 +561,17 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
             </p>
             <div>
               <select
+                value={taskLogForm.task_id}
+                onChange={e => setTaskLogForm({ ...taskLogForm, task_id: e.target.value })}
                 className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
                 required
               >
                 <option value="">Select a task...</option>
+                {tasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.title} ({task.estimated_hours}h)
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex gap-1">
@@ -494,7 +586,8 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
                 min="0.25"
                 max="8"
                 step="0.25"
-                defaultValue="1"
+                value={taskLogForm.hours}
+                onChange={e => setTaskLogForm({ ...taskLogForm, hours: parseFloat(e.target.value) || 1 })}
                 placeholder="Hours"
                 className="w-16 px-1 py-1 border border-neutral-300 rounded-md text-xs"
                 required
@@ -502,6 +595,8 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
             </div>
             <textarea
               placeholder="Notes (optional)"
+              value={taskLogForm.notes}
+              onChange={e => setTaskLogForm({ ...taskLogForm, notes: e.target.value })}
               className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs resize-none"
               rows={2}
             />
@@ -515,7 +610,9 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
               </button>
               <button
                 type="button"
-                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                onClick={handleCreateTaskLog}
+                disabled={!taskLogForm.task_id}
+                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Create Task Log
               </button>

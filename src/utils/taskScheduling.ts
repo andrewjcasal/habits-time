@@ -20,15 +20,38 @@ export const getAvailableTimeBlocks = (
   const blocks = []
   const { start, end } = getWorkHoursRange()
   
-  // Don't filter by current time - allow scheduling from start of day
-  // const now = new Date()
-  // const isToday = format(now, 'yyyy-MM-dd') === dateStr
-  // const currentHour = isToday ? now.getHours() + now.getMinutes() / 60 : start
+  // Filter by current time for today - start from next 15-minute block
+  const now = new Date()
+  const isToday = format(now, 'yyyy-MM-dd') === dateStr
+  
+  // Calculate the next 15-minute block
+  let startHour = start
+  if (isToday) {
+    const currentHour = now.getHours()
+    const currentMinute = now.getMinutes()
+    
+    // Round up to next 15-minute block
+    const next15MinBlock = Math.ceil(currentMinute / 15) * 15
+    if (next15MinBlock >= 60) {
+      // Move to next hour if rounding up goes past 60 minutes
+      startHour = Math.max(start, currentHour + 1)
+    } else {
+      startHour = Math.max(start, currentHour + next15MinBlock / 60)
+    }
+    
+    console.log(`🕐 Current time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Next 15-min block: ${startHour.toFixed(2)} (${Math.floor(startHour)}:${((startHour % 1) * 60).toString().padStart(2, '0')})`)
+  }
 
-  for (let hour = start; hour < end; hour++) {
+  for (let hour = Math.floor(startHour); hour < end; hour++) {
     for (let quarterHour = 0; quarterHour < 4; quarterHour++) {
       const minutes = quarterHour * 15
       const timeInHours = hour + minutes / 60
+      
+      // Skip time blocks before the calculated start time for today
+      if (isToday && timeInHours < startHour) {
+        continue
+      }
+      
       const timeSlot = hour.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0')
 
       // Use pre-computed conflict maps for O(1) lookups
@@ -502,6 +525,8 @@ export const scheduleAllTasks = async (
       console.error('Error persisting task chunks:', error)
     }
   }
+
+  console.log('[BUFFER DEBUG]', tasksByDate)
 
   return tasksByDate
 }

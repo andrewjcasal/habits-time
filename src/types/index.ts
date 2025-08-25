@@ -299,6 +299,42 @@ export interface ContractSession {
   created_at: string
 }
 
+// Category Buffer
+export interface CategoryBuffer {
+  id: string
+  user_id: string
+  category_id: string
+  weekly_hours: number
+  created_at: string
+  updated_at: string
+}
+
+// Buffer Utilization (calculated data)
+export interface BufferUtilization {
+  buffer_id: string
+  category_id: string
+  category_name: string
+  category_color: string
+  weekly_hours: number
+  hours_spent: number
+  hours_remaining: number
+  utilization_percentage: number
+}
+
+// Buffer Block (for calendar rendering)
+export interface BufferBlock {
+  id: string
+  buffer_id: string
+  category_id: string
+  category_name: string
+  category_color: string
+  start_time: number // hours in decimal (e.g., 9.5 for 9:30)
+  duration: number // hours in decimal
+  remaining_hours: number
+  date: Date
+  dateStr: string
+}
+
 // Meeting Category
 export interface MeetingCategory {
   id: string
@@ -327,6 +363,29 @@ export interface Meeting {
   created_at: string
   updated_at: string
 }
+
+// Category Buffer
+export interface CategoryBuffer {
+  id: string
+  user_id: string
+  category_id: string
+  weekly_hours: number
+  created_at: string
+  updated_at: string
+}
+
+// Buffer Utilization (returned from get_buffer_utilization function)
+export interface BufferUtilization {
+  buffer_id: string
+  category_id: string
+  category_name: string
+  category_color: string
+  weekly_hours: number
+  hours_spent: number
+  hours_remaining: number
+  utilization_percentage: number
+}
+
 
 // Social media account
 export interface Social {
@@ -366,4 +425,26 @@ export interface SocialPostEngagementHistory {
   shares_count: number
   recorded_at: string
   notes?: string
+}
+
+// Category Buffer for weekly time allocation
+export interface CategoryBuffer {
+  id: string
+  user_id: string
+  category_id: string
+  weekly_hours: number
+  created_at: string
+  updated_at: string
+}
+
+// Buffer utilization data
+export interface BufferUtilization {
+  buffer_id: string
+  category_id: string
+  category_name: string
+  category_color: string
+  weekly_hours: number
+  hours_spent: number
+  hours_remaining: number
+  utilization_percentage: number
 }

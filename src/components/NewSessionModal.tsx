@@ -18,6 +18,7 @@ const NewSessionModal = ({
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
   const [sessionHours, setSessionHours] = useState<{ [key: string]: number }>({})
   const [contractName, setContractName] = useState('')
+  const [startTime, setStartTime] = useState('09:00')
   const [modalStep, setModalStep] = useState<'contract' | 'dates' | 'preview'>('contract')
 
   const generateCalendarDays = useCallback((month: number, year: number) => {
@@ -79,6 +80,7 @@ const NewSessionModal = ({
       const sessionData = selectedDates.map(date => ({
         date,
         hours: sessionHours[date.toDateString()] || 2,
+        startTime: startTime,
       }))
 
       // Create sessions with contract
@@ -88,6 +90,7 @@ const NewSessionModal = ({
       setSelectedDates([])
       setSessionHours({})
       setContractName('')
+      setStartTime('09:00')
       setModalStep('contract')
       onClose()
     } catch (error) {
@@ -99,6 +102,7 @@ const NewSessionModal = ({
     setSelectedDates([])
     setSessionHours({})
     setContractName('')
+    setStartTime('09:00')
     setModalStep('contract')
     onClose()
   }
@@ -289,6 +293,22 @@ const NewSessionModal = ({
               </div>
             </div>
 
+            {/* Start Time Picker */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-neutral-700">
+                Start Time
+              </label>
+              <div className="text-xs text-neutral-500 mb-2">
+                This time will be set as the actual start time for all sessions
+              </div>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-32 px-3 py-2 border border-neutral-300 rounded-md text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+
             {selectedDates.length > 0 && (
               <div className="text-sm text-neutral-600">
                 {selectedDates.length} date{selectedDates.length > 1 ? 's' : ''} selected
@@ -325,6 +345,7 @@ const NewSessionModal = ({
 
             <div className="bg-neutral-50 p-3 rounded-lg mb-4">
               <div className="text-sm font-medium text-neutral-900">Contract: {contractName}</div>
+              <div className="text-sm text-neutral-600 mt-1">Start Time: {startTime}</div>
             </div>
 
             <div className="max-h-64 overflow-y-auto">

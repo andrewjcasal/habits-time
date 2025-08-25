@@ -9,6 +9,9 @@ import { scheduleAllTasks, scheduleTaskInAvailableSlots } from '../utils/taskSch
 import { addMeeting as addMeetingUtil, updateMeeting as updateMeetingUtil, deleteMeeting as deleteMeetingUtil } from '../utils/meetingManager'
 import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
 import { generateBuffersForDays, getBuffersForTimeSlot, BufferTime } from '../utils/bufferManager'
+import { BufferBlock } from '../types'
+import { startOfWeek } from 'date-fns'
+import { calculateCategoryBufferBlocks } from '../utils/categoryBufferCalculation'
 
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const [allTasks, setAllTasks] = useState<any[]>([])
@@ -20,6 +23,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [scheduledTasksCache, setScheduledTasksCache] = useState<Map<string, any[]>>(new Map())
   const [tasksScheduled, setTasksScheduled] = useState(false)
   const [buffers, setBuffers] = useState<Map<string, BufferTime>>(new Map())
+  const [categoryBufferBlocks, setCategoryBufferBlocks] = useState<BufferBlock[]>([])
+
+  // Category buffers state  
+  const currentWeekStart = startOfWeek(baseDate, { weekStartsOn: 1 })
   
   const [dataHash, setDataHash] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -89,7 +96,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         // Step 3: Fetch and process tasks in background
         const tasksPromise = fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions)
-        
+        console.log('[BUFFER DEBUG] load tasks')
         // Step 4: Process conflict maps while tasks are loading
         const today = new Date()
         const todayStr = format(today, 'yyyy-MM-dd')
@@ -97,10 +104,12 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const dayColumnsList = getDayColumns()
         const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
         setConflictMaps(newConflictMaps)
+        console.log('[BUFFER DEBUG] generating')
         
         // Step 4.5: Generate daily buffers (extracted from conflict maps)
         const generatedBuffers = generateBuffersForDays(dayColumnsList, fetchedMeetings)
         setBuffers(generatedBuffers)
+
 
         // Step 5: Wait for tasks and schedule them
         const fetchedTasks = await tasksPromise
@@ -157,6 +166,14 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           // Ensure tasksScheduled is true when using cached data
           setTasksScheduled(true)
         }
+
+        // Step 7: Calculate category buffer blocks after task scheduling
+        // Need to recompute conflicts including scheduled tasks
+        const finalConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
+        console.log('final conflict', finalConflictMaps)
+        const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits)
+        console.log('[BUFFER DEBUG]', calculatedBufferBlocks)
+        setCategoryBufferBlocks(calculatedBufferBlocks)
         
       } catch (error) {
         console.error('Error in calendar data loading:', error)
@@ -170,7 +187,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     if (!tasksScheduled) {
       loadAndProcessAllCalendarData()
     }
-  }, [tasksScheduled]) // Re-run when tasksScheduled changes
+  }, [tasksScheduled])
 
   // Update current time every minute
   useEffect(() => {
@@ -297,6 +314,17 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       // Update state with fresh data
       setAllTasks(updatedTasks)
       setTasksDailyLogs(updatedTasksDailyLogs)
+
+      // Recalculate conflict maps with updated meetings
+      const today = new Date()
+      const todayStr = format(today, 'yyyy-MM-dd')
+      const filteredTasksDailyLogs = updatedTasksDailyLogs.filter(log => log.log_date !== todayStr)
+      const newConflictMaps = computeConflictMaps(habits, sessions, meetings, dayColumns, filteredTasksDailyLogs)
+      setConflictMaps(newConflictMaps)
+
+      // Regenerate category buffer blocks with updated conflict maps
+      const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, newConflictMaps, getWorkHoursRange, habits)
+      setCategoryBufferBlocks(calculatedBufferBlocks)
       
     } catch (error) {
       console.error('❌ Error refreshing calendar data:', error)
@@ -482,10 +510,14 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         // Check for session conflicts and rescheduling
         const conflictingSession = sessions.find(session => {
-          if (!session.actual_start_time || session.scheduled_date !== dateKey) return false
+          if (session.scheduled_date !== dateKey) return false
 
-          const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
-          const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
+          // Handle both scheduled and started sessions
+          const workHours = getWorkHoursRange()
+          const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
+          const sessionStartTime = session.actual_start_time || defaultStartTime
+          const sessionStartHour = parseInt(sessionStartTime.split(':')[0])
+          const sessionStartMinute = parseInt(sessionStartTime.split(':')[1])
           const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
 
           const habitDuration = effectiveDuration
@@ -554,10 +586,14 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         })
 
         const conflictingSession = sessions.find(session => {
-          if (!session.actual_start_time || session.scheduled_date !== dateKey) return false
+          if (session.scheduled_date !== dateKey) return false
 
-          const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
-          const sessionStartMinute = parseInt(session.actual_start_time.split(':')[1])
+          // Handle both scheduled and started sessions
+          const workHours = getWorkHoursRange()
+          const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
+          const sessionStartTime = session.actual_start_time || defaultStartTime
+          const sessionStartHour = parseInt(sessionStartTime.split(':')[0])
+          const sessionStartMinute = parseInt(sessionStartTime.split(':')[1])
           const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
 
           const habitDuration = effectiveDuration
@@ -610,8 +646,15 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
     return sessions
       .filter(session => {
-        if (!session.actual_start_time || session.scheduled_date !== dateStr) return false
-        const sessionStartHour = parseInt(session.actual_start_time.split(':')[0])
+        // Check if session is scheduled for this date
+        if (session.scheduled_date !== dateStr) return false
+        
+        // For scheduled sessions without actual_start_time, we need to determine their display time
+        // Use work hours start time or default to 9 AM
+        const workHours = getWorkHoursRange()
+        const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
+        const startTime = session.actual_start_time || defaultStartTime
+        const sessionStartHour = parseInt(startTime.split(':')[0])
         
         // Hide anything before 6 AM
         if (sessionStartHour < 6) return false
@@ -619,7 +662,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         return sessionStartHour === currentHour
       })
       .map(session => {
-        const minutes = parseInt(session.actual_start_time!.split(':')[1])
+        const workHours = getWorkHoursRange()
+        const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
+        const startTime = session.actual_start_time || defaultStartTime
+        const minutes = parseInt(startTime.split(':')[1])
         return {
           ...session,
           topPosition: (minutes / 60) * 100,
@@ -656,9 +702,55 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       })
   }
 
-  // Get buffers for a specific time slot
+  // Get buffers for a specific time slot (daily buffers)
   const getBuffersForCalendarTimeSlot = (timeSlot: string, date: Date) => {
     return getBuffersForTimeSlot(timeSlot, date, buffers)
+  }
+
+  // Get category buffers for a specific time slot
+  const getCategoryBuffersForTimeSlot = (timeSlot: string, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd')
+    
+    // Early return if no buffer blocks exist for this specific date
+    const hasBuffersForDate = categoryBufferBlocks.some(block => block.dateStr === dateStr)
+    if (!hasBuffersForDate) {
+      return []
+    }
+
+    
+    console.log(`[BUFFER DEBUG] getCategoryBuffersForTimeSlot called - timeSlot: ${timeSlot}, date: ${dateStr}`)
+    console.log('[BUFFER DEBUG] All categoryBufferBlocks:', categoryBufferBlocks)
+    
+    const currentHour = parseInt(timeSlot.split(':')[0])
+    
+    const matchingBlocks = categoryBufferBlocks.filter(block => {
+      console.log(`[BUFFER DEBUG] Checking block - dateStr: ${block.dateStr}, start_time: ${block.start_time}, duration: ${block.duration}`)
+      
+      // First check if the buffer block is for the correct date
+      if (block.dateStr !== dateStr) {
+        console.log(`[BUFFER DEBUG] Date mismatch: ${block.dateStr} !== ${dateStr}`)
+        return false
+      }
+      
+      // Check if this buffer block should appear in this time slot
+      const blockStartHour = Math.floor(block.start_time)
+      const blockEndHour = Math.ceil(block.start_time + block.duration)
+      
+      console.log(`[BUFFER DEBUG] Time check - blockStartHour: ${blockStartHour}, blockEndHour: ${blockEndHour}, currentHour: ${currentHour}`)
+      
+      // Check if the buffer block overlaps with this time slot
+      const shouldShow = blockStartHour <= currentHour && currentHour < blockEndHour
+      console.log(`[BUFFER DEBUG] Should show buffer in this slot: ${shouldShow}`)
+      
+      return shouldShow
+    }).map(block => ({
+      ...block,
+      // Calculate position within the hour slot
+      topPosition: ((block.start_time - currentHour) / 1) * 100
+    }))
+    
+    console.log(`[BUFFER DEBUG] Returning ${matchingBlocks.length} matching buffer blocks:`, matchingBlocks)
+    return matchingBlocks
   }
 
   const hourSlots = useMemo(() => getHourSlots(), [])
@@ -689,7 +781,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     getSessionsForTimeSlot,
     getTasksDailyLogsForTimeSlot,
     getBuffersForCalendarTimeSlot,
+    getCategoryBuffersForTimeSlot,
     buffers,
+    categoryBufferBlocks,
     setAllTasks,
     setScheduledTasksCache,
     setTasksScheduled,
