@@ -327,14 +327,8 @@ export const scheduleAllTasks = async (
   if (billableHoursEnabled) {
     // Use the exact same logic as the UI for consistency
     // Note: The UI uses unfiltered tasksDailyLogs, but scheduling gets filtered ones
-    // We need to get the unfiltered logs for accurate revenue calculation
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return new Map()
-    
-    const { data: unfilteredTasksDailyLogs } = await supabase
-      .from('tasks_daily_logs')
-      .select('*, tasks!inner(*, projects(*))')
-      .eq('user_id', user.id)
+    // Use passed tasks daily logs data instead of fetching again
+    const unfilteredTasksDailyLogs = tasksDailyLogsData
     
     const { plannedHoursBreakdown } = calculateWorkHours(
       scheduledTasksCache,

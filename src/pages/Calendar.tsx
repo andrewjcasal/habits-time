@@ -12,8 +12,6 @@ import {
   Sun,
 } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
-import { useHabits } from '../hooks/useHabits'
-import { useSettings } from '../hooks/useSettings'
 import { useVirtualizedCalendar } from '../hooks/useVirtualizedCalendar'
 import { Meeting } from '../types'
 import MeetingModal from '../components/MeetingModal'
@@ -113,7 +111,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     category_id: undefined as string | undefined,
   })
 
-  const { settings } = useSettings()
   const {
     allTasks,
     dayColumns,
@@ -133,6 +130,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     getCategoryBuffersForTimeSlot,
     buffers,
     categoryBufferBlocks,
+    settings,
     tasksScheduled,
     scheduledTasksCache,
     addMeeting,
@@ -142,8 +140,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     refreshCalendarOnHabitChange,
   } = useCalendarData(windowWidth, baseDate)
 
-  // Use habits hook to enable immediate calendar updates when habit times change
-  useHabits(format(baseDate, 'yyyy-MM-dd'), refreshCalendarOnHabitChange)
+  // Calendar data already includes habits - no need for separate useHabits hook
 
   // Virtual scrolling for performance
   const virtualizedCalendar = useVirtualizedCalendar(hourSlots.length, {

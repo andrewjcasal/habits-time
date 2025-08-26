@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { format, addDays } from 'date-fns'
-import { useSettings } from './useSettings'
 import { useTaskDailyLogs } from './useTaskDailyLogs'
+import { useUserContext } from '../contexts/UserContext'
 import { supabase } from '../lib/supabase'
 import { fetchAllCalendarData, fetchTasksForProjects } from '../utils/calendarDataFetcher'
 import { computeConflictMaps } from '../utils/calendarConflicts'
@@ -14,6 +14,7 @@ import { startOfWeek } from 'date-fns'
 import { calculateCategoryBufferBlocks } from '../utils/categoryBufferCalculation'
 
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
+  const { user, loading: userLoading } = useUserContext()
   const [allTasks, setAllTasks] = useState<any[]>([])
   const [habits, setHabits] = useState<any[]>([])
   const [sessions, setSessions] = useState<any[]>([])
@@ -24,6 +25,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [tasksScheduled, setTasksScheduled] = useState(false)
   const [buffers, setBuffers] = useState<Map<string, BufferTime>>(new Map())
   const [categoryBufferBlocks, setCategoryBufferBlocks] = useState<BufferBlock[]>([])
+  const [settings, setSettings] = useState<any>(null)
+  const [isInitializing, setIsInitializing] = useState(false)
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0)
 
   // Category buffers state  
   const currentWeekStart = startOfWeek(baseDate, { weekStartsOn: 1 })
@@ -39,7 +43,15 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     bufferConflicts: new Map()
   })
 
-  const { settings, getWorkHoursRange } = useSettings()
+  // getWorkHoursRange function using our local settings state
+  const getWorkHoursRange = () => {
+    if (!settings) {
+      return { start: 10, end: 22 }
+    }
+    const start = parseInt(settings.work_hours_start.split(':')[0], 10)
+    const end = parseInt(settings.work_hours_end.split(':')[0], 10)
+    return { start, end }
+  }
   const { saveTaskChunks, clearTaskLogsForDate, clearTaskLogsFromTimeForward } = useTaskDailyLogs()
 
   // Don't reset on date changes - keep cached tasks
@@ -58,19 +70,23 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   // Load data once and cache tasks intelligently
   useEffect(() => {
     const loadAndProcessAllCalendarData = async () => {
+      // Prevent multiple simultaneous initializations
+      if (isInitializing) return
       
+      console.log('🔥 CALENDAR DATA LOAD STARTED', { user: user?.id, userLoading, tasksScheduled })
+      setIsInitializing(true)
       setIsDataLoading(true)
       
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        if (userLoading || !user) {
           setIsDataLoading(false)
+          setIsInitializing(false)
           return
         }
 
         // Step 1: Fetch all base data in parallel and update UI immediately
         const dataPromise = fetchAllCalendarData(user.id)
-        const { habits: fetchedHabits, sessions: fetchedSessions, projects: fetchedProjects, meetings: fetchedMeetings, tasksDailyLogs: fetchedTasksDailyLogs, settings: fetchedSettings } = await dataPromise
+        const { habits: fetchedHabits, sessions: fetchedSessions, projects: fetchedProjects, meetings: fetchedMeetings, tasksDailyLogs: fetchedTasksDailyLogs, tasks: fetchedTasks, settings: fetchedSettings } = await dataPromise
 
         // Step 2: Update UI immediately with base data (shows habits, sessions, meetings)
         setHabits(fetchedHabits)
@@ -78,6 +94,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setProjects(fetchedProjects)
         setMeetings(fetchedMeetings)
         setTasksDailyLogs(fetchedTasksDailyLogs)
+        setSettings(fetchedSettings)
         setIsDataLoading(false) // Show partial data immediately
         
         // Create work hours range function using fetched settings
@@ -94,7 +111,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           return { start, end }
         }
 
-        // Step 3: Fetch and process tasks in background
+        // Step 3: Fetch and filter tasks (exclude tasks from projects with sessions)
         const tasksPromise = fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions)
         console.log('[BUFFER DEBUG] load tasks')
         // Step 4: Process conflict maps while tasks are loading
@@ -111,12 +128,12 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setBuffers(generatedBuffers)
 
 
-        // Step 5: Wait for tasks and schedule them
-        const fetchedTasks = await tasksPromise
-        setAllTasks(fetchedTasks)
+        // Step 5: Wait for filtered tasks and schedule them
+        const filteredTasks = await tasksPromise
+        setAllTasks(filteredTasks)
 
         // Step 6: Check if we need to regenerate tasks
-        const newDataHash = createDataHash(fetchedHabits, fetchedSessions, fetchedMeetings, fetchedTasks, fetchedTasksDailyLogs)
+        const newDataHash = createDataHash(fetchedHabits, fetchedSessions, fetchedMeetings, filteredTasks, fetchedTasksDailyLogs)
         const needsRegeneration = !tasksScheduled || dataHash !== newDataHash
 
         if (needsRegeneration) {
@@ -139,7 +156,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           try {
             // Schedule tasks - use filtered data consistent with conflict computation
             const scheduledTasksResult = await scheduleAllTasks(
-              fetchedTasks,
+              filteredTasks,
               newConflictMaps,
               dayColumnsList,
               getWorkHoursRangeFromSettings,
@@ -171,7 +188,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         // Need to recompute conflicts including scheduled tasks
         const finalConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
         console.log('final conflict', finalConflictMaps)
-        const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits)
+        const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings)
         console.log('[BUFFER DEBUG]', calculatedBufferBlocks)
         setCategoryBufferBlocks(calculatedBufferBlocks)
         
@@ -180,14 +197,16 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setIsDataLoading(false)
         // Set tasksScheduled to true to prevent infinite loading state
         setTasksScheduled(true)
+      } finally {
+        setIsInitializing(false)
       }
     }
 
     // Only load if not already scheduled, or if explicitly reset
-    if (!tasksScheduled) {
+    if (!tasksScheduled && !userLoading && user && !isInitializing) {
       loadAndProcessAllCalendarData()
     }
-  }, [tasksScheduled])
+  }, [tasksScheduled, user?.id, userLoading, isInitializing])
 
   // Update current time every minute
   useEffect(() => {
@@ -297,26 +316,11 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   // Helper function to refresh all calendar data after meeting changes
   const refreshCalendarData = async () => {
     try {
-      
-      
-      const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Re-fetch tasks and task daily logs to get updated hours
-      const [updatedTasks, updatedTasksDailyLogs] = await Promise.all([
-        fetchTasksForProjects(user.id, projects, sessions),
-        supabase
-          .from('tasks_daily_logs')
-          .select('*, tasks!inner(*, projects(*))')
-          .eq('user_id', user.id)
-          .then(({ data, error }) => {
-            if (error) {
-              console.error('Error fetching updated task daily logs:', error)
-              return tasksDailyLogs // Return current state on error
-            }
-            return data || []
-          })
-      ])
+      // Re-fetch only tasks (task daily logs shouldn't need re-fetching after meeting changes)
+      const updatedTasks = await fetchTasksForProjects(user.id, projects, sessions)
+      const updatedTasksDailyLogs = tasksDailyLogs // Use existing task daily logs
 
       
       
@@ -332,7 +336,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       setConflictMaps(newConflictMaps)
 
       // Regenerate category buffer blocks with updated conflict maps
-      const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, newConflictMaps, getWorkHoursRange, habits)
+      const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, newConflictMaps, getWorkHoursRange, habits, settings)
       setCategoryBufferBlocks(calculatedBufferBlocks)
       
     } catch (error) {
@@ -353,7 +357,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       // Trigger immediate regeneration
       const regenerateTasks = async () => {
         try {
-          const { data: { user } } = await supabase.auth.getUser()
           if (!user) return
 
           setDataHash(newDataHash)
@@ -785,6 +788,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     getCategoryBuffersForTimeSlot,
     buffers,
     categoryBufferBlocks,
+    settings,
     setAllTasks,
     setScheduledTasksCache,
     setTasksScheduled,

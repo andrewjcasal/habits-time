@@ -10,7 +10,8 @@ export const calculateCategoryBufferBlocks = async (
   baseDate: Date,
   conflictMaps: any,
   getWorkHoursRange: () => { start: number; end: number },
-  habits: any[] = []
+  habits: any[] = [],
+  settings: any = null
 ): Promise<BufferBlock[]> => {
   console.log('[BUFFER DEBUG] Starting buffer calculation step...')
   
@@ -74,12 +75,7 @@ export const calculateCategoryBufferBlocks = async (
     
     console.log('[BUFFER DEBUG] Buffers with utilization:', buffersWithUtilization)
     
-    // Get user settings for week ending constraints
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('week_ending_day, week_ending_time')
-      .eq('user_id', userId)
-      .single()
+    // Use passed settings instead of fetching
 
     // Get empty slots but filter out times before Morning Routine
     const allEmptySlots = findEmptyTimeSlots(weekStart, weekEnd, conflictMaps, getWorkHoursRange, settings || undefined)

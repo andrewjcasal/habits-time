@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { format } from 'date-fns'
 
 export const fetchAllCalendarData = async (userId: string) => {
   
@@ -15,12 +16,13 @@ export const fetchAllCalendarData = async (userId: string) => {
 
   try {
     // Fetch all data sources in parallel with timeout protection
-    const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, settingsResult] = await Promise.allSettled([
+    const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, tasksResult, settingsResult] = await Promise.allSettled([
       withTimeout(supabase.from('habits').select('*, habits_daily_logs(*), habits_types(*)').eq('user_id', userId).eq('is_visible', true)),
       withTimeout(supabase.from('sessions').select('*, projects(*)').eq('user_id', userId)),
       withTimeout(supabase.from('projects').select('*').eq('user_id', userId)),
       withTimeout(supabase.from('meetings').select('*').eq('user_id', userId)),
       withTimeout(supabase.from('tasks_daily_logs').select('*, tasks!inner(*, projects(*))').eq('user_id', userId)),
+      withTimeout(supabase.from('tasks').select('*, projects!inner(*)').eq('user_id', userId)),
       withTimeout(supabase.from('user_settings').select('*').eq('user_id', userId).single())
     ])
 
@@ -30,6 +32,7 @@ export const fetchAllCalendarData = async (userId: string) => {
     const projects = projectsResult.status === 'fulfilled' ? (projectsResult.value.data || []) : []
     const meetings = meetingsResult.status === 'fulfilled' ? (meetingsResult.value.data || []) : []
     const tasksDailyLogs = tasksDailyLogsResult.status === 'fulfilled' ? (tasksDailyLogsResult.value.data || []) : []
+    const tasks = tasksResult.status === 'fulfilled' ? (tasksResult.value.data || []) : []
     const settings = settingsResult.status === 'fulfilled' ? settingsResult.value.data : null
 
     // Log any failures
@@ -39,6 +42,7 @@ export const fetchAllCalendarData = async (userId: string) => {
       projectsResult.status === 'rejected' && 'projects',
       meetingsResult.status === 'rejected' && 'meetings',
       tasksDailyLogsResult.status === 'rejected' && 'tasksDailyLogs',
+      tasksResult.status === 'rejected' && 'tasks',
       settingsResult.status === 'rejected' && 'settings'
     ].filter(Boolean)
     
@@ -48,11 +52,11 @@ export const fetchAllCalendarData = async (userId: string) => {
 
     
 
-    return { habits, sessions, projects, meetings, tasksDailyLogs, settings }
+    return { habits, sessions, projects, meetings, tasksDailyLogs, tasks, settings }
   } catch (error) {
     console.error('Critical error fetching calendar data:', error)
     // Return minimal data to prevent complete failure
-    return { habits: [], sessions: [], projects: [], meetings: [], tasksDailyLogs: [], settings: null }
+    return { habits: [], sessions: [], projects: [], meetings: [], tasksDailyLogs: [], tasks: [], settings: null }
   }
 }
 
@@ -61,6 +65,7 @@ export const fetchTasksForProjects = async (userId: string, projects: any[], ses
   
   if (projects.length === 0) return []
 
+  // Hide ALL tasks from projects that have ANY sessions (past, present, or future)
   const projectsWithSessions = new Set(sessions.map(s => s.project_id))
   const projectsWithoutSessions = projects.filter(p => !projectsWithSessions.has(p.id))
 
