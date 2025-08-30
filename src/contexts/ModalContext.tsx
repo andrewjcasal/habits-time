@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { Meeting } from '../types'
 
 interface ModalState {
@@ -98,8 +98,8 @@ interface ModalProviderProps {
 export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: ModalProviderProps) => {
   const [modalState, setModalState] = useState<ModalState>(initialModalState)
 
-  // Helper function to close all modals and reset their state
-  const getClosedModalState = (prevState: ModalState) => ({
+  // Helper function to close all modals and reset their state (memoized)
+  const getClosedModalState = useCallback((prevState: ModalState) => ({
     ...prevState,
     showMeetingModal: false,
     showHabitModal: false,
@@ -111,9 +111,9 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: Moda
     selectedHabitDate: null,
     selectedTask: null,
     selectedSession: null,
-  })
+  }), [])
 
-  const openMeetingModal = (timeSlot?: { time: string; date: Date; endTime?: string }, editing?: Meeting) => {
+  const openMeetingModal = useCallback((timeSlot?: { time: string; date: Date; endTime?: string }, editing?: Meeting) => {
     if (editing) {
       const startTime = new Date(editing.start_time)
       const endTime = new Date(editing.end_time)
@@ -183,7 +183,7 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: Moda
         },
       }))
     }
-  }
+  }, [getClosedModalState])
 
   const closeMeetingModal = () => {
     setModalState(prev => ({

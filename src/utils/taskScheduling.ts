@@ -520,7 +520,6 @@ export const scheduleAllTasks = async (
     }
   }
 
-  console.log('[BUFFER DEBUG]', tasksByDate)
 
   return tasksByDate
 }

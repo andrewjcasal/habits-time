@@ -43,7 +43,6 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
       }
 
       setBuffers(data || [])
-      console.log('buffers', data)
       fetchUtilization();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -57,11 +56,6 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      console.log('📅 fetchUtilization - Week bounds:', { 
-        weekStart: weekStart.toISOString(), 
-        weekEnd: weekEnd.toISOString(),
-        user_id: user.id 
-      })
 
       // Call the database function to get buffer utilization
       const { data, error: fetchError } = await supabase
@@ -76,7 +70,6 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
         return
       }
 
-      console.log('📊 fetchUtilization result:', data)
       setUtilization(data || [])
     } catch (err) {
       console.error('Error fetching buffer utilization:', err)
@@ -150,20 +143,11 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
   }
 
   const getBufferData = () => {
-    console.log('🔍 useCategoryBuffers - buffers state:', buffers)
-    console.log('🔍 useCategoryBuffers - utilization state:', utilization)
-    console.log('🔍 useCategoryBuffers - loading state:', loading)
-    console.log('🔍 useCategoryBuffers - error state:', error)
-    
-    // If we don't have buffers yet, return empty array
     if (loading || buffers.length === 0) {
-      console.log('❌ getBufferData: No buffers available yet (loading or empty)')
       return []
     }
     
-    // If we have buffers but no utilization data, try to fetch it
     if (buffers.length > 0 && utilization.length === 0) {
-      console.log('⚠️ Have buffers but no utilization data, triggering fetch...')
       fetchUtilization()
     }
     
@@ -187,7 +171,6 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
       }
     })
     
-    console.log('🎯 getBufferData result:', result)
     return result
   }
 

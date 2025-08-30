@@ -25,6 +25,7 @@ import PersonDetail from './pages/PersonDetail'
 import Projects from './pages/Projects'
 import Calendar from './pages/Calendar'
 import Categories from './pages/Categories'
+import Buffers from './pages/Buffers'
 import Settings from './pages/Settings'
 
 // Components
@@ -79,6 +80,7 @@ function App() {
             <Route path="projects" element={<Projects />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="categories" element={<Categories />} />
+            <Route path="buffers" element={<Buffers />} />
             <Route path="todoist" element={<Todoist />} />
             <Route path="wins" element={<Wins />} />
             <Route path="notes" element={<Notes />} />

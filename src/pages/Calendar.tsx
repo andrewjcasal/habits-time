@@ -778,7 +778,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     onSetDeleteHandler(handleDeleteMeeting)
   }, [handleSaveMeeting, handleDeleteMeeting, onSetSaveHandler, onSetDeleteHandler])
 
-  console.log('123 plannedhoursbreakdown', plannedHoursBreakdown)
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       {/* CSS for drag animation */}

@@ -39,7 +39,7 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
   const is15Min = durationInMinutes == 15
   const is30Min = durationInMinutes == 30
   
-  const baseClass = `absolute text-sm sm:text-xs p-1 sm:p-0.5 ${is15Min || is30Min ? 'pt-0 sm:pt-0' : '' } rounded border-l-2 ${is30PlusMin ? 'flex-col items-start' : 'flex items-start justify-between'} shadow-sm`
+  const baseClass = `absolute text-sm sm:text-xs p-1 sm:p-0.5 ${is15Min || is30Min ? 'pt-0 sm:pt-0' : '' } rounded border-l-2 ${is30PlusMin ? 'flex-col items-start' : 'flex items-start justify-between'} shadow-sm overflow-hidden`
   
   const typeClasses = {
     habit: "bg-blue-100 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-200 transition-colors",

@@ -9,7 +9,8 @@ export const findEmptyTimeSlots = (
   endDate: Date,
   conflictMaps: any,
   getWorkHoursRange: () => { start: number; end: number },
-  weekSettings?: { week_ending_day: string; week_ending_time: string }
+  weekSettings?: { week_ending_day: string; week_ending_time: string },
+  habits?: any[]
 ) => {
   const emptySlots: Array<{ timeInHours: number; date: Date; dateStr: string }> = []
   const { start: workStart, end: workEnd } = getWorkHoursRange()
@@ -23,11 +24,29 @@ export const findEmptyTimeSlots = (
     // (buffers can be scheduled on weekends)
     
     // Check each 15-minute slot throughout the work day
-    // Adjust end time for week ending day
+    // Adjust end time based on Wind down time habit or week ending settings
     const dayOfWeek = currentDate.getDay()
     let effectiveWorkEnd = workEnd
     
-    if (weekSettings?.week_ending_day && weekSettings?.week_ending_time) {
+    // Find Wind down time habit for this date
+    const windDownHabit = habits?.find(habit => habit.name === 'Wind down time')
+    const isSunday = dayOfWeek === 0
+    
+    if (windDownHabit && !isSunday) {
+      // Use Wind down time for all days except Sunday
+      const dailyLog = windDownHabit.habits_daily_logs?.find((log: any) => log.log_date === dateStr)
+      const windDownStartTime = dailyLog?.scheduled_start_time || windDownHabit.current_start_time
+      
+      if (windDownStartTime) {
+        const [windDownHour, windDownMinute] = windDownStartTime.split(':').map(Number)
+        effectiveWorkEnd = windDownHour + windDownMinute / 60
+      }
+    } else if (isSunday && weekSettings?.week_ending_time) {
+      // Use fixed week ending time for Sunday (8:30pm)
+      const [endHour, endMinute] = weekSettings.week_ending_time.split(':').map(Number)
+      effectiveWorkEnd = endHour + endMinute / 60
+    } else if (weekSettings?.week_ending_day && weekSettings?.week_ending_time) {
+      // Fallback to original week ending logic
       const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 }
       const weekEndingDayNum = dayMap[weekSettings.week_ending_day.toLowerCase() as keyof typeof dayMap]
       
@@ -37,11 +56,18 @@ export const findEmptyTimeSlots = (
       }
     }
     
-    for (let hour = workStart; hour < effectiveWorkEnd; hour++) {
+    // Use the maximum of workEnd and effectiveWorkEnd to allow extending beyond normal work hours
+    const maxWorkEnd = Math.max(workEnd, effectiveWorkEnd)
+    
+    for (let hour = workStart; hour <= Math.floor(maxWorkEnd); hour++) {
       for (let quarterHour = 0; quarterHour < 4; quarterHour++) {
         const minutes = quarterHour * 15
         const timeInHours = hour + minutes / 60
         
+        // Skip if this slot is beyond the effective work end time
+        if (timeInHours >= maxWorkEnd) {
+          break
+        }
         
         // Check if this time slot has any conflicts
         const normalizedTime = Math.round(timeInHours * 4) / 4
@@ -106,9 +132,17 @@ export const allocateBufferBlocks = (
   emptySlots: Array<{ timeInHours: number; date: Date; dateStr: string }>,
   categoryInfo: { id: string; name: string; color: string },
   bufferId: string,
-  weekSettings?: { week_ending_day: string; week_ending_time: string }
+  weekSettings?: { week_ending_day: string; week_ending_time: string },
+  habits?: any[]
 ): BufferBlock[] => {
+  console.log(`\ud83d\udcca ALLOCATING BUFFER: ${categoryInfo.name}`, {
+    bufferHours,
+    emptySlots: emptySlots.length,
+    bufferId
+  });
+  
   if (bufferHours <= 0 || emptySlots.length === 0) {
+    console.log(`\u26a0\ufe0f Skipping allocation - bufferHours: ${bufferHours}, slots: ${emptySlots.length}`);
     return []
   }
   
@@ -135,6 +169,8 @@ export const allocateBufferBlocks = (
   })
   
   let remainingHours = bufferHours
+  
+  console.log(`📋 Starting allocation with ${remainingHours} hours to allocate`);
   
   // Fill from latest day backwards
   for (const [dateStr, daySlots] of sortedDays) {
@@ -163,25 +199,53 @@ export const allocateBufferBlocks = (
       // Create the buffer block
       let hoursToAllocate = Math.min(remainingHours, blockDuration)
       
-      // Check if this block extends past week ending time and cap it
-      // Apply week ending time constraint to all days to respect weekly work cutoff
-      if (weekSettings?.week_ending_time) {
+      console.log(`  \ud83d\udcdd Creating block:`, {
+        remainingHours,
+        blockDuration,
+        hoursToAllocate,
+        blockStart,
+        dateStr: startSlot.dateStr
+      });
+      
+      // Check if this block extends past Wind down time or week ending time and cap it
+      const blockDate = startSlot.date
+      const dayOfWeek = blockDate.getDay()
+      const isSunday = dayOfWeek === 0
+      
+      // Find Wind down time habit for this date
+      const windDownHabit = habits?.find(habit => habit.name === 'Wind down time')
+      
+      if (windDownHabit && !isSunday) {
+        // Use Wind down time for all days except Sunday
+        const dailyLog = windDownHabit.habits_daily_logs?.find((log: any) => log.log_date === startSlot.dateStr)
+        const windDownStartTime = dailyLog?.scheduled_start_time || windDownHabit.current_start_time
+        
+        if (windDownStartTime) {
+          const [windDownHour, windDownMinute] = windDownStartTime.split(':').map(Number)
+          const windDownTimeInHours = windDownHour + windDownMinute / 60
+          
+          // Cap the block so it doesn't extend past Wind down time
+          const blockEndTime = blockStart + hoursToAllocate
+          if (blockEndTime > windDownTimeInHours) {
+            hoursToAllocate = windDownTimeInHours - blockStart
+          }
+        }
+      } else if (weekSettings?.week_ending_time) {
+        // Use week ending time for Sunday or as fallback
         const [endHour, endMinute] = weekSettings.week_ending_time.split(':').map(Number)
         const weekEndTimeInHours = endHour + endMinute / 60
-        
-        console.log(`[BUFFER DEBUG] Checking week end cap - date: ${startSlot.dateStr}, blockStart: ${blockStart}, duration: ${hoursToAllocate}, weekEndTime: ${weekEndTimeInHours}`)
         
         // Cap the block so it doesn't extend past week ending time
         const blockEndTime = blockStart + hoursToAllocate
         if (blockEndTime > weekEndTimeInHours) {
-          const originalHours = hoursToAllocate
           hoursToAllocate = weekEndTimeInHours - blockStart
-          console.log(`[BUFFER DEBUG] Capping buffer from ${originalHours}h to ${hoursToAllocate}h for week ending constraint`)
         }
       }
       
+      console.log(`  ➡️ Final allocation:`, { hoursToAllocate });
+      
       if (hoursToAllocate > 0) {
-        blocks.push({
+        const block = {
           id: `${bufferId}-block-${blocks.length}`,
           buffer_id: bufferId,
           category_id: categoryInfo.id,
@@ -192,10 +256,13 @@ export const allocateBufferBlocks = (
           remaining_hours: bufferHours,
           date: startSlot.date,
           dateStr: startSlot.dateStr
-        })
+        };
+        
+        console.log(`  ✅ Block created:`, block);
+        blocks.push(block);
+        remainingHours -= hoursToAllocate
       }
-      
-      remainingHours -= hoursToAllocate
+      console.log(`  📊 After allocation: remainingHours = ${remainingHours}`);
       i = j
     }
   }
@@ -212,7 +279,8 @@ export const prioritizeBufferPlacement = (
     utilization: BufferUtilization
   }>,
   emptySlots: Array<{ timeInHours: number; date: Date; dateStr: string }>,
-  weekSettings?: { week_ending_day: string; week_ending_time: string }
+  weekSettings?: { week_ending_day: string; week_ending_time: string },
+  habits?: any[]
 ): BufferBlock[] => {
   // Sort buffers by priority (could be customized)
   // For now, prioritize by:
@@ -231,7 +299,16 @@ export const prioritizeBufferPlacement = (
   for (const buffer of sortedBuffers) {
     // Only allocate remaining hours
     const remainingHours = buffer.utilization.hours_remaining
-    if (remainingHours <= 0) continue
+    
+    console.log(`\n🎯 Processing buffer: ${buffer.utilization.category_name}`);
+    console.log(`  - Weekly hours: ${buffer.utilization.weekly_hours}`);
+    console.log(`  - Hours spent: ${buffer.utilization.hours_spent}`);
+    console.log(`  - Remaining hours: ${remainingHours}`);
+    
+    if (remainingHours <= 0) {
+      console.log(`  - Skipping (no remaining hours)`);
+      continue
+    }
     
     // Filter out already used slots
     const availableSlots = emptySlots.filter(slot => {
@@ -250,7 +327,8 @@ export const prioritizeBufferPlacement = (
       availableSlots,
       categoryInfo,
       buffer.id,
-      weekSettings
+      weekSettings,
+      habits
     )
     
     // Mark used slots

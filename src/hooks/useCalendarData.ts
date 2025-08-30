@@ -113,7 +113,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         // Step 3: Fetch and filter tasks (exclude tasks from projects with sessions)
         const tasksPromise = fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions)
-        console.log('[BUFFER DEBUG] load tasks')
         // Step 4: Process conflict maps while tasks are loading
         const today = new Date()
         const todayStr = format(today, 'yyyy-MM-dd')
@@ -121,7 +120,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const dayColumnsList = getDayColumns()
         const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
         setConflictMaps(newConflictMaps)
-        console.log('[BUFFER DEBUG] generating')
         
         // Step 4.5: Generate daily buffers (extracted from conflict maps)
         const generatedBuffers = generateBuffersForDays(dayColumnsList, fetchedMeetings)
@@ -189,7 +187,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const finalConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
         console.log('final conflict', finalConflictMaps)
         const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings)
-        console.log('[BUFFER DEBUG]', calculatedBufferBlocks)
         setCategoryBufferBlocks(calculatedBufferBlocks)
         
       } catch (error) {
@@ -722,17 +719,13 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     }
 
     
-    console.log(`[BUFFER DEBUG] getCategoryBuffersForTimeSlot called - timeSlot: ${timeSlot}, date: ${dateStr}`)
-    console.log('[BUFFER DEBUG] All categoryBufferBlocks:', categoryBufferBlocks)
     
     const currentHour = parseInt(timeSlot.split(':')[0])
     
     const matchingBlocks = categoryBufferBlocks.filter(block => {
-      console.log(`[BUFFER DEBUG] Checking block - dateStr: ${block.dateStr}, start_time: ${block.start_time}, duration: ${block.duration}`)
       
       // First check if the buffer block is for the correct date
       if (block.dateStr !== dateStr) {
-        console.log(`[BUFFER DEBUG] Date mismatch: ${block.dateStr} !== ${dateStr}`)
         return false
       }
       
@@ -740,11 +733,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       const blockStartHour = Math.floor(block.start_time)
       const blockEndHour = Math.ceil(block.start_time + block.duration)
       
-      console.log(`[BUFFER DEBUG] Time check - blockStartHour: ${blockStartHour}, blockEndHour: ${blockEndHour}, currentHour: ${currentHour}`)
       
       // Check if the buffer block overlaps with this time slot
       const shouldShow = blockStartHour <= currentHour && currentHour < blockEndHour
-      console.log(`[BUFFER DEBUG] Should show buffer in this slot: ${shouldShow}`)
       
       return shouldShow
     }).map(block => ({
@@ -753,7 +744,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       topPosition: ((block.start_time - currentHour) / 1) * 100
     }))
     
-    console.log(`[BUFFER DEBUG] Returning ${matchingBlocks.length} matching buffer blocks:`, matchingBlocks)
     return matchingBlocks
   }
 

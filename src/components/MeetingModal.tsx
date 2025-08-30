@@ -1,12 +1,13 @@
 import { format, subWeeks } from 'date-fns'
 import { ChevronDown, FileText, Calendar, ArrowLeft } from 'lucide-react'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Meeting } from '../types'
 import { supabase } from '../lib/supabase'
 import TaskDailyLogModal from './TaskDailyLogModal'
 import ModalWrapper from './ModalWrapper'
 import SidebarActionButton from './SidebarActionButton'
 import { useModal } from '../contexts/ModalContext'
+import { useUserContext } from '../contexts/UserContext'
 
 interface Category {
   id: string
@@ -30,11 +31,13 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
     handleSaveMeeting,
     handleDeleteMeeting,
   } = useModal()
+  const { user } = useUserContext()
   const [previousTitles, setPreviousTitles] = useState<
     { title: string; count: number; lastUsed: Date }[]
   >([])
   const [showTitleDropdown, setShowTitleDropdown] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
+  const [categoriesFetched, setCategoriesFetched] = useState(false)
   const [showTaskLogModal, setShowTaskLogModal] = useState(false)
   const [localTitle, setLocalTitle] = useState(meeting.title)
   const [showTaskLogForm, setShowTaskLogForm] = useState(false)
@@ -60,25 +63,22 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
     }
   }, [showTaskLogForm])
 
-  // Fetch previous meeting titles when modal opens (only for new meetings)
+  // Fetch previous meeting titles when modal opens (only for new meetings, memoized)
   useEffect(() => {
-    if (showMeetingModal && !editingMeeting) {
+    if (showMeetingModal && !editingMeeting && previousTitles.length === 0) {
       fetchPreviousTitles()
     }
-  }, [showMeetingModal, editingMeeting])
+  }, [showMeetingModal, editingMeeting, previousTitles.length])
 
-  // Fetch categories when modal opens
+  // Fetch categories when modal opens (memoized)
   useEffect(() => {
-    if (showMeetingModal) {
+    if (showMeetingModal && !categoriesFetched) {
       fetchCategories()
     }
-  }, [showMeetingModal])
+  }, [showMeetingModal, categoriesFetched])
 
   const fetchCategories = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
       if (!user) return
 
       const { data, error } = await supabase
@@ -93,6 +93,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       }
 
       setCategories(data || [])
+      setCategoriesFetched(true)
     } catch (error) {
       console.error('Error fetching categories:', error)
     }
@@ -100,7 +101,6 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
 
   const fetchTasks = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
       const { data, error } = await supabase
@@ -122,11 +122,9 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
   }
 
   const handleCreateTaskLog = async () => {
-    if (!taskLogForm.task_id || !selectedTimeSlot) return
+    if (!taskLogForm.task_id || !selectedTimeSlot || !user) return
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
 
       // Calculate end time
       const [startHour, startMinute] = selectedTimeSlot.time.split(':').map(Number)
@@ -172,9 +170,6 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
 
   const fetchPreviousTitles = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
       if (!user) return
 
       const twoWeeksAgo = subWeeks(new Date(), 2)
@@ -186,7 +181,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
         .not('title', 'is', null)
         .not('title', 'eq', '')
         .order('start_time', { ascending: false })
-        .limit(100)
+        .limit(20)
 
       if (error) {
         console.error('Error fetching previous meeting titles:', error)
@@ -270,6 +265,18 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
     }
   }, [showMeetingModal, closeMeetingModal])
 
+  // Memoize filtered titles computation - MUST be called before any conditional returns
+  const filteredTitles = useMemo(() => {
+    return previousTitles
+      .filter(
+        titleData =>
+          localTitle.length === 0 ||
+          titleData.title.toLowerCase().includes(localTitle.toLowerCase())
+      )
+      .slice(0, 10)
+  }, [previousTitles, localTitle])
+
+  // Return null AFTER all hooks have been called to maintain hook order
   if (!showMeetingModal) return null
 
   const getTitle = () => {
@@ -371,24 +378,12 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
                 previousTitles.length > 0 &&
                 localTitle.length <= 3 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-md shadow-lg z-50 max-h-32 overflow-y-auto">
-                    {(() => {
-                      const filteredTitles = previousTitles
-                        .filter(
-                          titleData =>
-                            localTitle.length === 0 ||
-                            titleData.title.toLowerCase().includes(localTitle.toLowerCase())
-                        )
-                        .slice(0, 10)
-
-                      if (filteredTitles.length === 0) {
-                        return (
-                          <div className="px-2 py-1 text-xs text-neutral-500">
-                            No matching titles found
-                          </div>
-                        )
-                      }
-
-                      return filteredTitles.map((titleData, index) => {
+                    {filteredTitles.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-neutral-500">
+                        No matching titles found
+                      </div>
+                    ) : (
+                      filteredTitles.map((titleData, index) => {
                         const isRecent = titleData.recentCount > 0
                         return (
                           <button
@@ -408,7 +403,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
                           </button>
                         )
                       })
-                    })()}
+                    )}
                   </div>
                 )}
             </div>

@@ -21,7 +21,7 @@ export const Tabs = ({ tabs, activeTab, onChange }: TabsProps) => {
             key={tab.id}
             onClick={() => onChange(tab.id)}
             className={`
-              relative py-4 px-1 text-sm font-medium
+              relative py-2 px-1 text-sm font-medium
               ${activeTab === tab.id ? 'text-primary-600' : 'text-neutral-500 hover:text-neutral-900'}
             `}
           >

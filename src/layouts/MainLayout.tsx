@@ -26,6 +26,7 @@ import {
   Zap,
   Crown,
   Tag,
+  Target,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUserContext } from '../contexts/UserContext'
@@ -49,12 +50,13 @@ const MainLayout = () => {
     { path: '/calendar', label: 'Calendar', icon: Calendar },
     { path: '/projects', label: 'Projects', icon: FolderOpen },
     { path: '/categories', label: 'Categories', icon: Tag },
+    { path: '/buffers', label: 'Buffers', icon: Target },
     // { path: '/community', label: 'Community', icon: Users },
     // { path: '/todoist', label: 'Todoist', icon: CheckSquare },
-    { path: '/reflections', label: 'Reflections', icon: Notebook },
+    // { path: '/reflections', label: 'Reflections', icon: Notebook },
     { path: '/habits', label: 'Habits', icon: Heart },
     { path: '/notes', label: 'Notes', icon: FileText },
-    { path: '/wins', label: 'Wins', icon: Trophy },
+    // { path: '/wins', label: 'Wins', icon: Trophy },
   ]
 
   const settingsItem = { path: '/settings', label: 'Settings', icon: Settings }
@@ -64,15 +66,15 @@ const MainLayout = () => {
   return (
     <div className="flex min-h-screen bg-neutral-50">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
-        <div className="p-4">
-          <h1 className="text-lg font-semibold text-primary-700 flex items-center">
-            <Crown className="w-4 h-4 mr-2 text-primary-600" />
-            Cassian
+      <aside className="hidden md:flex md:w-14 lg:w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
+        <div className="p-4 md:p-2 lg:p-4">
+          <h1 className="text-lg font-semibold text-primary-700 flex items-center md:justify-center lg:justify-start">
+            <Crown className="w-4 h-4 md:mr-0 lg:mr-2 text-primary-600" />
+            <span className="md:hidden lg:block">Cassian</span>
           </h1>
         </div>
 
-        <nav className="flex-1 px-2 pb-4">
+        <nav className="flex-1 px-2 pb-4 md:px-1 lg:px-2">
           <ul className="space-y-0.5">
             {navItems.map(item => {
               const Icon = item.icon
@@ -81,15 +83,16 @@ const MainLayout = () => {
                   <NavLink
                     to={item.path}
                     className={({ isActive }) =>
-                      `flex items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+                      `flex items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors md:justify-center lg:justify-start md:px-1 lg:px-2 ${
                         isActive
                           ? 'bg-primary-50 text-primary-700'
                           : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                       }`
                     }
+                    title={item.label}
                   >
-                    <Icon className="mr-2 h-3.5 w-3.5" />
-                    {item.label}
+                    <Icon className="mr-2 h-3 w-3 md:mr-0 lg:mr-2" />
+                    <span className="md:hidden lg:block">{item.label}</span>
                   </NavLink>
                 </li>
               )
@@ -102,25 +105,27 @@ const MainLayout = () => {
             href="https://ko-fi.com/andrewjcasal"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600"
+            className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600 md:justify-center lg:justify-start md:px-1 lg:px-2"
+            title="Support"
           >
-            <Heart className="mr-2 h-3.5 w-3.5" />
-            Support
+            <Heart className="mr-2 h-3 w-3 md:mr-0 lg:mr-2" />
+            <span className="md:hidden lg:block">Support</span>
           </a>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 md:flex-col lg:flex-row">
             <NavLink
               to="/settings"
-              className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 flex-1"
+              className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 flex-1 md:justify-center lg:justify-start md:px-1 lg:px-2"
+              title="Settings"
             >
-              <Settings className="mr-2 h-3.5 w-3.5" />
-              Settings
+              <Settings className="mr-2 h-3 w-3 md:mr-0 lg:mr-2" />
+              <span className="md:hidden lg:block">Settings</span>
             </NavLink>
             <button
               onClick={signOut}
-              className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+              className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 md:justify-center md:px-1 lg:px-2"
               title="Logout"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <LogOut className="h-3 w-3" />
             </button>
           </div>
         </div>
@@ -236,7 +241,7 @@ const MainLayout = () => {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-56 pt-16 md:pt-0 w-full md:w-auto">
+      <main className="flex-1 md:ml-14 lg:ml-56 pt-16 md:pt-0 w-full md:w-auto">
         <Outlet />
       </main>
 

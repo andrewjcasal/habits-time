@@ -84,6 +84,18 @@ export const computeConflictMaps = (
         // Round to nearest 15-minute boundary for precise conflict detection
         const startSlot = Math.round(adjustedStartTime * 4) / 4
         const endSlot = Math.round(adjustedEndTime * 4) / 4
+        
+        // Debug Morning Routine conflicts
+        if (habit.name === 'Morning Routine' && (dateStr === '2025-08-30' || dateStr === '2025-08-31')) {
+          console.log(`🐛 Morning Routine conflict detection for ${dateStr}:`, {
+            adjustedStartTime,
+            adjustedEndTime,
+            startSlot,
+            endSlot,
+            duration: duration / 60
+          })
+        }
+        
         for (let time = startSlot; time < endSlot; time += 0.25) {
           const normalizedTime = Math.round(time * 4) / 4
           const key = `${dateStr}-${normalizedTime}`
