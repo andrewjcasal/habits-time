@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, MessageSquare, Trash2, Plus, X, Target, FileText, Edit2 } from 'lucide-react'
+import { Settings, MessageSquare, Trash2, Plus, X, Target, FileText, Edit2, ArrowLeft, CheckCircle2, Circle } from 'lucide-react'
 import HabitContext from './HabitContext'
 import { useHabits } from '../hooks/useHabits'
 import { useHabitTypes } from '../hooks/useHabitTypes'
@@ -16,6 +16,11 @@ interface HabitDetailTabsProps {
     consequences: string
   }
   onHabitDeleted?: () => void
+  showBackButton?: boolean
+  onBackClick?: () => void
+  showCompletionToggle?: boolean
+  onCompletionToggle?: () => void
+  isCompleted?: boolean
 }
 
 const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
@@ -24,6 +29,11 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   initialTab = 'notes',
   initialContext,
   onHabitDeleted,
+  showBackButton = false,
+  onBackClick,
+  showCompletionToggle = false,
+  onCompletionToggle,
+  isCompleted = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'notes' | 'subhabits' | 'settings'>(initialTab)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -352,7 +362,31 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     <div className="h-full flex flex-col">
       {/* Context Header */}
       <div className="bg-gray-50 px-2 py-1.5 border-b border-gray-200 flex-shrink-0">
-        <h2 className="text-base font-semibold text-gray-900">{habitName} Context</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {showBackButton && onBackClick && (
+              <button
+                onClick={onBackClick}
+                className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+            <h2 className="text-base font-semibold text-gray-900">{habitName} Context</h2>
+          </div>
+          {showCompletionToggle && onCompletionToggle && (
+            <button
+              onClick={onCompletionToggle}
+              className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              {isCompleted ? (
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              ) : (
+                <Circle className="w-5 h-5 text-gray-400" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tab Navigation */}

@@ -112,8 +112,8 @@ const HabitsMainContent = ({
           </div>
         </div>
         
-        {/* Detail Panel - Show only selected habit */}
-        <div className="bg-white col-span-2 h-full overflow-hidden">
+        {/* Detail Panel - Show only selected habit on desktop */}
+        <div className="bg-white col-span-2 h-full overflow-hidden hidden lg:block">
           {selectedHabit && (
             <HabitDetailTabs
               key={`detail-${selectedHabit.id}`}

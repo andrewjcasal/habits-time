@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   RefreshCw,
 } from 'lucide-react'
@@ -15,6 +15,7 @@ import Aspects from './Aspects'
 
 const Habits = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
   const {
@@ -33,11 +34,22 @@ const Habits = () => {
   
   // Update URL when habit selection changes
   const handleHabitSelect = (habitId: string | null) => {
-    setSelectedHabitId(habitId)
-    if (habitId) {
-      setSearchParams({ habitId, tab: 'notes' })
-    } else {
+    if (!habitId) {
+      setSelectedHabitId(null)
       setSearchParams({})
+      return
+    }
+
+    // Check if we're on mobile
+    const isMobile = window.innerWidth < 768 // md breakpoint
+    
+    if (isMobile) {
+      // Navigate to habit detail page on mobile
+      navigate(`/habits/${habitId}`)
+    } else {
+      // Show in sidebar on desktop
+      setSelectedHabitId(habitId)
+      setSearchParams({ habitId, tab: 'notes' })
     }
   }
   const [showCreateModal, setShowCreateModal] = useState(false)

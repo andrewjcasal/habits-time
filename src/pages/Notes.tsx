@@ -573,7 +573,7 @@ const Notes = () => {
     <div className="flex grid grid-cols-5 h-screen bg-white overflow-hidden max-w-full">
       {/* Left Sidebar - Full width on mobile, fixed width on desktop */}
       <aside
-        className={`col-span-2 border-r border-neutral-200 bg-neutral-50 flex flex-col flex-shrink-0 md:flex ${
+        className={`col-span-5 md:col-span-2 border-r border-neutral-200 bg-neutral-50 flex flex-col flex-shrink-0 md:flex ${
           showMobileDetail ? 'hidden' : 'flex'
         }`}
       >
@@ -680,7 +680,7 @@ const Notes = () => {
 
       {/* Main Content - Full width on mobile when showing detail, hidden when showing list on mobile */}
       <main
-        className={`col-span-3 flex-col min-w-0 overflow-hidden md:flex ${
+        className={`col-span-5 md:col-span-3 flex-col min-w-0 overflow-hidden md:flex ${
           showMobileDetail ? 'flex w-full' : 'hidden md:flex md:w-0'
         }`}
       >

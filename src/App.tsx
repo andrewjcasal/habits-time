@@ -23,6 +23,8 @@ import Notes from './pages/Notes'
 import Community from './pages/Community'
 import PersonDetail from './pages/PersonDetail'
 import Projects from './pages/Projects'
+import HabitDetail from './pages/HabitDetail'
+import AspectDetail from './pages/AspectDetail'
 import Calendar from './pages/Calendar'
 import Categories from './pages/Categories'
 import Buffers from './pages/Buffers'
@@ -77,6 +79,8 @@ function App() {
             <Route path="essentials" element={<Essentials />} />
             <Route path="daily-overrides" element={<DailyOverrides />} />
             <Route path="habits" element={<Habits />} />
+            <Route path="habits/:habitId" element={<HabitDetail />} />
+            <Route path="habits/aspect/:aspectId" element={<AspectDetail />} />
             <Route path="projects" element={<Projects />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="categories" element={<Categories />} />

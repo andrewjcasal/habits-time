@@ -19,8 +19,8 @@ const TabNavigation = ({ activeTab, onTabChange }: TabNavigationProps) => {
               : 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300'
           }`}
         >
-          <CheckCircle2 className="w-4 h-4" />
-          Habits
+          <CheckCircle2 className="w-3 h-3 md:w-2 md:h-2" />
+          <span className="hidden md:inline">Habits</span>
         </button>
         <button
           onClick={() => onTabChange('progress')}
@@ -30,8 +30,8 @@ const TabNavigation = ({ activeTab, onTabChange }: TabNavigationProps) => {
               : 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300'
           }`}
         >
-          <BarChart3 className="w-4 h-4" />
-          Progress
+          <BarChart3 className="w-3 h-3 md:w-2 md:h-2" />
+          <span className="hidden md:inline">Progress</span>
         </button>
         <button
           onClick={() => onTabChange('aspects')}
@@ -41,8 +41,8 @@ const TabNavigation = ({ activeTab, onTabChange }: TabNavigationProps) => {
               : 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300'
           }`}
         >
-          <Target className="w-4 h-4" />
-          Aspects
+          <Target className="w-3 h-3 md:w-2 md:h-2" />
+          <span className="hidden md:inline">Aspects</span>
         </button>
       </div>
     </div>

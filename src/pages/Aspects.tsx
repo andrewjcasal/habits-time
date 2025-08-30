@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, X, Target, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -20,6 +21,7 @@ interface Subhabit {
 }
 
 const Aspects = () => {
+  const navigate = useNavigate()
   const [aspects, setAspects] = useState<Aspect[]>([])
   const [loading, setLoading] = useState(true)
   const [newAspectTitle, setNewAspectTitle] = useState('')
@@ -129,15 +131,33 @@ const Aspects = () => {
 
   // Handle aspect selection
   const handleAspectSelect = (aspect: Aspect) => {
-    setSelectedAspect(aspect)
-    setSelectedSubhabit(null)
-    fetchComments(undefined, aspect.id)
+    // Check if we're on mobile
+    const isMobile = window.innerWidth < 768 // md breakpoint
+    
+    if (isMobile) {
+      // Navigate to aspect detail page on mobile
+      navigate(`/habits/aspect/${aspect.id}`)
+    } else {
+      // Show in right panel on desktop
+      setSelectedAspect(aspect)
+      setSelectedSubhabit(null)
+      fetchComments(undefined, aspect.id)
+    }
   }
 
   // Handle subhabit selection
   const handleSubhabitSelect = (subhabit: Subhabit) => {
-    setSelectedSubhabit(subhabit)
-    fetchComments(subhabit.id)
+    // Check if we're on mobile
+    const isMobile = window.innerWidth < 768 // md breakpoint
+    
+    if (isMobile) {
+      // Navigate to aspect detail page on mobile (it will auto-select the subhabit)
+      navigate(`/habits/aspect/${subhabit.aspect_id}`)
+    } else {
+      // Show in right panel on desktop
+      setSelectedSubhabit(subhabit)
+      fetchComments(subhabit.id)
+    }
   }
 
   useEffect(() => {
@@ -157,8 +177,8 @@ const Aspects = () => {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Left Navigation */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      {/* Left Navigation - Full width on mobile */}
+      <div className="w-full md:w-80 bg-white border-r border-gray-200 flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-2">
@@ -275,8 +295,8 @@ const Aspects = () => {
         </div>
       </div>
 
-      {/* Right Panel - Comments */}
-      <div className="flex-1 flex flex-col">
+      {/* Right Panel - Comments (hidden on mobile) */}
+      <div className="flex-1 flex flex-col hidden md:flex">
         {selectedAspect ? (
           <>
             {/* Comments Header */}
