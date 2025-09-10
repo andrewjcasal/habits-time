@@ -448,3 +448,14 @@ export interface BufferUtilization {
   hours_remaining: number
   utilization_percentage: number
 }
+
+// Calendar notes for pinning notes to specific dates/times
+export interface CalendarNote {
+  id: string
+  pinned_date: string
+  note_id: string
+  user_id: string
+  created_at: string
+  updated_at: string
+  habits_notes?: HabitNote
+}

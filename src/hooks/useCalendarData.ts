@@ -185,7 +185,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         // Step 7: Calculate category buffer blocks after task scheduling
         // Need to recompute conflicts including scheduled tasks
         const finalConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
-        console.log('final conflict', finalConflictMaps)
         const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings)
         setCategoryBufferBlocks(calculatedBufferBlocks)
         
@@ -659,6 +658,20 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         // Hide anything before 6 AM
         if (sessionStartHour < 6) return false
         
+        // Debug logging for all sessions on Sep 2
+        if (dateStr === '2025-09-02' && (currentHour === 13 || currentHour === 15)) {
+          console.log(`🐛 Session check for ${currentHour}:00 slot on Sep 2:`, {
+            sessionId: session.id,
+            sessionTitle: session.project_name || 'Unknown',
+            currentHour,
+            startTime,
+            sessionStartHour,
+            shouldShow: sessionStartHour === currentHour,
+            dateStr
+          })
+        }
+        
+        // Check if session starts within this hour slot (including sessions that start at :30)
         return sessionStartHour === currentHour
       })
       .map(session => {
@@ -666,9 +679,22 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
         const startTime = session.actual_start_time || defaultStartTime
         const minutes = parseInt(startTime.split(':')[1])
+        const topPosition = (minutes / 60) * 100
+        
+        // Debug logging for sessions on Sep 2 at 3PM
+        if (session.scheduled_date === '2025-09-02' && parseInt(startTime.split(':')[0]) === 15) {
+          console.log(`🐛 Session topPosition calc for 3PM Sep 2:`, {
+            sessionId: session.id,
+            sessionTitle: session.project_name || 'Unknown',
+            startTime,
+            minutes,
+            topPosition
+          })
+        }
+        
         return {
           ...session,
-          topPosition: (minutes / 60) * 100,
+          topPosition,
         }
       })
   }

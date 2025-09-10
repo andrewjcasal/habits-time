@@ -94,10 +94,13 @@ const Buffers = () => {
   return (
     <div className="h-screen bg-neutral-50 overflow-hidden flex flex-col">
       <div className="bg-white border-b border-neutral-200">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between p-1">
           <div className="flex items-center space-x-4 text-sm text-neutral-600">
             <h1 className="text-lg font-semibold text-neutral-900">Buffers</h1>
-            <span>{format(currentWeekStart, 'MMM d')} - {format(new Date(currentWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000), 'MMM d')}</span>
+            <span>
+              {format(currentWeekStart, 'MMM d')} -{' '}
+              {format(new Date(currentWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000), 'MMM d')}
+            </span>
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-xs text-neutral-500">{bufferData.length} buffers</div>
@@ -229,7 +232,9 @@ const Buffers = () => {
                   {categories
                     .filter(cat => {
                       if (editingBuffer) {
-                        return !bufferData.some(buf => buf.category_id === cat.id && buf.id !== editingBuffer.id)
+                        return !bufferData.some(
+                          buf => buf.category_id === cat.id && buf.id !== editingBuffer.id
+                        )
                       }
                       return !bufferData.some(buf => buf.category_id === cat.id)
                     })

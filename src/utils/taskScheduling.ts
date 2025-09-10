@@ -39,7 +39,6 @@ export const getAvailableTimeBlocks = (
       startHour = Math.max(start, currentHour + next15MinBlock / 60)
     }
     
-    console.log(`🕐 Current time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Next 15-min block: ${startHour.toFixed(2)} (${Math.floor(startHour)}:${((startHour % 1) * 60).toString().padStart(2, '0')})`)
   }
 
   for (let hour = Math.floor(startHour); hour < end; hour++) {
@@ -202,8 +201,8 @@ const scheduleTasksWithoutBillableLogic = async (
 ) => {
   const completedHoursByTask = new Map()
   tasksDailyLogsData.forEach(log => {
-    if (log.task_id) {
-      const completedHours = log.actual_duration || log.scheduled_duration || log.estimated_hours || 0
+    if (log.task_id && log.completed_at) { // Only count actually completed logs
+      const completedHours = log.actual_duration || log.time_spent_hours || log.scheduled_duration || log.estimated_hours || 0
       const currentCompleted = completedHoursByTask.get(log.task_id) || 0
       completedHoursByTask.set(log.task_id, currentCompleted + completedHours)
     }
@@ -309,6 +308,7 @@ export const scheduleAllTasks = async (
   allTasks: any[] = [],
   scheduledTasksCache: Map<string, any[]> = new Map()
 ) => {
+  
   const unscheduledTasks = tasksData.filter(
     task =>
       !task.parent_task_id &&
@@ -346,13 +346,6 @@ export const scheduleAllTasks = async (
         const revenue = entry.hours * Number(entry.hourlyRate)
         return total + revenue
       }, 0)
-    
-      console.log('123', plannedHoursBreakdown)
-    console.log('📊 Using workHoursCalculation logic (plannedHoursBreakdown):', {
-      plannedHoursBreakdown: plannedHoursBreakdown.length,
-      billableEntries: plannedHoursBreakdown.filter(item => item.hourlyRate && Number(item.hourlyRate) > 0).length,
-      completedBillableRevenueThisWeek
-    })
   }
   
   // Skip billable hours logic if disabled
@@ -367,8 +360,8 @@ export const scheduleAllTasks = async (
   // Calculate completed hours for each task from task daily logs
   const completedHoursByTask = new Map()
   tasksDailyLogsData.forEach(log => {
-    if (log.task_id) {
-      const completedHours = log.actual_duration || log.scheduled_duration || log.estimated_hours || 0
+    if (log.task_id && log.completed_at) { // Only count actually completed logs
+      const completedHours = log.actual_duration || log.time_spent_hours || log.scheduled_duration || log.estimated_hours || 0
       const currentCompleted = completedHoursByTask.get(log.task_id) || 0
       completedHoursByTask.set(log.task_id, currentCompleted + completedHours)
     }
@@ -390,15 +383,7 @@ export const scheduleAllTasks = async (
   
   // Convert revenue needed to hours using default hourly rate for placeholder task
   const hoursNeeded = revenueNeeded > 0 ? Math.ceil(revenueNeeded / DEFAULT_HOURLY_RATE) : 0
-  
-  console.log('📊 Billable revenue calculation:', {
-    TARGET_REVENUE,
-    existingBillableRevenue,
-    completedBillableRevenueThisWeek,
-    revenueNeeded,
-    hoursNeeded,
-    DEFAULT_HOURLY_RATE
-  })
+
   
   // Sort tasks by priority first, then add placeholder tasks
   let tasksToSchedule = sortTasksByPriority([...unscheduledTasks])

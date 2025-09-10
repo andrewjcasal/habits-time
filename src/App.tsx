@@ -24,10 +24,12 @@ import Community from './pages/Community'
 import PersonDetail from './pages/PersonDetail'
 import Projects from './pages/Projects'
 import HabitDetail from './pages/HabitDetail'
+import Aspects from './pages/Aspects'
 import AspectDetail from './pages/AspectDetail'
 import Calendar from './pages/Calendar'
 import Categories from './pages/Categories'
 import Buffers from './pages/Buffers'
+import Transactions from './pages/Transactions'
 import Settings from './pages/Settings'
 
 // Components
@@ -80,11 +82,13 @@ function App() {
             <Route path="daily-overrides" element={<DailyOverrides />} />
             <Route path="habits" element={<Habits />} />
             <Route path="habits/:habitId" element={<HabitDetail />} />
+            <Route path="aspects" element={<Aspects />} />
             <Route path="habits/aspect/:aspectId" element={<AspectDetail />} />
             <Route path="projects" element={<Projects />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="categories" element={<Categories />} />
             <Route path="buffers" element={<Buffers />} />
+            <Route path="transactions" element={<Transactions />} />
             <Route path="todoist" element={<Todoist />} />
             <Route path="wins" element={<Wins />} />
             <Route path="notes" element={<Notes />} />

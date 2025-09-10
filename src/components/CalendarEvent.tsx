@@ -39,24 +39,28 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
   const is15Min = durationInMinutes == 15
   const is30Min = durationInMinutes == 30
   
-  const baseClass = `absolute text-sm sm:text-xs p-1 sm:p-0.5 ${is15Min || is30Min ? 'pt-0 sm:pt-0' : '' } rounded border-l-2 ${is30PlusMin ? 'flex-col items-start' : 'flex items-start justify-between'} shadow-sm overflow-hidden`
-  
+  const baseClass = `absolute text-sm sm:text-xs p-1 sm:p-0.5 ${
+    is15Min || is30Min ? 'pt-0 sm:pt-0' : ''
+  } rounded ${
+    is30PlusMin ? 'flex-col items-start' : 'flex items-start justify-between'
+  } shadow-sm overflow-hidden`
+
   const typeClasses = {
-    habit: "bg-blue-100 border-blue-400 text-blue-800 cursor-pointer hover:bg-blue-200 transition-colors",
-    session: "bg-purple-100 border-purple-400 text-purple-800",
-    task: "bg-yellow-100 border-yellow-400 text-yellow-800 cursor-pointer hover:bg-yellow-200",
-    placeholder: "bg-green-100 border-green-400 text-green-800 cursor-pointer hover:bg-green-200",
-    meeting: "bg-red-100 border-red-400 text-red-800",
-    tasklog: "bg-yellow-100 border-yellow-400 text-yellow-800 cursor-pointer hover:opacity-100",
-    buffer: "bg-indigo-100 border-indigo-400 text-indigo-800",
-    'reduced-buffer': "bg-orange-100 border-orange-400 text-orange-800 opacity-80",
-    'category-buffer': "bg-gray-100 border-gray-400 text-gray-800"
+    habit: 'bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200 transition-colors',
+    session: 'bg-purple-100 text-purple-800',
+    task: 'bg-yellow-100 text-yellow-800 cursor-pointer hover:bg-yellow-200',
+    placeholder: 'bg-green-100 text-green-800 cursor-pointer hover:bg-green-200',
+    meeting: 'bg-red-100 text-red-800',
+    tasklog: 'bg-yellow-100 text-yellow-800 cursor-pointer hover:opacity-100',
+    buffer: 'bg-indigo-100 text-indigo-800',
+    'reduced-buffer': 'bg-orange-100 text-orange-800 opacity-80',
+    'category-buffer': 'bg-gray-100 text-gray-800',
   }
 
   return (
     <div
       className={`${baseClass} ${typeClasses[type]} ${className}`}
-      style={style}
+      style={{ ...style, pointerEvents: 'auto' }}
       onClick={onClick}
       title={title}
       data-calendar-event="true"

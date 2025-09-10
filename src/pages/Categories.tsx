@@ -135,7 +135,7 @@ const Categories = () => {
   return (
     <div className="h-screen bg-neutral-50 overflow-hidden flex flex-col">
       <div className="bg-white border-b border-neutral-200">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between p-1">
           <div className="flex items-center space-x-4 text-sm text-neutral-600">
             <span>Current Week: {formatHours(totalHours)}</span>
             <span className="text-neutral-300">•</span>
@@ -154,84 +154,83 @@ const Categories = () => {
       </div>
 
       <div className="flex-1 overflow-auto">
-          {categories.length === 0 ? (
-            <div className="text-center py-12">
-              <Tag className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-neutral-900 mb-2">No categories yet</h3>
-              <p className="text-neutral-500 mb-6">
-                Create your first category to organize your meetings
-              </p>
-              <button
-                onClick={() => setShowCategoryModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Your First Category
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white">
-              <Table>
-                <TableHeader>
-                  <TableRow className="h-6">
-                    <TableHead className="h-6 py-0">Category</TableHead>
-                    {weeksData.map((week, index) => (
-                      <TableHead key={index} className="text-center min-w-[120px] h-6 py-0">
-                        {week.displayWeek}
-                      </TableHead>
-                    ))}
-                    <TableHead className="h-6 py-0">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {categories.map(category => {
-                    return (
-                      <TableRow key={category.id} className="h-6">
-                        <TableCell className="py-0">
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className="w-1 h-1 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: category.color }}
-                            />
-                            <span className="font-medium">{category.name}</span>
-                          </div>
-                        </TableCell>
-                        {weeksData.map((week, weekIndex) => {
-                          const weekCategoryData = week.data.find(cat => cat.id === category.id)
-                          const hours = weekCategoryData?.totalHours || 0
+        {categories.length === 0 ? (
+          <div className="text-center py-12">
+            <Tag className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-neutral-900 mb-2">No categories yet</h3>
+            <p className="text-neutral-500 mb-6">
+              Create your first category to organize your meetings
+            </p>
+            <button
+              onClick={() => setShowCategoryModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Your First Category
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow className="h-1">
+                  <TableHead className="h-6 py-0">Category</TableHead>
+                  {weeksData.map((week, index) => (
+                    <TableHead key={index} className="text-center min-w-[120px] h-6 py-0">
+                      {week.displayWeek}
+                    </TableHead>
+                  ))}
+                  <TableHead className="h-6 py-0">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {categories.map(category => {
+                  return (
+                    <TableRow key={category.id}>
+                      <TableCell className="py-0">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className="w-1 h-1 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <span className="font-medium">{category.name}</span>
+                        </div>
+                      </TableCell>
+                      {weeksData.map((week, weekIndex) => {
+                        const weekCategoryData = week.data.find(cat => cat.id === category.id)
+                        const hours = weekCategoryData?.totalHours || 0
 
-                          return (
-                            <TableCell key={weekIndex} className="text-center py-0">
-                              <div className="font-medium text-sm">{formatHours(hours)}</div>
-                            </TableCell>
-                          )
-                        })}
-                        <TableCell className="py-0">
-                          <div className="flex items-center space-x-1">
-                            <button
-                              onClick={() => handleEditCategory(category)}
-                              className="p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded"
-                              title="Edit category"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteCategory(category.id)}
-                              className="p-1 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded"
-                              title="Delete category"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )
-        }
+                        return (
+                          <TableCell key={weekIndex} className="text-center py-0">
+                            <div className="font-medium text-sm">{formatHours(hours)}</div>
+                          </TableCell>
+                        )
+                      })}
+                      <TableCell className="py-0">
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={() => handleEditCategory(category)}
+                            className="px-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded"
+                            title="Edit category"
+                          >
+                            <Edit2 className="w-2 h-2" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(category.id)}
+                            className="px-1 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Delete category"
+                          >
+                            <Trash2 className="w-2 h-2" />
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       {/* Category Modal */}
@@ -319,7 +318,6 @@ const Categories = () => {
           </div>
         </div>
       )}
-
     </div>
   )
 }

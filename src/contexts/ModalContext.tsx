@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { Meeting } from '../types'
+import { useUserContext } from './UserContext'
+import { supabase } from '../lib/supabase'
 
 interface ModalState {
   // Meeting Modal
@@ -96,7 +98,35 @@ interface ModalProviderProps {
 }
 
 export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: ModalProviderProps) => {
+  const { user } = useUserContext()
   const [modalState, setModalState] = useState<ModalState>(initialModalState)
+  const [userSettings, setUserSettings] = useState<any>(null)
+
+  // Fetch user settings
+  useEffect(() => {
+    const fetchUserSettings = async () => {
+      if (!user) return
+
+      try {
+        const { data: settings, error } = await supabase
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching user settings:', error)
+          return
+        }
+
+        setUserSettings(settings)
+      } catch (error) {
+        console.error('Error fetching user settings:', error)
+      }
+    }
+
+    fetchUserSettings()
+  }, [user])
 
   // Helper function to close all modals and reset their state (memoized)
   const getClosedModalState = useCallback((prevState: ModalState) => ({
@@ -126,7 +156,9 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: Moda
           description: editing.description || '',
           start_time: startTime.toTimeString().slice(0, 5),
           end_time: endTime.toTimeString().slice(0, 5),
-          date: startTime.toISOString().split('T')[0],
+          date: userSettings?.week_ending_timezone 
+            ? startTime.toLocaleDateString('en-CA', { timeZone: userSettings.week_ending_timezone })
+            : startTime.toLocaleDateString('en-CA'),
           location: editing.location || '',
           meeting_type: editing.meeting_type,
           priority: editing.priority,
@@ -183,7 +215,7 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: Moda
         },
       }))
     }
-  }, [getClosedModalState])
+  }, [getClosedModalState, userSettings])
 
   const closeMeetingModal = () => {
     setModalState(prev => ({

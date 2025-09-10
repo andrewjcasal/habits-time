@@ -418,35 +418,135 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
               />
               <input
                 type="time"
-                value={meeting.start_time}
+                value={typeof meeting.start_time === 'string' && meeting.start_time.includes('T') 
+                  ? new Date(meeting.start_time).toTimeString().slice(0, 5)
+                  : meeting.start_time}
                 onChange={e => {
                   const newStartTime = e.target.value
 
-                  // Calculate current duration in minutes
-                  const startTime = new Date(`1970-01-01T${meeting.start_time}:00`)
-                  const endTime = new Date(`1970-01-01T${meeting.end_time}:00`)
-                  const durationMs = endTime.getTime() - startTime.getTime()
+                  try {
+                    // Create full timestamp for start_time with validation
+                    const startDateTime = new Date(meeting.date + 'T' + newStartTime + ':00')
+                    if (isNaN(startDateTime.getTime())) {
+                      console.error('Invalid start date created:', meeting.date, newStartTime)
+                      return
+                    }
 
-                  // Calculate new end time maintaining the same duration
-                  const newStartDateTime = new Date(`1970-01-01T${newStartTime}:00`)
-                  const newEndDateTime = new Date(newStartDateTime.getTime() + durationMs)
+                    // Calculate current duration if end_time exists
+                    let newEndDateTime = startDateTime
+                    if (meeting.end_time) {
+                      let currentEndTime, currentStartTime
+                      
+                      // Parse current end time with validation
+                      if (typeof meeting.end_time === 'string' && meeting.end_time.includes('T')) {
+                        currentEndTime = new Date(meeting.end_time)
+                      } else {
+                        currentEndTime = new Date(meeting.date + 'T' + meeting.end_time + ':00')
+                      }
+                      
+                      // Parse current start time with validation
+                      if (typeof meeting.start_time === 'string' && meeting.start_time.includes('T')) {
+                        currentStartTime = new Date(meeting.start_time)
+                      } else {
+                        currentStartTime = new Date(meeting.date + 'T' + meeting.start_time + ':00')
+                      }
+                      
+                      // Validate parsed dates
+                      if (isNaN(currentEndTime.getTime()) || isNaN(currentStartTime.getTime())) {
+                        console.error('Invalid current times:', meeting.end_time, meeting.start_time)
+                        // Use 15-minute default duration if current times are invalid
+                        newEndDateTime = new Date(startDateTime.getTime() + (15 * 60 * 1000))
+                      } else {
+                        const durationMs = currentEndTime.getTime() - currentStartTime.getTime()
+                        newEndDateTime = new Date(startDateTime.getTime() + durationMs)
+                      }
+                    }
 
-                  // Format new end time back to HH:MM
-                  const newEndTime = newEndDateTime.toTimeString().slice(0, 5)
+                    // Validate final end time
+                    if (isNaN(newEndDateTime.getTime())) {
+                      console.error('Invalid end date created')
+                      return
+                    }
 
-                  setNewMeeting({
-                    ...meeting,
-                    start_time: newStartTime,
-                    end_time: newEndTime,
-                  })
+                    setNewMeeting({
+                      ...meeting,
+                      start_time: startDateTime.toISOString(),
+                      end_time: newEndDateTime.toISOString(),
+                    })
+                  } catch (error) {
+                    console.error('Error updating start time:', error)
+                  }
                 }}
                 className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
                 required
               />
               <input
                 type="time"
-                value={meeting.end_time}
-                onChange={e => setNewMeeting({ ...meeting, end_time: e.target.value })}
+                value={typeof meeting.end_time === 'string' && meeting.end_time.includes('T')
+                  ? new Date(meeting.end_time).toTimeString().slice(0, 5)
+                  : meeting.end_time}
+onChange={e => {
+                  const newEndTime = e.target.value
+                  
+                  try {
+                    // Get start time string for comparison
+                    let startTimeString = meeting.start_time
+                    if (typeof meeting.start_time === 'string' && meeting.start_time.includes('T')) {
+                      const startDate = new Date(meeting.start_time)
+                      if (!isNaN(startDate.getTime())) {
+                        startTimeString = startDate.toTimeString().slice(0, 5)
+                      } else {
+                        console.error('Invalid start time for comparison:', meeting.start_time)
+                        startTimeString = '00:00' // fallback
+                      }
+                    }
+                    
+                    // Parse times to determine if end time should be next day
+                    const [startHour, startMinute] = startTimeString.split(':').map(Number)
+                    const [endHour, endMinute] = newEndTime.split(':').map(Number)
+                    
+                    if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+                      console.error('Invalid time parsing:', startTimeString, newEndTime)
+                      return
+                    }
+                    
+                    const startTotalMinutes = startHour * 60 + startMinute
+                    const endTotalMinutes = endHour * 60 + endMinute
+                    
+                    // Check if end time should be next day
+                    const shouldBeNextDay = 
+                      // Case 1: Start time is PM (after 12:00) and end time is AM (before 12:00)
+                      (startHour >= 12 && endHour < 12) ||
+                      // Case 2: Both times are AM and before 4:00 AM, and end time is before start time
+                      (startHour < 4 && endHour < 4 && endTotalMinutes < startTotalMinutes)
+                    
+                    // Create the full timestamp for end_time with validation
+                    let endDateTime = new Date(meeting.date + 'T' + newEndTime + ':00')
+                    
+                    if (isNaN(endDateTime.getTime())) {
+                      console.error('Invalid end date created:', meeting.date, newEndTime)
+                      return
+                    }
+                    
+                    if (shouldBeNextDay) {
+                      // Add one day if end time is next day
+                      endDateTime.setDate(endDateTime.getDate() + 1)
+                      
+                      // Validate date after modification
+                      if (isNaN(endDateTime.getTime())) {
+                        console.error('Invalid end date after adding day')
+                        return
+                      }
+                    }
+                    
+                    setNewMeeting({ 
+                      ...meeting, 
+                      end_time: endDateTime.toISOString()
+                    })
+                  } catch (error) {
+                    console.error('Error updating end time:', error)
+                  }
+                }}
                 className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
                 required
               />

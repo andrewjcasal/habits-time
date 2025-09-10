@@ -16,7 +16,6 @@ export const calculateCategoryBufferBlocks = async (
   
   try {
     const { weekStart, weekEnd } = getCurrentWeekBounds(baseDate)
-    console.log('🔍 BUFFER CALCULATION START', { weekStart, weekEnd })
     
     // Fetch category buffers with utilization data
     const { data: buffers, error: buffersError } = await supabase
@@ -36,7 +35,6 @@ export const calculateCategoryBufferBlocks = async (
       console.log('📊 No buffers found')
       return []
     }
-    console.log('📊 Found buffers:', buffers.map(b => ({ name: b.meeting_categories?.name, weekly_hours: b.weekly_hours })))
     
     
     // Calculate utilization by querying actual meetings this week
@@ -57,28 +55,17 @@ export const calculateCategoryBufferBlocks = async (
     const buffersWithUtilization = buffers.map(buffer => {
       const categoryMeetings = weeklyMeetings?.filter(m => m.category_id === buffer.category_id) || []
       
-      console.log(`📝 Processing buffer: ${buffer.meeting_categories?.name}`);
-      console.log('  - Category meetings this week:', categoryMeetings.length);
-      categoryMeetings.forEach((m, i) => {
-        console.log(`    ${i + 1}. ${new Date(m.start_time)} - ${new Date(m.end_time)}`);
-      });
-      
       // Calculate total hours spent from actual meetings this week
       const hoursSpent = categoryMeetings.reduce((total, meeting) => {
         const start = new Date(meeting.start_time)
         const end = new Date(meeting.end_time)
         const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60)
-        console.log(`    Meeting duration: ${durationHours} hours`);
         return total + durationHours
       }, 0)
       
       const weeklyHours = parseFloat(buffer.weekly_hours.toString())
       const hoursRemaining = Math.max(0, weeklyHours - hoursSpent)
       const utilizationPercentage = weeklyHours > 0 ? (hoursSpent / weeklyHours) * 100 : 0
-      
-      console.log(`  - Weekly allocation: ${weeklyHours} hours`);
-      console.log(`  - Hours spent: ${hoursSpent} hours`);
-      console.log(`  - Hours remaining: ${hoursRemaining} hours`);
       
       const utilization = {
         buffer_id: buffer.id,
@@ -161,14 +148,6 @@ export const calculateCategoryBufferBlocks = async (
     
     
     const calculatedBufferBlocks = prioritizeBufferPlacement(buffersWithUtilization, emptySlots, settings || undefined, habits)
-    
-    console.log('🎯 Final buffer blocks:', calculatedBufferBlocks.map(b => ({
-      category: b.category_name,
-      duration: b.duration,
-      remaining_hours: b.remaining_hours,
-      date: b.dateStr
-    })));
-    
     return calculatedBufferBlocks
   } catch (error) {
     console.error('Error in buffer calculation:', error)

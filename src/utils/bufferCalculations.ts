@@ -135,11 +135,6 @@ export const allocateBufferBlocks = (
   weekSettings?: { week_ending_day: string; week_ending_time: string },
   habits?: any[]
 ): BufferBlock[] => {
-  console.log(`\ud83d\udcca ALLOCATING BUFFER: ${categoryInfo.name}`, {
-    bufferHours,
-    emptySlots: emptySlots.length,
-    bufferId
-  });
   
   if (bufferHours <= 0 || emptySlots.length === 0) {
     console.log(`\u26a0\ufe0f Skipping allocation - bufferHours: ${bufferHours}, slots: ${emptySlots.length}`);
@@ -170,8 +165,6 @@ export const allocateBufferBlocks = (
   
   let remainingHours = bufferHours
   
-  console.log(`📋 Starting allocation with ${remainingHours} hours to allocate`);
-  
   // Fill from latest day backwards
   for (const [dateStr, daySlots] of sortedDays) {
     if (remainingHours <= 0) break
@@ -198,14 +191,6 @@ export const allocateBufferBlocks = (
       
       // Create the buffer block
       let hoursToAllocate = Math.min(remainingHours, blockDuration)
-      
-      console.log(`  \ud83d\udcdd Creating block:`, {
-        remainingHours,
-        blockDuration,
-        hoursToAllocate,
-        blockStart,
-        dateStr: startSlot.dateStr
-      });
       
       // Check if this block extends past Wind down time or week ending time and cap it
       const blockDate = startSlot.date
@@ -242,8 +227,6 @@ export const allocateBufferBlocks = (
         }
       }
       
-      console.log(`  ➡️ Final allocation:`, { hoursToAllocate });
-      
       if (hoursToAllocate > 0) {
         const block = {
           id: `${bufferId}-block-${blocks.length}`,
@@ -257,12 +240,10 @@ export const allocateBufferBlocks = (
           date: startSlot.date,
           dateStr: startSlot.dateStr
         };
-        
-        console.log(`  ✅ Block created:`, block);
+
         blocks.push(block);
         remainingHours -= hoursToAllocate
       }
-      console.log(`  📊 After allocation: remainingHours = ${remainingHours}`);
       i = j
     }
   }
@@ -299,11 +280,6 @@ export const prioritizeBufferPlacement = (
   for (const buffer of sortedBuffers) {
     // Only allocate remaining hours
     const remainingHours = buffer.utilization.hours_remaining
-    
-    console.log(`\n🎯 Processing buffer: ${buffer.utilization.category_name}`);
-    console.log(`  - Weekly hours: ${buffer.utilization.weekly_hours}`);
-    console.log(`  - Hours spent: ${buffer.utilization.hours_spent}`);
-    console.log(`  - Remaining hours: ${remainingHours}`);
     
     if (remainingHours <= 0) {
       console.log(`  - Skipping (no remaining hours)`);

@@ -27,6 +27,8 @@ import {
   Crown,
   Tag,
   Target,
+  DollarSign,
+  Layers,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUserContext } from '../contexts/UserContext'
@@ -55,7 +57,9 @@ const MainLayout = () => {
     // { path: '/todoist', label: 'Todoist', icon: CheckSquare },
     // { path: '/reflections', label: 'Reflections', icon: Notebook },
     { path: '/habits', label: 'Habits', icon: Heart },
+    { path: '/aspects', label: 'Aspects', icon: Layers },
     { path: '/notes', label: 'Notes', icon: FileText },
+    { path: '/transactions', label: 'Transactions', icon: DollarSign },
     // { path: '/wins', label: 'Wins', icon: Trophy },
   ]
 

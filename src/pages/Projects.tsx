@@ -530,17 +530,17 @@ const Projects = () => {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowProjectSettings(true)}
-                  className="flex items-center gap-1 px-2 py-1 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
+                  className="flex items-center gap-1 px-2 py-0.5 my-0.5 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
                 >
-                  <Settings className="w-3 h-3" />
+                  <Settings className="w-2.5 h-2.5" />
                   <span>Project Settings</span>
                 </button>
-                
+
                 <button
                   onClick={() => setShowDayView(true)}
-                  className="flex items-center gap-1 px-2 py-1 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
+                  className="flex items-center gap-1 px-2 py-0.5 my-0.5 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
                 >
-                  <Calendar className="w-3 h-3" />
+                  <Calendar className="w-2.5 h-2.5" />
                   <span>Day View</span>
                 </button>
               </div>
@@ -636,11 +636,7 @@ const Projects = () => {
             onToggleTaskStatus={handleToggleTaskStatus}
           />
 
-
-          <DayViewModal
-            isOpen={showDayView}
-            onClose={() => setShowDayView(false)}
-          />
+          <DayViewModal isOpen={showDayView} onClose={() => setShowDayView(false)} />
         </>
       )}
 
