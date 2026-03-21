@@ -17,7 +17,7 @@ import TimeTracker from './pages/TimeTracker'
 import Essentials from './pages/Essentials'
 import DailyOverrides from './pages/DailyOverrides'
 import Habits from './pages/Habits'
-import Todoist from './pages/Todoist'
+import TodoistTriage from './pages/TodoistTriage'
 import Wins from './pages/Wins'
 import Notes from './pages/Notes'
 import Community from './pages/Community'
@@ -89,7 +89,7 @@ function App() {
             <Route path="categories" element={<Categories />} />
             <Route path="buffers" element={<Buffers />} />
             <Route path="transactions" element={<Transactions />} />
-            <Route path="todoist" element={<Todoist />} />
+            <Route path="todoist" element={<TodoistTriage />} />
             <Route path="wins" element={<Wins />} />
             <Route path="notes" element={<Notes />} />
             <Route path="community" element={<Community />} />

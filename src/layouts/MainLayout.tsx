@@ -54,7 +54,7 @@ const MainLayout = () => {
     { path: '/categories', label: 'Categories', icon: Tag },
     { path: '/buffers', label: 'Buffers', icon: Target },
     // { path: '/community', label: 'Community', icon: Users },
-    // { path: '/todoist', label: 'Todoist', icon: CheckSquare },
+    { path: '/todoist', label: 'Todoist Triage', icon: CheckSquare },
     // { path: '/reflections', label: 'Reflections', icon: Notebook },
     { path: '/habits', label: 'Habits', icon: Heart },
     { path: '/aspects', label: 'Aspects', icon: Layers },

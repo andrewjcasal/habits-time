@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, Save, RotateCcw, Key, Calendar, DollarSign } from 'lucide-react'
+import { Clock, Save, RotateCcw, Calendar, DollarSign } from 'lucide-react'
 import { useSettings } from '../hooks/useSettings'
 
 interface SettingsSectionProps {
@@ -61,7 +61,6 @@ const Settings = () => {
   const [weekEndingTime, setWeekEndingTime] = useState('20:30')
   const [weekEndingTimezone, setWeekEndingTimezone] = useState('America/New_York')
   const [weekendDays, setWeekendDays] = useState<string[]>(['saturday', 'sunday'])
-  const [todoistApiKey, setTodoistApiKey] = useState('')
   const [billableHoursEnabled, setBillableHoursEnabled] = useState(false)
   const [defaultHourlyRate, setDefaultHourlyRate] = useState('65.00')
   const [weeklyRevenueTarget, setWeeklyRevenueTarget] = useState('1000.00')
@@ -80,7 +79,6 @@ const Settings = () => {
         week_ending_time: weekEndingTime,
         week_ending_timezone: weekEndingTimezone,
         weekend_days: weekendDays,
-        todoist_api_key: todoistApiKey,
         billable_hours_enabled: billableHoursEnabled,
         default_hourly_rate: parseFloat(defaultHourlyRate) || 65.00,
         weekly_revenue_target: parseFloat(weeklyRevenueTarget) || 1000.00,
@@ -104,7 +102,6 @@ const Settings = () => {
     setWeekEndingTime('20:30')
     setWeekEndingTimezone('America/New_York')
     setWeekendDays(['saturday', 'sunday'])
-    setTodoistApiKey('')
     setBillableHoursEnabled(false)
     setDefaultHourlyRate('65.00')
     setWeeklyRevenueTarget('1000.00')
@@ -120,7 +117,6 @@ const Settings = () => {
       setWeekEndingTime(settings.week_ending_time || '20:30')
       setWeekEndingTimezone(settings.week_ending_timezone || 'America/New_York')
       setWeekendDays(settings.weekend_days || ['saturday', 'sunday'])
-      setTodoistApiKey(settings.todoist_api_key || '')
       setBillableHoursEnabled(settings.billable_hours_enabled || false)
       setDefaultHourlyRate((settings.default_hourly_rate || 65.00).toString())
       setWeeklyRevenueTarget((settings.weekly_revenue_target || 1000.00).toString())
@@ -273,28 +269,6 @@ const Settings = () => {
                   {weekEndingTimezone.split('/')[1]?.replace('_', ' ') || weekEndingTimezone}
                 </p>
               </SettingsSection>
-
-              {/* Todoist Integration Section - Hidden for now */}
-              {/* <SettingsSection
-                icon={Key}
-                title="Todoist Integration"
-                description="Connect your Todoist account to sync tasks and projects. You can find your API token in your Todoist settings under Integrations."
-              >
-                <>
-                  <SettingsInput
-                    label="API Token"
-                    type="password"
-                    value={todoistApiKey}
-                    onChange={setTodoistApiKey}
-                    placeholder="Enter your Todoist API token"
-                  />
-
-                  <p className="text-sm text-yellow-800">
-                    <strong>Security:</strong> Your API token is stored securely and only used to
-                    sync with Todoist.
-                  </p>
-                </>
-              </SettingsSection> */}
 
               {/* Billable Hours Section */}
               <SettingsSection
