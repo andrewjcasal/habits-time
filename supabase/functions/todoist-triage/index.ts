@@ -23,7 +23,7 @@ async function todoistFetch(url: string, options: RequestInit, apiKey: string) {
 
 function getRecentReviewLabels(): string[] {
   const labels: string[] = []
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 4; i++) {
     const d = new Date()
     d.setDate(d.getDate() - i)
     const mm = String(d.getMonth() + 1).padStart(2, '0')
@@ -91,18 +91,29 @@ Deno.serve(async (req: Request) => {
     const apiKey = settings.todoist_api_key
 
     if (action === 'list') {
-      const data = await todoistFetch('https://api.todoist.com/api/v1/tasks', {}, apiKey)
-      const allTasks = Array.isArray(data) ? data : (data?.results || [])
-      console.log('allTasks', allTasks)
-      // Find tasks that are parents (have children)
-      const parentIds = new Set(allTasks.map((t: any) => t.parent_id).filter(Boolean))
-      // Filter out parents and recently reviewed tasks
+      // Build filter query to exclude recently reviewed tasks
       const recentLabels = getRecentReviewLabels()
-      const tasks = allTasks.filter((t: any) =>
-        !parentIds.has(t.id) &&
-        !t.labels?.some((l: string) => recentLabels.includes(l))
-      )
-      return new Response(JSON.stringify({ tasks }), {
+      const excludeLabels = recentLabels.map(l => `!@${l}`).join(' & ')
+      const filterQuery = encodeURIComponent(`!subtask & ${excludeLabels}`)
+      console.log('filter_query:', `!subtask & ${excludeLabels}`)
+
+      const allTasks: any[] = []
+      let cursor: string | null = null
+      do {
+        const params = cursor
+          ? `query=${filterQuery}&cursor=${cursor}`
+          : `query=${filterQuery}`
+        const data = await todoistFetch(`https://api.todoist.com/api/v1/tasks/filter?${params}`, {}, apiKey)
+        if (Array.isArray(data)) {
+          allTasks.push(...data)
+          cursor = null
+        } else {
+          allTasks.push(...(data?.results || []))
+          cursor = data?.next_cursor || null
+        }
+      } while (cursor)
+
+      return new Response(JSON.stringify({ tasks: allTasks }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

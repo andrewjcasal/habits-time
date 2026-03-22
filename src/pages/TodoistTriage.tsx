@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Trash2, Check, Tag, Loader2, AlertCircle, Key, ExternalLink } from 'lucide-react'
+import { Trash2, Check, Tag, Loader2, AlertCircle, Key, ExternalLink, SkipForward } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSettings } from '../hooks/useSettings'
 
@@ -14,7 +14,7 @@ interface TodoistTask {
   parent_id: string | null
 }
 
-const TIMER_DURATION = 10
+const TIMER_DURATION = 20
 
 const TodoistTriage = () => {
   const { settings, loading: settingsLoading, updateSettings } = useSettings()
@@ -124,6 +124,7 @@ const TodoistTriage = () => {
       // Remove the task from the list and move to next
       setTasks(prev => prev.filter((_, i) => i !== currentIndex))
       setTimeLeft(TIMER_DURATION)
+      setIsPaused(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed')
     } finally {
@@ -138,10 +139,12 @@ const TodoistTriage = () => {
       await invokeAction('skip')
       setTasks(prev => prev.filter((_, i) => i !== currentIndex))
       setTimeLeft(TIMER_DURATION)
+      setIsPaused(false)
     } catch {
       // If skip label fails, just move on locally
       setCurrentIndex(i => i + 1)
       setTimeLeft(TIMER_DURATION)
+      setIsPaused(false)
     } finally {
       setActionInProgress(null)
     }
@@ -165,7 +168,7 @@ const TodoistTriage = () => {
   // API key setup screen
   if (!settingsLoading && !settings?.todoist_api_key) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-white">
+      <div className="flex flex-col items-center justify-center h-[calc(100dvh-4rem)] md:h-dvh p-6 bg-white">
         <div className="w-full max-w-sm space-y-4">
           <div className="text-center">
             <Key className="w-8 h-8 text-primary-600 mx-auto mb-2" />
@@ -194,7 +197,7 @@ const TodoistTriage = () => {
 
   if (loading || settingsLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center h-[calc(100dvh-4rem)] md:h-dvh">
         <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
       </div>
     )
@@ -202,7 +205,7 @@ const TodoistTriage = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 gap-4">
+      <div className="flex flex-col items-center justify-center h-[calc(100dvh-4rem)] md:h-dvh p-6 gap-4">
         <AlertCircle className="w-8 h-8 text-red-500" />
         <p className="text-red-600 text-center">{error}</p>
         <button
@@ -218,7 +221,7 @@ const TodoistTriage = () => {
   // All done
   if (!currentTask) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 gap-4">
+      <div className="flex flex-col items-center justify-center h-[calc(100dvh-4rem)] md:h-dvh p-6 gap-4">
         <Check className="w-12 h-12 text-green-500" />
         <h2 className="text-xl font-bold text-gray-900">All triaged!</h2>
         <p className="text-gray-500 text-center">
@@ -235,7 +238,7 @@ const TodoistTriage = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-dvh bg-white">
       {/* Progress bar */}
       <div className="h-1 bg-neutral-100">
         <div
@@ -271,10 +274,10 @@ const TodoistTriage = () => {
       </div>
 
       {/* Task content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-lg text-center space-y-3">
-          <div className="flex items-center justify-center gap-2">
-            <h1 className="text-2xl font-bold text-gray-900 leading-tight">
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-lg text-center space-y-2">
+          <div className="flex items-start justify-center gap-2">
+            <h1 className="text-lg font-bold text-gray-900 leading-snug line-clamp-3">
               {currentTask.content}
             </h1>
             <a
@@ -305,8 +308,8 @@ const TodoistTriage = () => {
       </div>
 
       {/* Action buttons */}
-      <div className="p-4 pb-8 space-y-3">
-        <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
+      <div className="p-4 pb-8">
+        <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
           <button
             onClick={() => handleAction('delete')}
             disabled={!!actionInProgress}
@@ -318,6 +321,19 @@ const TodoistTriage = () => {
               <Trash2 className="w-6 h-6" />
             )}
             <span className="text-xs font-medium">Delete</span>
+          </button>
+
+          <button
+            onClick={() => handleAction('complete')}
+            disabled={!!actionInProgress}
+            className="flex flex-col items-center gap-1.5 py-4 rounded-xl bg-green-50 text-green-600 active:bg-green-100 disabled:opacity-50 transition-colors"
+          >
+            {actionInProgress === 'complete' ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : (
+              <Check className="w-6 h-6" />
+            )}
+            <span className="text-xs font-medium">Complete</span>
           </button>
 
           <button
@@ -334,27 +350,16 @@ const TodoistTriage = () => {
           </button>
 
           <button
-            onClick={() => handleAction('complete')}
-            disabled={!!actionInProgress}
-            className="flex flex-col items-center gap-1.5 py-4 rounded-xl bg-green-50 text-green-600 active:bg-green-100 disabled:opacity-50 transition-colors"
-          >
-            {actionInProgress === 'complete' ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
-            ) : (
-              <Check className="w-6 h-6" />
-            )}
-            <span className="text-xs font-medium">Complete</span>
-          </button>
-        </div>
-
-        {/* Skip button */}
-        <div className="text-center">
-          <button
             onClick={handleSkip}
             disabled={!!actionInProgress}
-            className="text-xs text-neutral-400 hover:text-neutral-600 disabled:opacity-50"
+            className="flex flex-col items-center gap-1.5 py-4 rounded-xl bg-neutral-50 text-neutral-500 active:bg-neutral-100 disabled:opacity-50 transition-colors"
           >
-            {actionInProgress === 'skip' ? 'Skipping...' : 'Skip'}
+            {actionInProgress === 'skip' ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : (
+              <SkipForward className="w-6 h-6" />
+            )}
+            <span className="text-xs font-medium">Skip</span>
           </button>
         </div>
       </div>
