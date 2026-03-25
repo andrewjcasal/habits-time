@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plus, Info, MapPin } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
-import { useCalendarNotes } from '../hooks/useCalendarNotes'
 import { Meeting } from '../types'
 import MeetingModal from '../components/MeetingModal'
 import CalendarTaskModal from '../components/CalendarTaskModal'
@@ -61,15 +60,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     date: Date
   } | null>(null)
 
-  // Calendar notes hook
-  const {
-    calendarNotes,
-    habitNotes,
-    addCalendarNote,
-    addHabitNote,
-    removeCalendarNote,
-    getNotesForDateTime,
-  } = useCalendarNotes()
+  // Calendar notes come from useCalendarData (merged into single fetch)
 
   // Drag-to-create meeting state
   const [isDragging, setIsDragging] = useState(false)
@@ -140,6 +131,12 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     updateMeeting,
     deleteMeeting,
     isDataLoading,
+    calendarNotes,
+    habitNotes,
+    getNotesForDateTime,
+    addCalendarNote,
+    addHabitNote,
+    removeCalendarNote,
   } = useCalendarData(windowWidth, baseDate)
 
   // Calendar data already includes habits - no need for separate useHabits hook
@@ -604,13 +601,17 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
       const meetingsInSlot = getMeetingsForTimeSlot(timeSlot, date)
       const buffersInSlot = getBuffersForCalendarTimeSlot(timeSlot, date)
       const categoryBuffersInSlot = getCategoryBuffersForTimeSlot(timeSlot, date)
-
       // For past dates and today: show task daily logs
       // For today and future: show auto-generated tasks
       const tasksInSlot =
         (isToday || isFuture) && tasksScheduled ? getTasksForTimeSlot(timeSlot, date) : []
-      const tasksDailyLogsInSlot =
+      const allTasksDailyLogsInSlot =
         isPast || isToday ? getTasksDailyLogsForTimeSlot(timeSlot, date) : []
+      // For today, exclude logs for tasks already shown via scheduledTasksCache to prevent duplicates
+      const scheduledTaskIds = new Set(tasksInSlot.map((t: any) => t.id?.split('-chunk-')[0]))
+      const tasksDailyLogsInSlot = isToday
+        ? allTasksDailyLogsInSlot.filter((log: any) => !scheduledTaskIds.has(log.task_id))
+        : allTasksDailyLogsInSlot
 
       const baseItemHeight = 32 // Base height for calculating offsets
 

@@ -11,28 +11,32 @@ export const calculateCategoryBufferBlocks = async (
   conflictMaps: any,
   getWorkHoursRange: () => { start: number; end: number },
   habits: any[] = [],
-  settings: any = null
+  settings: any = null,
+  prefetchedBuffers: any[] | null = null
 ): Promise<BufferBlock[]> => {
-  
+
   try {
     const { weekStart, weekEnd } = getCurrentWeekBounds(baseDate)
-    
-    // Fetch category buffers with utilization data
-    const { data: buffers, error: buffersError } = await supabase
-      .from('category_buffers')
-      .select(`
-        *,
-        meeting_categories(id, name, color)
-      `)
-      .eq('user_id', userId)
-    
-    if (buffersError) {
-      console.error('Error fetching buffers:', buffersError)
-      return []
+
+    // Use pre-fetched buffers if available, otherwise fetch
+    let buffers = prefetchedBuffers
+    if (!buffers) {
+      const { data, error: buffersError } = await supabase
+        .from('category_buffers')
+        .select(`
+          *,
+          meeting_categories(id, name, color)
+        `)
+        .eq('user_id', userId)
+
+      if (buffersError) {
+        console.error('Error fetching buffers:', buffersError)
+        return []
+      }
+      buffers = data
     }
-    
+
     if (!buffers || buffers.length === 0) {
-      console.log('📊 No buffers found')
       return []
     }
     

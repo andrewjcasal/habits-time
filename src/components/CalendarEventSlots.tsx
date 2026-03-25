@@ -147,7 +147,7 @@ export default function CalendarEventSlots({
               e.stopPropagation()
               handleTaskClick(task)
             }}
-            eventTitle={`${task.title}${isPlaceholder ? ' 💰' : ''}`}
+            eventTitle={`${task.title}${isPlaceholder ? ' \u{1F4B0}' : ''}`}
             duration={`${task.estimated_hours}h`}
           />
         )
@@ -235,6 +235,7 @@ export default function CalendarEventSlots({
           />
         )
       })}
+
 
       {/* Calendar Note Pins */}
       {getNotesForDateTime(date, timeSlot).map(note => {

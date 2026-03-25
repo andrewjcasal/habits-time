@@ -16,14 +16,17 @@ export const fetchAllCalendarData = async (userId: string) => {
 
   try {
     // Fetch all data sources in parallel with timeout protection
-    const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, tasksResult, settingsResult] = await Promise.allSettled([
+    const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, tasksResult, settingsResult, calendarNotesResult, habitNotesResult, categoryBuffersResult] = await Promise.allSettled([
       withTimeout(supabase.from('habits').select('*, habits_daily_logs(*), habits_types(*)').eq('user_id', userId).eq('is_visible', true)),
       withTimeout(supabase.from('sessions').select('*, projects(*)').eq('user_id', userId)),
       withTimeout(supabase.from('projects').select('*').eq('user_id', userId)),
       withTimeout(supabase.from('meetings').select('*').eq('user_id', userId)),
       withTimeout(supabase.from('tasks_daily_logs').select('*, tasks!inner(*, projects(*))').eq('user_id', userId)),
       withTimeout(supabase.from('tasks').select('*, projects!inner(*)').eq('user_id', userId)),
-      withTimeout(supabase.from('user_settings').select('*').eq('user_id', userId).single())
+      withTimeout(supabase.from('user_settings').select('*').eq('user_id', userId).single()),
+      withTimeout(supabase.from('calendar_notes').select('*, habits_notes:note_id(id, content, note_date, created_at)').order('pinned_date', { ascending: true })),
+      withTimeout(supabase.from('habits_notes').select('*').order('created_at', { ascending: false })),
+      withTimeout(supabase.from('category_buffers').select('*, meeting_categories(id, name, color)').eq('user_id', userId))
     ])
 
     // Extract data with fallbacks
@@ -34,16 +37,22 @@ export const fetchAllCalendarData = async (userId: string) => {
     const tasksDailyLogs = tasksDailyLogsResult.status === 'fulfilled' ? (tasksDailyLogsResult.value.data || []) : []
     const tasks = tasksResult.status === 'fulfilled' ? (tasksResult.value.data || []) : []
     const settings = settingsResult.status === 'fulfilled' ? settingsResult.value.data : null
+    const calendarNotes = calendarNotesResult.status === 'fulfilled' ? (calendarNotesResult.value.data || []) : []
+    const habitNotes = habitNotesResult.status === 'fulfilled' ? (habitNotesResult.value.data || []) : []
+    const categoryBuffers = categoryBuffersResult.status === 'fulfilled' ? (categoryBuffersResult.value.data || []) : []
 
     // Log any failures
     const failures = [
       habitsResult.status === 'rejected' && 'habits',
-      sessionsResult.status === 'rejected' && 'sessions', 
+      sessionsResult.status === 'rejected' && 'sessions',
       projectsResult.status === 'rejected' && 'projects',
       meetingsResult.status === 'rejected' && 'meetings',
       tasksDailyLogsResult.status === 'rejected' && 'tasksDailyLogs',
       tasksResult.status === 'rejected' && 'tasks',
-      settingsResult.status === 'rejected' && 'settings'
+      settingsResult.status === 'rejected' && 'settings',
+      calendarNotesResult.status === 'rejected' && 'calendarNotes',
+      habitNotesResult.status === 'rejected' && 'habitNotes',
+      categoryBuffersResult.status === 'rejected' && 'categoryBuffers'
     ].filter(Boolean)
     
     if (failures.length > 0) {
@@ -52,11 +61,11 @@ export const fetchAllCalendarData = async (userId: string) => {
 
     
 
-    return { habits, sessions, projects, meetings, tasksDailyLogs, tasks, settings }
+    return { habits, sessions, projects, meetings, tasksDailyLogs, tasks, settings, calendarNotes, habitNotes, categoryBuffers }
   } catch (error) {
     console.error('Critical error fetching calendar data:', error)
     // Return minimal data to prevent complete failure
-    return { habits: [], sessions: [], projects: [], meetings: [], tasksDailyLogs: [], tasks: [], settings: null }
+    return { habits: [], sessions: [], projects: [], meetings: [], tasksDailyLogs: [], tasks: [], settings: null, calendarNotes: [], habitNotes: [], categoryBuffers: [] }
   }
 }
 

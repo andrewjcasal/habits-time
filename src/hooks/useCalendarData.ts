@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { format, addDays } from 'date-fns'
 import { useTaskDailyLogs } from './useTaskDailyLogs'
 import { useUserContext } from '../contexts/UserContext'
@@ -12,6 +12,10 @@ import { generateBuffersForDays, getBuffersForTimeSlot, BufferTime } from '../ut
 import { BufferBlock } from '../types'
 import { startOfWeek } from 'date-fns'
 import { calculateCategoryBufferBlocks } from '../utils/categoryBufferCalculation'
+import { syncTodoistTasks } from '../utils/todoistSync'
+
+// Todoist tasks are scheduled in personal hours, separate from work tasks
+const TODOIST_HOURS = { start: 19, end: 23 }
 
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const { user, loading: userLoading } = useUserContext()
@@ -27,12 +31,15 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const [categoryBufferBlocks, setCategoryBufferBlocks] = useState<BufferBlock[]>([])
   const [settings, setSettings] = useState<any>(null)
   const [isInitializing, setIsInitializing] = useState(false)
+  const initializingRef = useRef(false)
   const [lastFetchTime, setLastFetchTime] = useState<number>(0)
 
   // Category buffers state  
   const currentWeekStart = startOfWeek(baseDate, { weekStartsOn: 1 })
   
   const [dataHash, setDataHash] = useState('')
+  const [calendarNotes, setCalendarNotes] = useState<any[]>([])
+  const [habitNotes, setHabitNotes] = useState<any[]>([])
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [conflictMaps, setConflictMaps] = useState({ 
@@ -69,24 +76,30 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   // Load data once and cache tasks intelligently
   useEffect(() => {
+    let cancelled = false
+
     const loadAndProcessAllCalendarData = async () => {
       // Prevent multiple simultaneous initializations
-      if (isInitializing) return
-      
+      if (initializingRef.current) return
+      initializingRef.current = true
+
       console.log('🔥 CALENDAR DATA LOAD STARTED', { user: user?.id, userLoading, tasksScheduled })
       setIsInitializing(true)
       setIsDataLoading(true)
-      
+
       try {
         if (userLoading || !user) {
           setIsDataLoading(false)
           setIsInitializing(false)
+          initializingRef.current = false
           return
         }
 
         // Step 1: Fetch all base data in parallel and update UI immediately
         const dataPromise = fetchAllCalendarData(user.id)
-        const { habits: fetchedHabits, sessions: fetchedSessions, projects: fetchedProjects, meetings: fetchedMeetings, tasksDailyLogs: fetchedTasksDailyLogs, tasks: fetchedTasks, settings: fetchedSettings } = await dataPromise
+        const { habits: fetchedHabits, sessions: fetchedSessions, projects: fetchedProjects, meetings: fetchedMeetings, tasksDailyLogs: fetchedTasksDailyLogs, tasks: fetchedTasks, settings: fetchedSettings, calendarNotes: fetchedCalendarNotes, habitNotes: fetchedHabitNotes, categoryBuffers: fetchedCategoryBuffers } = await dataPromise
+
+        if (cancelled) return
 
         // Step 2: Update UI immediately with base data (shows habits, sessions, meetings)
         setHabits(fetchedHabits)
@@ -95,8 +108,54 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setMeetings(fetchedMeetings)
         setTasksDailyLogs(fetchedTasksDailyLogs)
         setSettings(fetchedSettings)
+        setCalendarNotes(fetchedCalendarNotes)
+        setHabitNotes(fetchedHabitNotes)
         setIsDataLoading(false) // Show partial data immediately
-        
+
+        // Sync todoist tasks to DB in background, then schedule them in personal hours
+        if (fetchedSettings?.todoist_api_key) {
+          supabase.functions.invoke('todoist', {
+            body: { action: 'list_all' },
+          }).then(async ({ data, error: fnError }) => {
+            if (!fnError && data?.tasks) {
+              try {
+                const todoistDbTasks = await syncTodoistTasks(data.tasks, user.id)
+                if (todoistDbTasks.length > 0) {
+                  const getTodoistHoursRange = () => TODOIST_HOURS
+                  const dayColumnsList = getDayColumns()
+                  const todoistConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, fetchedTasksDailyLogs)
+                  const todoistScheduleResult = await scheduleAllTasks(
+                    todoistDbTasks,
+                    todoistConflictMaps,
+                    dayColumnsList,
+                    getTodoistHoursRange,
+                    scheduleTaskInAvailableSlots,
+                    saveTaskChunks,
+                    clearTaskLogsFromTimeForward,
+                    user.id,
+                    fetchedTasksDailyLogs,
+                    [], // no weekend skip for personal tasks
+                    null, // no billable settings
+                    todoistDbTasks,
+                    new Map()
+                  )
+                  // Merge todoist scheduled tasks into cache
+                  setScheduledTasksCache(prev => {
+                    const merged = new Map(prev)
+                    todoistScheduleResult.forEach((tasks, dateKey) => {
+                      const existing = merged.get(dateKey) || []
+                      merged.set(dateKey, [...existing, ...tasks])
+                    })
+                    return merged
+                  })
+                }
+              } catch (err) {
+                console.error('Todoist sync/schedule failed:', err)
+              }
+            }
+          }).catch(() => {})
+        }
+
         // Create work hours range function using fetched settings
         const getWorkHoursRangeFromSettings = () => {
           if (!fetchedSettings) {
@@ -185,7 +244,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         // Step 7: Calculate category buffer blocks after task scheduling
         // Need to recompute conflicts including scheduled tasks
         const finalConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
-        const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings)
+        const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings, fetchedCategoryBuffers)
         setCategoryBufferBlocks(calculatedBufferBlocks)
         
       } catch (error) {
@@ -195,14 +254,20 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setTasksScheduled(true)
       } finally {
         setIsInitializing(false)
+        initializingRef.current = false
       }
     }
 
     // Only load if not already scheduled, or if explicitly reset
-    if (!tasksScheduled && !userLoading && user && !isInitializing) {
+    if (!tasksScheduled && !userLoading && user) {
       loadAndProcessAllCalendarData()
     }
-  }, [tasksScheduled, user?.id, userLoading, isInitializing])
+
+    return () => {
+      cancelled = true
+      initializingRef.current = false
+    }
+  }, [tasksScheduled, user?.id, userLoading])
 
   // Update current time every minute
   useEffect(() => {
@@ -773,7 +838,51 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     return matchingBlocks
   }
 
+
   const hourSlots = useMemo(() => getHourSlots(), [])
+
+  // Calendar notes helpers
+  const getNotesForDateTime = (date: Date, time: string) => {
+    const [hours, minutes] = time.split(':').map(Number)
+    const targetDateTime = new Date(date)
+    targetDateTime.setHours(hours, minutes, 0, 0)
+
+    return calendarNotes.filter(note => {
+      const pinnedDateTime = new Date(note.pinned_date)
+      return Math.abs(pinnedDateTime.getTime() - targetDateTime.getTime()) < 60000
+    })
+  }
+
+  const addCalendarNote = async (pinnedDate: string, noteId: string) => {
+    const { data, error } = await supabase
+      .from('calendar_notes')
+      .insert({ pinned_date: pinnedDate, note_id: noteId })
+      .select('*, habits_notes:note_id(id, content, note_date, created_at)')
+      .single()
+    if (error) throw error
+    setCalendarNotes(prev => [...prev, data])
+    return data
+  }
+
+  const addHabitNote = async (content: string, noteDate: string) => {
+    const { data, error } = await supabase
+      .from('habits_notes')
+      .insert({ content, note_date: noteDate })
+      .select()
+      .single()
+    if (error) throw error
+    setHabitNotes(prev => [data, ...prev])
+    return data
+  }
+
+  const removeCalendarNote = async (calendarNoteId: string) => {
+    const { error } = await supabase
+      .from('calendar_notes')
+      .delete()
+      .eq('id', calendarNoteId)
+    if (error) throw error
+    setCalendarNotes(prev => prev.filter(note => note.id !== calendarNoteId))
+  }
 
   return {
     allTasks,
@@ -805,6 +914,12 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     buffers,
     categoryBufferBlocks,
     settings,
+    calendarNotes,
+    habitNotes,
+    getNotesForDateTime,
+    addCalendarNote,
+    addHabitNote,
+    removeCalendarNote,
     setAllTasks,
     setScheduledTasksCache,
     setTasksScheduled,
