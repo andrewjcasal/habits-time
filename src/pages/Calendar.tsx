@@ -4,10 +4,6 @@ import { format } from 'date-fns'
 import { Plus, Info, MapPin } from 'lucide-react'
 import { useCalendarData } from '../hooks/useCalendarData'
 import { Meeting } from '../types'
-import MeetingModal from '../components/MeetingModal'
-import CalendarTaskModal from '../components/CalendarTaskModal'
-import HabitModal from '../components/HabitModal'
-import SessionEditModal from '../components/SessionEditModal'
 import CalendarNoteModal from '../components/CalendarNoteModal'
 import TaskScheduleModal from '../components/TaskScheduleModal'
 import {
@@ -23,35 +19,23 @@ import CalendarTopBar from '../components/CalendarTopBar'
 import CalendarGrid, { getQuarterFromMousePosition, quarterToTimeString } from '../components/CalendarGrid'
 
 interface CalendarContentProps {
-  onSetSaveHandler: (
-    handler: (e: React.FormEvent, updatedMeeting: any, editingMeeting?: Meeting) => Promise<void>
-  ) => void
+  onSetSaveHandler: (handler: (e: React.FormEvent, updatedMeeting: any, editingMeeting?: Meeting) => Promise<void>) => void
   onSetDeleteHandler: (handler: (meeting: Meeting) => Promise<void>) => void
+  onSetHabitTimeChangeHandler: (handler: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>) => void
+  onSetHabitSkipHandler: (handler: (habitId: string, date: string) => Promise<void>) => void
 }
 
-const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarContentProps) => {
+const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeChangeHandler, onSetHabitSkipHandler }: CalendarContentProps) => {
 
-  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal } = useModal()
+  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals } = useModal()
   const [searchParams, setSearchParams] = useSearchParams()
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [containerHeight, setContainerHeight] = useState(600)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [showMeetingModal, setShowMeetingModal] = useState(false)
-  const [showTaskModal, setShowTaskModal] = useState(false)
   const [showActualHoursTooltip, setShowActualHoursTooltip] = useState(false)
   const [showPlannedHoursTooltip, setShowPlannedHoursTooltip] = useState(false)
   const [showWorkHoursTooltip, setShowWorkHoursTooltip] = useState(false)
   const [showTaskScheduleModal, setShowTaskScheduleModal] = useState(false)
-  const [showHabitModal, setShowHabitModal] = useState(false)
-  const [selectedHabit, setSelectedHabit] = useState<any>(null)
-  const [selectedHabitDate, setSelectedHabitDate] = useState<Date | null>(null)
-  const [showSessionModal, setShowSessionModal] = useState(false)
-  const [selectedSession, setSelectedSession] = useState<any>(null)
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ time: string; date: Date } | null>(
-    null
-  )
-  const [selectedTask, setSelectedTask] = useState<any>(null)
-  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null)
 
   // Calendar notes state
   const [showCalendarNoteModal, setShowCalendarNoteModal] = useState(false)
@@ -97,17 +81,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
   }
 
   const [baseDate, setBaseDate] = useState(getInitialDate)
-  const [newMeeting, setNewMeeting] = useState({
-    title: '',
-    description: '',
-    start_time: '',
-    end_time: '',
-    date: '',
-    location: '',
-    meeting_type: 'general' as Meeting['meeting_type'],
-    priority: 'medium' as Meeting['priority'],
-    category_id: undefined as string | undefined,
-  })
 
   const {
     allTasks,
@@ -137,6 +110,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     addCalendarNote,
     addHabitNote,
     removeCalendarNote,
+    removeTaskFromCalendar,
   } = useCalendarData(windowWidth, baseDate)
 
   // Calendar data already includes habits - no need for separate useHabits hook
@@ -215,7 +189,13 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     }
   }, [])
 
+  const dragOccurredRef = useRef(false)
   const handleTimeSlotClick = (event: React.MouseEvent, timeSlot: string, date: Date) => {
+    // Skip if a drag just completed (the drag handler already opened the modal)
+    if (dragOccurredRef.current) {
+      dragOccurredRef.current = false
+      return
+    }
     // Check if the click originated from a calendar event
     const target = event.target as HTMLElement
     if (target.closest('[data-calendar-event]')) {
@@ -228,9 +208,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     openMeetingModal()
   }
 
-  const handleEditMeeting = (meeting: Meeting) => {
+  const handleEditMeeting = useCallback((meeting: Meeting) => {
     openMeetingModal(undefined, meeting)
-  }
+  }, [openMeetingModal])
 
   const handleTimeSlotContextMenu = (event: React.MouseEvent, timeSlot: string, date: Date) => {
     event.preventDefault() // Prevent browser context menu
@@ -240,7 +220,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
 
   const handleSaveMeeting = async (
     e: React.FormEvent,
-    updatedMeeting: typeof newMeeting,
+    updatedMeeting: any,
     editingMeeting?: Meeting
   ) => {
     e.preventDefault()
@@ -330,22 +310,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
         await addMeeting(meetingData)
       }
 
-      // Task scheduling will be automatically regenerated by useCalendarData hook
-
-      setNewMeeting({
-        title: '',
-        description: '',
-        start_time: '',
-        end_time: '',
-        date: '',
-        location: '',
-        meeting_type: 'general',
-        priority: 'medium',
-        category_id: undefined,
-      })
-      setShowMeetingModal(false)
-      setSelectedTimeSlot(null)
-      setEditingMeeting(null)
+      // Modal cleanup handled by ModalContext's closeMeetingModal()
     } catch (error) {
       console.error('Error saving meeting:', error)
     }
@@ -360,17 +325,17 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     }
   }
 
-  const handleTaskClick = (task: any) => {
+  const handleTaskClick = useCallback((task: any) => {
     openTaskModal(task)
-  }
+  }, [openTaskModal])
 
-  const handleHabitClick = (habit: any, date: Date) => {
+  const handleHabitClick = useCallback((habit: any, date: Date) => {
     openHabitModal(habit, date)
-  }
+  }, [openHabitModal])
 
-  const handleSessionClick = (session: any) => {
+  const handleSessionClick = useCallback((session: any) => {
     openSessionModal(session)
-  }
+  }, [openSessionModal])
 
   const handleHabitTimeChangeWithReset = async (
     habitId: string,
@@ -398,27 +363,10 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     }
   }
 
-  const handleCompleteTaskWrapper = async () => {
-    await handleCompleteTask(selectedTask)
-  }
-
-  const handleDeleteTaskWrapper = async () => {
-    await handleDeleteTask(selectedTask)
-  }
-
   const closeModal = () => {
-    setShowMeetingModal(false)
-    setShowTaskModal(false)
-    setShowHabitModal(false)
-    setShowSessionModal(false)
+    closeAllModals()
     setShowCalendarNoteModal(false)
-    setSelectedTimeSlot(null)
     setSelectedNoteTimeSlot(null)
-    setEditingMeeting(null)
-    setSelectedTask(null)
-    setSelectedHabit(null)
-    setSelectedHabitDate(null)
-    setSelectedSession(null)
     setIsDragging(false)
     setDragStart(null)
     setDragEnd(null)
@@ -481,7 +429,8 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
     hourIndex?: number,
     columnIndex?: number
   ) => {
-    console.log('Mouse up:', { isDragging, dragStart, dragEnd, timeSlot, hourIndex })
+    if (event) mouseHandledRef.current = true
+    console.log('Mouse up:', { hasEvent: !!event, isDragging, dragStart, dragEnd, timeSlot, hourIndex })
     
     if (isDragging && dragStart) {
       // Force update dragEnd to the mouse up position if we have it
@@ -499,11 +448,12 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
         const minQuarters = Math.min(startTotalQuarters, endTotalQuarters)
         const maxQuarters = Math.max(startTotalQuarters, endTotalQuarters)
 
-        // Calculate positions (same as drag overlay)
         const startHourIndex = Math.floor(minQuarters / 4)
         const startQuarter = minQuarters % 4
-        const endHourIndex = Math.floor(maxQuarters / 4)
-        const endQuarter = maxQuarters % 4
+        // End time is the END of the last selected quarter (add 1)
+        const endPlusOne = maxQuarters + 1
+        const endHourIndex = Math.floor(endPlusOne / 4)
+        const endQuarter = endPlusOne % 4
 
         const startTime = quarterToTimeString(startHourIndex, startQuarter, hourSlots)
         const endTime = quarterToTimeString(endHourIndex, endQuarter, hourSlots)
@@ -521,6 +471,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
 
         // Only open modal if we have a valid drag (not just a click)
         if (startTotalQuarters !== endTotalQuarters) {
+          dragOccurredRef.current = true
           openMeetingModal({ time: startTime, date: dragStart.date, endTime: endTime })
         }
       }
@@ -532,11 +483,13 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
   }
 
   // Add global mouse up listener to handle mouse up outside the calendar
+  const mouseHandledRef = useRef(false)
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-      if (isDragging) {
+      if (isDragging && !mouseHandledRef.current) {
         handleMouseUp()
       }
+      mouseHandledRef.current = false
     }
 
     document.addEventListener('mouseup', handleGlobalMouseUp)
@@ -601,17 +554,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
       const meetingsInSlot = getMeetingsForTimeSlot(timeSlot, date)
       const buffersInSlot = getBuffersForCalendarTimeSlot(timeSlot, date)
       const categoryBuffersInSlot = getCategoryBuffersForTimeSlot(timeSlot, date)
-      // For past dates and today: show task daily logs
-      // For today and future: show auto-generated tasks
-      const tasksInSlot =
-        (isToday || isFuture) && tasksScheduled ? getTasksForTimeSlot(timeSlot, date) : []
-      const allTasksDailyLogsInSlot =
-        isPast || isToday ? getTasksDailyLogsForTimeSlot(timeSlot, date) : []
-      // For today, exclude logs for tasks already shown via scheduledTasksCache to prevent duplicates
-      const scheduledTaskIds = new Set(tasksInSlot.map((t: any) => t.id?.split('-chunk-')[0]))
-      const tasksDailyLogsInSlot = isToday
-        ? allTasksDailyLogsInSlot.filter((log: any) => !scheduledTaskIds.has(log.task_id))
-        : allTasksDailyLogsInSlot
+      // Tasks render from tasks_daily_logs (single source of truth)
+      const tasksInSlot: any[] = []
+      const tasksDailyLogsInSlot = getTasksDailyLogsForTimeSlot(timeSlot, date)
 
       const baseItemHeight = 32 // Base height for calculating offsets
 
@@ -647,7 +592,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
       getCategoryBuffersForTimeSlot,
       tasksScheduled,
       handleHabitClick,
+      handleSessionClick,
       handleTaskClick,
+      handleEditMeeting,
       getNotesForDateTime,
       removeCalendarNote,
     ]
@@ -663,6 +610,8 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
   useEffect(() => {
     onSetSaveHandler(handleSaveMeeting)
     onSetDeleteHandler(handleDeleteMeeting)
+    onSetHabitTimeChangeHandler(handleHabitTimeChangeWithReset)
+    onSetHabitSkipHandler(handleHabitSkipWithReset)
   }, [handleSaveMeeting, handleDeleteMeeting, onSetSaveHandler, onSetDeleteHandler])
 
   return (
@@ -782,63 +731,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
         getCurrentTimeLinePosition={getCurrentTimeLinePosition}
       />
 
-      <MeetingModal
-        onTaskLogCreated={async () => {
-          // Refresh calendar data when a task log is created
-          window.location.reload()
-        }}
-        onBackToTask={
-          selectedTask
-            ? () => {
-                // Go back to task modal from meeting modal
-                setShowMeetingModal(false)
-                setShowTaskModal(true)
-              }
-            : undefined
-        }
-      />
-
-      <CalendarTaskModal
-        isOpen={showTaskModal}
-        onClose={closeModal}
-        task={selectedTask}
-        onComplete={handleCompleteTaskWrapper}
-        onDelete={handleDeleteTaskWrapper}
-        onAddMeeting={() => {
-          // Extract time slot info from the selected task and open meeting modal
-          if (selectedTask) {
-            const taskDate = new Date(
-              selectedTask.startTime ? selectedTask.startTime * 60 * 60 * 1000 : Date.now()
-            )
-            const timeSlot = selectedTask.startTime
-              ? `${Math.floor(selectedTask.startTime).toString().padStart(2, '0')}:${(
-                  (selectedTask.startTime % 1) *
-                  60
-                )
-                  .toString()
-                  .padStart(2, '0')}`
-              : '09:00'
-
-            setSelectedTimeSlot({ time: timeSlot, date: taskDate })
-            setNewMeeting({
-              title: '',
-              description: '',
-              start_time: timeSlot,
-              end_time: timeSlot,
-              date: format(taskDate, 'yyyy-MM-dd'),
-              location: '',
-              meeting_type: 'general',
-              priority: 'medium',
-              category_id: undefined,
-            })
-            setShowTaskModal(false)
-            setShowMeetingModal(true)
-          }
-        }}
-      />
-
-      <HabitModal onTimeChange={handleHabitTimeChangeWithReset} onSkip={handleHabitSkipWithReset} />
-
       <CalendarNoteModal
         isOpen={showCalendarNoteModal}
         onClose={closeModal}
@@ -849,20 +741,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
         habitNotes={habitNotes}
         existingNotes={calendarNotes}
       />
-
-      {selectedSession && (
-        <SessionEditModal
-          isOpen={showSessionModal}
-          onClose={closeModal}
-          session={selectedSession}
-          onUpdateSession={async (sessionId: string, updates: any) => {
-            // This would typically call a function from useCalendarData
-            // For now, we'll add a placeholder
-            console.log('Update session:', sessionId, updates)
-            closeModal()
-          }}
-        />
-      )}
 
       <TaskScheduleModal
         showTaskScheduleModal={showTaskScheduleModal}
@@ -878,6 +756,8 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler }: CalendarConte
 const Calendar = () => {
   let saveMeetingHandler: (e: React.FormEvent, updatedMeeting: any, editingMeeting?: Meeting) => Promise<void>
   let deleteMeetingHandler: (meeting: Meeting) => Promise<void>
+  let habitTimeChangeHandler: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
+  let habitSkipHandler: (habitId: string, date: string) => Promise<void>
 
   return (
     <ModalProvider
@@ -891,10 +771,27 @@ const Calendar = () => {
           return await deleteMeetingHandler(meeting)
         }
       }}
+      onCompleteTask={async (task: any) => { await handleCompleteTask(task) }}
+      onDeleteTask={async (task: any) => {
+        const deletedId = await handleDeleteTask(task)
+        if (deletedId) removeTaskFromCalendar(deletedId)
+      }}
+      onHabitTimeChange={async (habitId: string, date: string, newTime: string, newDuration?: number) => {
+        if (habitTimeChangeHandler) await habitTimeChangeHandler(habitId, date, newTime, newDuration)
+      }}
+      onHabitSkip={async (habitId: string, date: string) => {
+        if (habitSkipHandler) await habitSkipHandler(habitId, date)
+      }}
+      onUpdateSession={async (sessionId: string, updates: any) => {
+        console.log('Update session:', sessionId, updates)
+      }}
+      onTaskLogCreated={() => { window.location.reload() }}
     >
-      <CalendarContent 
+      <CalendarContent
         onSetSaveHandler={(handler) => { saveMeetingHandler = handler }}
         onSetDeleteHandler={(handler) => { deleteMeetingHandler = handler }}
+        onSetHabitTimeChangeHandler={(handler) => { habitTimeChangeHandler = handler }}
+        onSetHabitSkipHandler={(handler) => { habitSkipHandler = handler }}
       />
     </ModalProvider>
   )

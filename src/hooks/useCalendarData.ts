@@ -59,7 +59,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const end = parseInt(settings.work_hours_end.split(':')[0], 10)
     return { start, end }
   }
-  const { saveTaskChunks, clearTaskLogsForDate, clearTaskLogsFromTimeForward } = useTaskDailyLogs()
+  const { saveTaskChunks } = useTaskDailyLogs()
 
   // Don't reset on date changes - keep cached tasks
 
@@ -83,7 +83,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       if (initializingRef.current) return
       initializingRef.current = true
 
-      console.log('🔥 CALENDAR DATA LOAD STARTED', { user: user?.id, userLoading, tasksScheduled })
       setIsInitializing(true)
       setIsDataLoading(true)
 
@@ -111,50 +110,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setCalendarNotes(fetchedCalendarNotes)
         setHabitNotes(fetchedHabitNotes)
         setIsDataLoading(false) // Show partial data immediately
-
-        // Sync todoist tasks to DB in background, then schedule them in personal hours
-        if (fetchedSettings?.todoist_api_key) {
-          supabase.functions.invoke('todoist', {
-            body: { action: 'list_all' },
-          }).then(async ({ data, error: fnError }) => {
-            if (!fnError && data?.tasks) {
-              try {
-                const todoistDbTasks = await syncTodoistTasks(data.tasks, user.id)
-                if (todoistDbTasks.length > 0) {
-                  const getTodoistHoursRange = () => TODOIST_HOURS
-                  const dayColumnsList = getDayColumns()
-                  const todoistConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, fetchedTasksDailyLogs)
-                  const todoistScheduleResult = await scheduleAllTasks(
-                    todoistDbTasks,
-                    todoistConflictMaps,
-                    dayColumnsList,
-                    getTodoistHoursRange,
-                    scheduleTaskInAvailableSlots,
-                    saveTaskChunks,
-                    clearTaskLogsFromTimeForward,
-                    user.id,
-                    fetchedTasksDailyLogs,
-                    [], // no weekend skip for personal tasks
-                    null, // no billable settings
-                    todoistDbTasks,
-                    new Map()
-                  )
-                  // Merge todoist scheduled tasks into cache
-                  setScheduledTasksCache(prev => {
-                    const merged = new Map(prev)
-                    todoistScheduleResult.forEach((tasks, dateKey) => {
-                      const existing = merged.get(dateKey) || []
-                      merged.set(dateKey, [...existing, ...tasks])
-                    })
-                    return merged
-                  })
-                }
-              } catch (err) {
-                console.error('Todoist sync/schedule failed:', err)
-              }
-            }
-          }).catch(() => {})
-        }
 
         // Create work hours range function using fetched settings
         const getWorkHoursRangeFromSettings = () => {
@@ -197,19 +152,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           
           setDataHash(newDataHash)
 
-          // Clear today's task logs from current time forward only when regenerating
-          const now = new Date()
-          const isToday = format(today, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd')
-          
-          if (isToday) {
-            // Only clear logs from current time forward for today
-            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-            await clearTaskLogsFromTimeForward(user.id, today, currentTime)
-          } else {
-            // For other dates, clear all logs (future dates)
-            await clearTaskLogsForDate(user.id, today)
-          }
-
           try {
             // Schedule tasks - use filtered data consistent with conflict computation
             const scheduledTasksResult = await scheduleAllTasks(
@@ -219,7 +161,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               getWorkHoursRangeFromSettings,
               scheduleTaskInAvailableSlots,
               saveTaskChunks,
-              clearTaskLogsFromTimeForward,
+              null, // clearTaskLogsFromTimeForward removed
               user.id,
               filteredTasksDailyLogs,
               fetchedSettings?.weekend_days || ['saturday', 'sunday'],
@@ -246,7 +188,39 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const finalConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
         const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings, fetchedCategoryBuffers)
         setCategoryBufferBlocks(calculatedBufferBlocks)
-        
+
+        // Step 8: Schedule todoist tasks from DB immediately, then sync API in background
+        if (fetchedSettings?.todoist_api_key) {
+          // Fetch existing todoist tasks from DB (instant, no API call)
+          const { data: todoistDbTasks } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('source', 'todoist')
+            .eq('user_id', user.id)
+            .eq('is_complete', false)
+
+          if (todoistDbTasks && todoistDbTasks.length > 0) {
+            const getTodoistHoursRange = () => TODOIST_HOURS
+            const todoistConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, fetchedTasksDailyLogs)
+            const todoistScheduleResult = await scheduleAllTasks(
+              todoistDbTasks, todoistConflictMaps, dayColumnsList, getTodoistHoursRange,
+              scheduleTaskInAvailableSlots, saveTaskChunks, null, // clearTaskLogsFromTimeForward removed
+              user.id, fetchedTasksDailyLogs, [], null, todoistDbTasks, new Map()
+            )
+            setScheduledTasksCache(prev => {
+              const merged = new Map(prev)
+              todoistScheduleResult.forEach((tasks, dateKey) => {
+                const existing = merged.get(dateKey) || []
+                const existingIds = new Set(existing.map((t: any) => t.id))
+                const newTasks = tasks.filter((t: any) => !existingIds.has(t.id))
+                if (newTasks.length > 0) merged.set(dateKey, [...existing, ...newTasks])
+              })
+              return merged
+            })
+          }
+
+        }
+
       } catch (error) {
         console.error('Error in calendar data loading:', error)
         setIsDataLoading(false)
@@ -421,22 +395,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           if (!user) return
 
           setDataHash(newDataHash)
-          
-          // Clear today's task logs from current time forward and regenerate
+
           const today = new Date()
-          const now = new Date()
-          const isToday = format(today, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd')
-          
-          if (isToday) {
-            // Only clear logs from current time forward for today
-            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-            await clearTaskLogsFromTimeForward(user.id, today, currentTime)
-          } else {
-            // For other dates, clear all logs (future dates)
-            await clearTaskLogsForDate(user.id, today)
-          }
-          
-          // Filter out today's task logs for conflict computation
           const todayStr = format(today, 'yyyy-MM-dd')
           const filteredTasksDailyLogs = tasksDailyLogs.filter(log => log.log_date !== todayStr)
           
@@ -457,7 +417,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               getWorkHoursRange,
               scheduleTaskInAvailableSlots,
               saveTaskChunks,
-              clearTaskLogsFromTimeForward,
+              null, // clearTaskLogsFromTimeForward removed
               user.id,
               filteredTasksDailyLogs,
               settings?.weekend_days || ['saturday', 'sunday'],
@@ -479,363 +439,243 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       
       regenerateTasks()
     }
-  }, [habits, sessions, meetings, allTasks, tasksDailyLogs, dataHash, tasksScheduled, dayColumns, getWorkHoursRange, saveTaskChunks, clearTaskLogsFromTimeForward])
+  }, [habits, sessions, meetings, allTasks, tasksDailyLogs, dataHash, tasksScheduled, dayColumns, getWorkHoursRange, saveTaskChunks])
 
   // Get tasks for a specific time slot
-  const getTasksForTimeSlot = (timeSlot: string, date: Date) => {
-    if (!tasksScheduled) {
-      return []
-    }
+  // --- Pre-indexed Maps for O(1) time slot lookups ---
+  const EMPTY: any[] = []
 
-    const dateKey = format(date, 'yyyy-MM-dd')
-    const cachedTasks = scheduledTasksCache.get(dateKey) || []
-    const currentHour = parseInt(timeSlot.split(':')[0])
-    
-    const filteredTasks = cachedTasks.filter(chunk => {
-      const taskStartHour = chunk.startTime ? Math.floor(chunk.startTime) : chunk.startHour
-      
-      // Hide anything before 6 AM
-      if (taskStartHour < 6) return false
-      
-      const matches = taskStartHour === currentHour
-      return matches
+  const tasksIndex = useMemo(() => {
+    if (!tasksScheduled) return new Map<string, any[]>()
+    const index = new Map<string, any[]>()
+    scheduledTasksCache.forEach((chunks, dateKey) => {
+      chunks.forEach(chunk => {
+        const hour = chunk.startTime ? Math.floor(chunk.startTime) : chunk.startHour
+        if (hour < 6) return
+        const key = `${dateKey}-${hour}`
+        const arr = index.get(key) || []
+        arr.push(chunk)
+        index.set(key, arr)
+      })
     })
+    return index
+  }, [scheduledTasksCache, tasksScheduled])
 
+  const meetingsIndex = useMemo(() => {
+    const index = new Map<string, any[]>()
+    meetings.forEach(meeting => {
+      const meetingStart = new Date(meeting.start_time)
+      const hour = meetingStart.getHours()
+      if (hour < 6) return
+      const key = `${format(meetingStart, 'yyyy-MM-dd')}-${hour}`
+      const arr = index.get(key) || []
+      arr.push(meeting)
+      index.set(key, arr)
+    })
+    return index
+  }, [meetings])
 
-    return filteredTasks
+  const getTasksForTimeSlot = (timeSlot: string, date: Date) => {
+    const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0])}`
+    return tasksIndex.get(key) || EMPTY
   }
 
-  // Get meetings for a specific time slot
   const getMeetingsForTimeSlot = (timeSlot: string, date: Date) => {
-    const dateKey = format(date, 'yyyy-MM-dd')
-    const currentHour = parseInt(timeSlot.split(':')[0])
-
-    return meetings.filter(meeting => {
-      const meetingStart = new Date(meeting.start_time)
-      const meetingDate = format(meetingStart, 'yyyy-MM-dd')
-      const meetingHour = meetingStart.getHours()
-
-      // Hide anything before 6 AM
-      if (meetingHour < 6) return false
-
-      return meetingDate === dateKey && meetingHour === currentHour
-    })
+    const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0])}`
+    return meetingsIndex.get(key) || EMPTY
   }
 
   // Get habits for a specific time slot
-  const getHabitsForTimeSlot = (timeSlot: string, date: Date) => {
-    const currentHour = parseInt(timeSlot.split(':')[0])
-    const dateKey = format(date, 'yyyy-MM-dd')
+  const habitsIndex = useMemo(() => {
+    const index = new Map<string, any[]>()
+    // Pre-index meetings and sessions by date for O(1) conflict lookups
+    const meetingsByDate = new Map<string, any[]>()
+    meetings.forEach(m => {
+      const start = new Date(m.start_time)
+      const key = format(start, 'yyyy-MM-dd')
+      const arr = meetingsByDate.get(key) || []
+      arr.push(m)
+      meetingsByDate.set(key, arr)
+    })
+    const sessionsByDate = new Map<string, any[]>()
+    sessions.forEach(s => {
+      const arr = sessionsByDate.get(s.scheduled_date) || []
+      arr.push(s)
+      sessionsByDate.set(s.scheduled_date, arr)
+    })
+    const workHours = getWorkHoursRange()
 
-    return habits
-      .filter(habit => {
-        // Filter out non-calendar habits
-        if (habit.habits_types?.scheduling_rule === 'non_calendar') {
-          return false
-        }
-        // Only show habits that existed on this date
+    for (const habit of habits) {
+      if (habit.habits_types?.scheduling_rule === 'non_calendar') continue
+
+      for (const col of dayColumns) {
+        const dateKey = col.dateStr
         if (habit.created_at) {
-          const habitCreationDate = new Date(habit.created_at).toISOString().split('T')[0]
-          if (dateKey < habitCreationDate) return false
+          const creationDate = new Date(habit.created_at).toISOString().split('T')[0]
+          if (dateKey < creationDate) continue
         }
-        
-        // Check if there's a daily log with a scheduled start time for this date
-        const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
-        
-        // Skip habit if it's marked as skipped for this date
-        if (dailyLog?.is_skipped) return false
-        
-        let effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
-        const effectiveDuration = dailyLog?.duration || habit.duration || 0
 
-        if (!effectiveStartTime) return false
+        const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateKey)
+        if (dailyLog?.is_skipped) continue
+
+        const effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
+        const effectiveDuration = dailyLog?.duration || habit.duration || 0
+        if (!effectiveStartTime) continue
 
         const habitStartHour = parseInt(effectiveStartTime.split(':')[0])
         const habitStartMinute = parseInt(effectiveStartTime.split(':')[1])
+        if (habitStartHour === 5) continue
 
-        // Allow early morning hours (0-4am) to show in calendar since we extended it
-        // Only hide hours 5am since calendar starts at 6am
-        if (habitStartHour === 5) {
-          return false
-        }
+        const habitStartInHours = habitStartHour + habitStartMinute / 60
+        const habitEndInHours = habitStartInHours + effectiveDuration / 60
 
-        // Allow early morning hours (0-4am) to remain as-is since calendar now shows them
-
-        // Check for meeting conflicts and rescheduling
-        const conflictingMeeting = meetings.find(meeting => {
+        // Check meeting conflicts (O(1) date lookup, then small array scan)
+        const dateMeetings = meetingsByDate.get(dateKey) || []
+        const conflictingMeeting = dateMeetings.find(meeting => {
           const meetingStart = new Date(meeting.start_time)
           const meetingEnd = new Date(meeting.end_time)
-          const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
-
-          if (meetingDateStr !== dateKey) return false
-
-          const habitDuration = effectiveDuration
-          const habitStartInHours = habitStartHour + habitStartMinute / 60
-          const habitEndInHours = habitStartInHours + habitDuration / 60
-          const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
-          const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
-
-          return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
+          const meetingStartH = meetingStart.getHours() + meetingStart.getMinutes() / 60
+          const meetingEndH = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
+          return habitStartInHours < meetingEndH && habitEndInHours > meetingStartH
         })
 
-        // Check for session conflicts and rescheduling
-        const conflictingSession = sessions.find(session => {
-          if (session.scheduled_date !== dateKey) return false
+        // Check session conflicts
+        const dateSessions = sessionsByDate.get(dateKey) || []
+        const conflictingSession = !conflictingMeeting ? dateSessions.find(session => {
+          const defaultStart = `${workHours.start.toString().padStart(2, '0')}:00`
+          const sTime = session.actual_start_time || defaultStart
+          const sH = parseInt(sTime.split(':')[0])
+          const sM = parseInt(sTime.split(':')[1])
+          const sStartH = sH + sM / 60
+          const sEndH = sStartH + ((session.scheduled_hours || 1) * 60) / 60
+          return habitStartInHours < sEndH && habitEndInHours > sStartH
+        }) : null
 
-          // Handle both scheduled and started sessions
-          const workHours = getWorkHoursRange()
-          const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
-          const sessionStartTime = session.actual_start_time || defaultStartTime
-          const sessionStartHour = parseInt(sessionStartTime.split(':')[0])
-          const sessionStartMinute = parseInt(sessionStartTime.split(':')[1])
-          const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
-
-          const habitDuration = effectiveDuration
-          const habitStartInHours = habitStartHour + habitStartMinute / 60
-          const habitEndInHours = habitStartInHours + habitDuration / 60
-          const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
-          const sessionEndInHours = sessionStartInHours + sessionDuration / 60
-
-          return habitStartInHours < sessionEndInHours && habitEndInHours > sessionStartInHours
-        })
+        // Determine final hour and position
+        let finalHour: number
+        let topPosition: number
+        let isRescheduled = false
 
         if (conflictingMeeting) {
           const meetingEnd = new Date(conflictingMeeting.end_time)
-          const newStartHour = meetingEnd.getHours() + (meetingEnd.getMinutes() > 30 ? 1 : 0)
-          return newStartHour === currentHour
+          const endMin = meetingEnd.getMinutes()
+          finalHour = meetingEnd.getHours() + (endMin > 30 ? 1 : 0)
+          const newStartMinute = endMin === 0 ? 0 : endMin <= 30 ? 30 : 0
+          topPosition = (newStartMinute / 60) * 100
+          isRescheduled = true
+        } else if (conflictingSession) {
+          const sTime = conflictingSession.actual_start_time!
+          const sH = parseInt(sTime.split(':')[0])
+          const sM = parseInt(sTime.split(':')[1])
+          const sDur = (conflictingSession.scheduled_hours || 1) * 60
+          const sEndM = sM + sDur
+          const sEndHour = sH + Math.floor(sEndM / 60)
+          const finalEndMin = sEndM % 60
+          finalHour = sEndHour + (finalEndMin > 30 ? 1 : 0)
+          const newStartMinute = finalEndMin === 0 ? 0 : finalEndMin <= 30 ? 30 : 0
+          topPosition = (newStartMinute / 60) * 100
+          isRescheduled = true
+        } else {
+          finalHour = habitStartHour
+          topPosition = (habitStartMinute / 60) * 100
         }
 
-        if (conflictingSession) {
-          const sessionStartHour = parseInt(conflictingSession.actual_start_time!.split(':')[0])
-          const sessionStartMinute = parseInt(conflictingSession.actual_start_time!.split(':')[1])
-          const sessionDuration = (conflictingSession.scheduled_hours || 1) * 60 // Duration in minutes
-          const sessionEndMinute = sessionStartMinute + sessionDuration
-          const sessionEndHour = sessionStartHour + Math.floor(sessionEndMinute / 60)
-          const finalEndMinute = sessionEndMinute % 60
+        const key = `${dateKey}-${finalHour}`
+        const arr = index.get(key) || []
+        arr.push({ ...habit, topPosition, isRescheduled })
+        index.set(key, arr)
+      }
+    }
+    return index
+  }, [habits, meetings, sessions, dayColumns])
 
-          const newStartHour = sessionEndHour + (finalEndMinute > 30 ? 1 : 0)
-          return newStartHour === currentHour
-        }
-
-        // Check if habit starts within this hour slot (handles 30-minute start times like 9:30)
-        const shouldShow = habitStartHour === currentHour
-        return shouldShow
-      })
-      .map(habit => {
-        // Use the same effective start time and duration logic as in the filter
-        const dailyLog = habit.habits_daily_logs?.find(log => log.log_date === dateKey)
-        let effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
-        const effectiveDuration = dailyLog?.duration || habit.duration || 0
-
-        // Allow early morning hours since calendar now shows 0-4am
-
-        const habitStartHour = parseInt(effectiveStartTime!.split(':')[0])
-        const habitStartMinute = parseInt(effectiveStartTime!.split(':')[1])
-
-        // Check for rescheduling (meetings first, then sessions)
-        const conflictingMeeting = meetings.find(meeting => {
-          const meetingStart = new Date(meeting.start_time)
-          const meetingEnd = new Date(meeting.end_time)
-          const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
-
-          if (meetingDateStr !== dateKey) return false
-
-          const habitDuration = effectiveDuration
-          const habitStartInHours = habitStartHour + habitStartMinute / 60
-          const habitEndInHours = habitStartInHours + habitDuration / 60
-          const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
-          const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
-
-          return habitStartInHours < meetingEndInHours && habitEndInHours > meetingStartInHours
-        })
-
-        const conflictingSession = sessions.find(session => {
-          if (session.scheduled_date !== dateKey) return false
-
-          // Handle both scheduled and started sessions
-          const workHours = getWorkHoursRange()
-          const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
-          const sessionStartTime = session.actual_start_time || defaultStartTime
-          const sessionStartHour = parseInt(sessionStartTime.split(':')[0])
-          const sessionStartMinute = parseInt(sessionStartTime.split(':')[1])
-          const sessionDuration = (session.scheduled_hours || 1) * 60 // Duration in minutes
-
-          const habitDuration = effectiveDuration
-          const habitStartInHours = habitStartHour + habitStartMinute / 60
-          const habitEndInHours = habitStartInHours + habitDuration / 60
-          const sessionStartInHours = sessionStartHour + sessionStartMinute / 60
-          const sessionEndInHours = sessionStartInHours + sessionDuration / 60
-
-          return habitStartInHours < sessionEndInHours && habitEndInHours > sessionStartInHours
-        })
-
-        if (conflictingMeeting) {
-          const meetingEnd = new Date(conflictingMeeting.end_time)
-          const newStartMinute =
-            meetingEnd.getMinutes() === 0 ? 0 : meetingEnd.getMinutes() <= 30 ? 30 : 0
-          return {
-            ...habit,
-            topPosition: (newStartMinute / 60) * 100,
-            isRescheduled: true,
-          }
-        }
-
-        if (conflictingSession) {
-          const sessionStartHour = parseInt(conflictingSession.actual_start_time!.split(':')[0])
-          const sessionStartMinute = parseInt(conflictingSession.actual_start_time!.split(':')[1])
-          const sessionDuration = (conflictingSession.scheduled_hours || 1) * 60 // Duration in minutes
-          const sessionEndMinute = sessionStartMinute + sessionDuration
-          const finalEndMinute = sessionEndMinute % 60
-
-          const newStartMinute = finalEndMinute === 0 ? 0 : finalEndMinute <= 30 ? 30 : 0
-          return {
-            ...habit,
-            topPosition: (newStartMinute / 60) * 100,
-            isRescheduled: true,
-          }
-        }
-
-        return {
-          ...habit,
-          topPosition: (habitStartMinute / 60) * 100,
-          isRescheduled: false,
-        }
-      })
+  const getHabitsForTimeSlot = (timeSlot: string, date: Date) => {
+    const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0])}`
+    return habitsIndex.get(key) || EMPTY
   }
 
   // Get sessions for a specific time slot
+  const sessionsIndex = useMemo(() => {
+    const index = new Map<string, any[]>()
+    const workHours = getWorkHoursRange()
+    const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
+    sessions.forEach(session => {
+      const dateStr = session.scheduled_date
+      if (!dateStr) return
+      const startTime = session.actual_start_time || defaultStartTime
+      const hour = parseInt(startTime.split(':')[0])
+      if (hour < 6) return
+      const minutes = parseInt(startTime.split(':')[1])
+      const key = `${dateStr}-${hour}`
+      const arr = index.get(key) || []
+      arr.push({ ...session, topPosition: (minutes / 60) * 100 })
+      index.set(key, arr)
+    })
+    return index
+  }, [sessions])
+
   const getSessionsForTimeSlot = (timeSlot: string, date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    const currentHour = parseInt(timeSlot.split(':')[0])
-
-    return sessions
-      .filter(session => {
-        // Check if session is scheduled for this date
-        if (session.scheduled_date !== dateStr) return false
-        
-        // For scheduled sessions without actual_start_time, we need to determine their display time
-        // Use work hours start time or default to 9 AM
-        const workHours = getWorkHoursRange()
-        const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
-        const startTime = session.actual_start_time || defaultStartTime
-        const sessionStartHour = parseInt(startTime.split(':')[0])
-        
-        // Hide anything before 6 AM
-        if (sessionStartHour < 6) return false
-        
-        // Debug logging for all sessions on Sep 2
-        if (dateStr === '2025-09-02' && (currentHour === 13 || currentHour === 15)) {
-          console.log(`🐛 Session check for ${currentHour}:00 slot on Sep 2:`, {
-            sessionId: session.id,
-            sessionTitle: session.project_name || 'Unknown',
-            currentHour,
-            startTime,
-            sessionStartHour,
-            shouldShow: sessionStartHour === currentHour,
-            dateStr
-          })
-        }
-        
-        // Check if session starts within this hour slot (including sessions that start at :30)
-        return sessionStartHour === currentHour
-      })
-      .map(session => {
-        const workHours = getWorkHoursRange()
-        const defaultStartTime = `${workHours.start.toString().padStart(2, '0')}:00`
-        const startTime = session.actual_start_time || defaultStartTime
-        const minutes = parseInt(startTime.split(':')[1])
-        const topPosition = (minutes / 60) * 100
-        
-        // Debug logging for sessions on Sep 2 at 3PM
-        if (session.scheduled_date === '2025-09-02' && parseInt(startTime.split(':')[0]) === 15) {
-          console.log(`🐛 Session topPosition calc for 3PM Sep 2:`, {
-            sessionId: session.id,
-            sessionTitle: session.project_name || 'Unknown',
-            startTime,
-            minutes,
-            topPosition
-          })
-        }
-        
-        return {
-          ...session,
-          topPosition,
-        }
-      })
+    const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0])}`
+    return sessionsIndex.get(key) || EMPTY
   }
 
-  // Get task daily logs for a specific time slot
+  const tasksDailyLogsIndex = useMemo(() => {
+    const index = new Map<string, any[]>()
+    tasksDailyLogs.forEach(log => {
+      const startTime = log.actual_start_time || log.scheduled_start_time
+      if (!startTime) return
+      const hour = parseInt(startTime.split(':')[0])
+      if (hour === 5) return
+      const minutes = parseInt(startTime.split(':')[1])
+      const key = `${log.log_date}-${hour}`
+      const arr = index.get(key) || []
+      arr.push({ ...log, topPosition: (minutes / 60) * 100 })
+      index.set(key, arr)
+    })
+    return index
+  }, [tasksDailyLogs])
+
   const getTasksDailyLogsForTimeSlot = (timeSlot: string, date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    const currentHour = parseInt(timeSlot.split(':')[0])
-
-    return tasksDailyLogs
-      .filter(log => {
-        if (log.log_date !== dateStr) return false
-        // Use actual_start_time if available, otherwise fall back to scheduled_start_time
-        const startTime = log.actual_start_time || log.scheduled_start_time
-        if (!startTime) return false
-        const logStartHour = parseInt(startTime.split(':')[0])
-        
-        // Allow early morning hours (0-4am) to show in calendar since we extended it
-        // Only hide 5am since calendar starts at 6am
-        if (logStartHour === 5) return false
-        
-        return logStartHour === currentHour
-      })
-      .map(log => {
-        // Use actual_start_time if available, otherwise fall back to scheduled_start_time
-        const startTime = log.actual_start_time || log.scheduled_start_time
-        const minutes = parseInt(startTime!.split(':')[1])
-        return {
-          ...log,
-          topPosition: (minutes / 60) * 100,
-        }
-      })
+    const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0])}`
+    return tasksDailyLogsIndex.get(key) || EMPTY
   }
 
-  // Get buffers for a specific time slot (daily buffers)
-  const getBuffersForCalendarTimeSlot = (timeSlot: string, date: Date) => {
-    return getBuffersForTimeSlot(timeSlot, date, buffers)
-  }
+  const buffersIndex = useMemo(() => {
+    const index = new Map<string, any[]>()
+    buffers.forEach((buffer, dateStr) => {
+      if (!buffer || !buffer.isActive) return
+      const hour = parseInt(buffer.startTime.split(':')[0])
+      if (hour < 6) return
+      const minutes = parseInt(buffer.startTime.split(':')[1])
+      const key = `${dateStr}-${hour}`
+      index.set(key, [{ ...buffer, topPosition: (minutes / 60) * 100 }])
+    })
+    return index
+  }, [buffers])
 
-  // Get category buffers for a specific time slot
-  const getCategoryBuffersForTimeSlot = (timeSlot: string, date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    
-    // Early return if no buffer blocks exist for this specific date
-    const hasBuffersForDate = categoryBufferBlocks.some(block => block.dateStr === dateStr)
-    if (!hasBuffersForDate) {
-      return []
-    }
-
-    
-    
-    const currentHour = parseInt(timeSlot.split(':')[0])
-    
-    const matchingBlocks = categoryBufferBlocks.filter(block => {
-      
-      // First check if the buffer block is for the correct date
-      if (block.dateStr !== dateStr) {
-        return false
-      }
-      
-      // Check if this buffer block should appear in this time slot
+  const categoryBuffersIndex = useMemo(() => {
+    const index = new Map<string, any[]>()
+    categoryBufferBlocks.forEach(block => {
       const blockStartHour = Math.floor(block.start_time)
       const blockEndHour = Math.ceil(block.start_time + block.duration)
-      
-      
-      // Check if the buffer block overlaps with this time slot
-      const shouldShow = blockStartHour <= currentHour && currentHour < blockEndHour
-      
-      return shouldShow
-    }).map(block => ({
-      ...block,
-      // Calculate position within the hour slot
-      topPosition: ((block.start_time - currentHour) / 1) * 100
-    }))
-    
-    return matchingBlocks
+      for (let hour = blockStartHour; hour < blockEndHour; hour++) {
+        const key = `${block.dateStr}-${hour}`
+        const arr = index.get(key) || []
+        arr.push({ ...block, topPosition: ((block.start_time - hour) / 1) * 100 })
+        index.set(key, arr)
+      }
+    })
+    return index
+  }, [categoryBufferBlocks])
+
+  const getBuffersForCalendarTimeSlot = (timeSlot: string, date: Date) => {
+    const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0])}`
+    return buffersIndex.get(key) || EMPTY
+  }
+
+  const getCategoryBuffersForTimeSlot = (timeSlot: string, date: Date) => {
+    const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0])}`
+    return categoryBuffersIndex.get(key) || EMPTY
   }
 
 
@@ -920,6 +760,17 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     addCalendarNote,
     addHabitNote,
     removeCalendarNote,
+    removeTaskFromCalendar: (taskId: string) => {
+      setTasksDailyLogs(prev => prev.filter(log => log.task_id !== taskId))
+      setScheduledTasksCache(prev => {
+        const updated = new Map(prev)
+        updated.forEach((chunks, dateKey) => {
+          const filtered = chunks.filter((c: any) => !c.id?.startsWith(taskId))
+          if (filtered.length !== chunks.length) updated.set(dateKey, filtered)
+        })
+        return updated
+      })
+    },
     setAllTasks,
     setScheduledTasksCache,
     setTasksScheduled,

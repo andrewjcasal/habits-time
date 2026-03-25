@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { Project } from '../types'
+import { supabase } from '../lib/supabase'
+import { format } from 'date-fns'
 
 interface ProjectSettingsModalProps {
   isOpen: boolean
@@ -46,21 +48,55 @@ const ProjectSettingsModal = ({
     }
   }
 
-  const handleArchiveProject = async () => {
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+  const [futureLogCount, setFutureLogCount] = useState(0)
+  const [archiving, setArchiving] = useState(false)
+
+  const handleArchiveClick = async () => {
     if (!selectedProject) return
+    // Check how many future task_daily_logs exist for this project's tasks
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const { count } = await supabase
+      .from('tasks_daily_logs')
+      .select('id', { count: 'exact', head: true })
+      .in('task_id',
+        (await supabase.from('tasks').select('id').eq('project_id', selectedProject.id)).data?.map(t => t.id) || []
+      )
+      .gte('log_date', today)
+
+    setFutureLogCount(count || 0)
+    setShowArchiveConfirm(true)
+  }
+
+  const handleArchiveConfirm = async (deleteFutureEvents: boolean) => {
+    if (!selectedProject) return
+    setArchiving(true)
 
     try {
+      if (deleteFutureEvents) {
+        const today = format(new Date(), 'yyyy-MM-dd')
+        const taskIds = (await supabase.from('tasks').select('id').eq('project_id', selectedProject.id)).data?.map(t => t.id) || []
+        if (taskIds.length > 0) {
+          await supabase
+            .from('tasks_daily_logs')
+            .delete()
+            .in('task_id', taskIds)
+            .gte('log_date', today)
+        }
+      }
+
       await onUpdateProject(selectedProject.id, { status: 'archived' })
 
-      // Find the first active project to navigate to
       const firstActiveProject = projects.find(
         p => p.id !== selectedProject.id && p.status === 'active'
       )
-
       onProjectSelect(firstActiveProject || null)
+      setShowArchiveConfirm(false)
       onClose()
     } catch (error) {
       console.error('Error archiving project:', error)
+    } finally {
+      setArchiving(false)
     }
   }
 
@@ -137,13 +173,51 @@ const ProjectSettingsModal = ({
             </label>
           </div>
 
+          {showArchiveConfirm && (
+            <div className="p-2 bg-red-50 rounded-md border border-red-200 space-y-2">
+              <p className="text-xs text-red-800 font-medium">Archive "{selectedProject?.name}"?</p>
+              {futureLogCount > 0 && (
+                <p className="text-xs text-red-600">
+                  This project has {futureLogCount} future calendar event{futureLogCount !== 1 ? 's' : ''}.
+                </p>
+              )}
+              <div className="flex gap-1">
+                {futureLogCount > 0 && (
+                  <button
+                    onClick={() => handleArchiveConfirm(true)}
+                    disabled={archiving}
+                    className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {archiving ? 'Archiving...' : 'Archive & Delete Events'}
+                  </button>
+                )}
+                <button
+                  onClick={() => handleArchiveConfirm(false)}
+                  disabled={archiving}
+                  className="px-2 py-1 bg-neutral-200 text-neutral-700 rounded text-xs hover:bg-neutral-300 disabled:opacity-50"
+                >
+                  {archiving ? 'Archiving...' : futureLogCount > 0 ? 'Archive & Keep Events' : 'Archive'}
+                </button>
+                <button
+                  onClick={() => setShowArchiveConfirm(false)}
+                  className="px-2 py-1 text-neutral-500 text-xs hover:text-neutral-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-between items-center pt-1 border-t border-neutral-200">
-            <button
-              onClick={handleArchiveProject}
-              className="px-2 py-1 text-red-600 hover:text-red-800 text-xs"
-            >
-              Archive
-            </button>
+            {!showArchiveConfirm && (
+              <button
+                onClick={handleArchiveClick}
+                className="px-2 py-1 text-red-600 hover:text-red-800 text-xs"
+              >
+                Archive
+              </button>
+            )}
+            {showArchiveConfirm && <div />}
             <div className="flex gap-1">
               <button
                 onClick={onClose}

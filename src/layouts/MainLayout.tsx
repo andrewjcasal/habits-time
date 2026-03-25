@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, Link } from 'react-router-dom'
 import { useLocation } from 'react-router'
 import { useState } from 'react'
 import {
@@ -48,19 +48,16 @@ const MainLayout = () => {
   // useAutoReflection() // Disabled to reduce API calls
 
   const navItems = [
-    // { path: '/time-tracker', label: 'Time Tracker', icon: Clock },
     { path: '/calendar', label: 'Calendar', icon: Calendar },
     { path: '/projects', label: 'Projects', icon: FolderOpen },
     { path: '/categories', label: 'Categories', icon: Tag },
     { path: '/buffers', label: 'Buffers', icon: Target },
-    // { path: '/community', label: 'Community', icon: Users },
     { path: '/todoist', label: 'Todoist Triage', icon: CheckSquare },
-    // { path: '/reflections', label: 'Reflections', icon: Notebook },
+    { path: '/reflections', label: 'Reflections', icon: Sparkles },
     { path: '/habits', label: 'Habits', icon: Heart },
     { path: '/aspects', label: 'Aspects', icon: Layers },
     { path: '/notes', label: 'Notes', icon: FileText },
     { path: '/transactions', label: 'Transactions', icon: DollarSign },
-    // { path: '/wins', label: 'Wins', icon: Trophy },
   ]
 
   const settingsItem = { path: '/settings', label: 'Settings', icon: Settings }
@@ -71,12 +68,12 @@ const MainLayout = () => {
     <div className="flex min-h-screen bg-neutral-50">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-14 lg:w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
-        <div className="p-4 md:p-2 lg:p-4">
+        <Link to="/dashboard" className="block p-4 md:p-2 lg:p-4">
           <h1 className="text-lg font-semibold text-primary-700 flex items-center md:justify-center lg:justify-start">
             <Crown className="w-4 h-4 md:mr-0 lg:mr-2 text-primary-600" />
             <span className="md:hidden lg:block">Cassian</span>
           </h1>
-        </div>
+        </Link>
 
         <nav className="flex-1 px-2 pb-4 md:px-1 lg:px-2">
           <ul className="space-y-0.5">
@@ -137,10 +134,10 @@ const MainLayout = () => {
 
       {/* Mobile Header with Hamburger */}
       <header className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-neutral-200 px-1 py-1 z-30 flex items-center justify-between">
-        <div className="flex items-center">
+        <Link to="/dashboard" className="flex items-center">
           <Crown className="w-3 h-3 mr-1 text-primary-600" />
           <h1 className="text-base font-semibold text-primary-700">Cassian</h1>
-        </div>
+        </Link>
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="p-1 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"

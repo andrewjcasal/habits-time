@@ -47,7 +47,7 @@ interface CalendarEventSlotsProps {
   removeCalendarNote: (noteId: string) => void
 }
 
-export default function CalendarEventSlots({
+function CalendarEventSlots({
   habitsInSlot,
   sessionsInSlot,
   meetingsInSlot,
@@ -193,7 +193,7 @@ export default function CalendarEventSlots({
               handleTaskClick(log.tasks)
             }}
             eventTitle={log.tasks?.title || 'Task Log'}
-            subtitle={log.tasks?.projects?.name || 'Project'}
+            subtitle={log.tasks?.projects?.name}
             duration={`${duration}h`}
           />
         )
@@ -259,3 +259,5 @@ export default function CalendarEventSlots({
     </>
   )
 }
+
+export default React.memo(CalendarEventSlots)

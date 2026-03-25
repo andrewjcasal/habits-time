@@ -2,6 +2,10 @@ import { createContext, useContext, useState, useCallback, ReactNode, useEffect 
 import { Meeting } from '../types'
 import { useUserContext } from './UserContext'
 import { supabase } from '../lib/supabase'
+import MeetingModal from '../components/MeetingModal'
+import CalendarTaskModal from '../components/CalendarTaskModal'
+import HabitModal from '../components/HabitModal'
+import SessionEditModal from '../components/SessionEditModal'
 
 interface ModalState {
   // Meeting Modal
@@ -95,9 +99,15 @@ interface ModalProviderProps {
   // Inject the actual handlers from Calendar
   onSaveMeeting: (e: React.FormEvent, meeting: any, editingMeeting?: Meeting) => Promise<void>
   onDeleteMeeting: (meeting: Meeting) => Promise<void>
+  onCompleteTask: (task: any) => Promise<void>
+  onDeleteTask: (task: any) => Promise<void>
+  onHabitTimeChange: (habit: any, date: Date, newTime: string) => Promise<void>
+  onHabitSkip: (habit: any, date: Date) => Promise<void>
+  onUpdateSession: (sessionId: string, updates: any) => Promise<void>
+  onTaskLogCreated: () => void
 }
 
-export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: ModalProviderProps) => {
+export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onCompleteTask, onDeleteTask, onHabitTimeChange, onHabitSkip, onUpdateSession, onTaskLogCreated }: ModalProviderProps) => {
   const { user } = useUserContext()
   const [modalState, setModalState] = useState<ModalState>(initialModalState)
   const [userSettings, setUserSettings] = useState<any>(null)
@@ -168,7 +178,7 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: Moda
     } else if (timeSlot) {
       const [hour, minute] = timeSlot.time.split(':')
       const startTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`
-      
+
       // Use provided endTime or calculate default 15-minute duration
       let endTime: string
       if (timeSlot.endTime) {
@@ -342,6 +352,33 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting }: Moda
 
   return (
     <ModalContext.Provider value={value}>
+      <MeetingModal
+        onTaskLogCreated={onTaskLogCreated}
+        onBackToTask={modalState.selectedTask ? () => { closeTaskModal(); } : undefined}
+      />
+      <CalendarTaskModal
+        isOpen={modalState.showTaskModal}
+        onClose={closeTaskModal}
+        task={modalState.selectedTask}
+        onComplete={async () => { await onCompleteTask(modalState.selectedTask); closeTaskModal(); }}
+        onDelete={async () => { await onDeleteTask(modalState.selectedTask); closeTaskModal(); }}
+        onAddMeeting={() => addMeetingFromTask()}
+      />
+      <HabitModal
+        onTimeChange={onHabitTimeChange}
+        onSkip={onHabitSkip}
+      />
+      {modalState.selectedSession && (
+        <SessionEditModal
+          isOpen={modalState.showSessionModal}
+          onClose={closeSessionModal}
+          session={modalState.selectedSession}
+          onUpdateSession={async (sessionId: string, updates: any) => {
+            await onUpdateSession(sessionId, updates);
+            closeSessionModal();
+          }}
+        />
+      )}
       {children}
     </ModalContext.Provider>
   )

@@ -13,6 +13,7 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
 import Dashboard from './pages/Dashboard'
+import DashboardHome from './pages/DashboardHome'
 import TimeTracker from './pages/TimeTracker'
 import Essentials from './pages/Essentials'
 import DailyOverrides from './pages/DailyOverrides'
@@ -76,6 +77,7 @@ function App() {
         {user ? (
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Navigate to="/calendar" replace />} />
+            <Route path="dashboard" element={<DashboardHome />} />
             <Route path="reflections" element={<Dashboard />} />
             <Route path="time-tracker" element={<TimeTracker />} />
             <Route path="essentials" element={<Essentials />} />

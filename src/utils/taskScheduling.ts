@@ -275,16 +275,10 @@ const scheduleTasksWithoutBillableLogic = async (
     tasksByDate.get(chunkDateKey).push(chunk)
   })
 
-  // Persist today's task chunks
-  const today = new Date()
-  const todayStr = format(today, 'yyyy-MM-dd')
-  const todayChunks = allScheduledChunks.filter(chunk => 
-    format(chunk.date, 'yyyy-MM-dd') === todayStr
-  )
-
-  if (todayChunks.length > 0) {
+  // Persist all task chunks to database
+  if (allScheduledChunks.length > 0) {
     try {
-      await saveTaskChunks(todayChunks, userId)
+      await saveTaskChunks(allScheduledChunks, userId)
     } catch (error) {
       console.error('Error persisting task chunks:', error)
     }
@@ -490,16 +484,10 @@ export const scheduleAllTasks = async (
     tasksByDate.get(chunkDateKey).push(chunk)
   })
 
-  // Persist today's task chunks to database (clearing already done in useCalendarData)
-  const today = new Date()
-  const todayStr = format(today, 'yyyy-MM-dd')
-  const todayChunks = allScheduledChunks.filter(chunk => 
-    format(chunk.date, 'yyyy-MM-dd') === todayStr
-  )
-
-  if (todayChunks.length > 0) {
+  // Persist all task chunks to database
+  if (allScheduledChunks.length > 0) {
     try {
-      await saveTaskChunks(todayChunks, userId)
+      await saveTaskChunks(allScheduledChunks, userId)
     } catch (error) {
       console.error('Error persisting task chunks:', error)
     }

@@ -19,10 +19,10 @@ export const fetchAllCalendarData = async (userId: string) => {
     const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, tasksResult, settingsResult, calendarNotesResult, habitNotesResult, categoryBuffersResult] = await Promise.allSettled([
       withTimeout(supabase.from('habits').select('*, habits_daily_logs(*), habits_types(*)').eq('user_id', userId).eq('is_visible', true)),
       withTimeout(supabase.from('sessions').select('*, projects(*)').eq('user_id', userId)),
-      withTimeout(supabase.from('projects').select('*').eq('user_id', userId)),
+      withTimeout(supabase.from('projects').select('*').eq('user_id', userId).neq('status', 'archived')),
       withTimeout(supabase.from('meetings').select('*').eq('user_id', userId)),
       withTimeout(supabase.from('tasks_daily_logs').select('*, tasks!inner(*, projects(*))').eq('user_id', userId)),
-      withTimeout(supabase.from('tasks').select('*, projects!inner(*)').eq('user_id', userId)),
+      withTimeout(supabase.from('tasks').select('*, projects!inner(*)').eq('user_id', userId).neq('projects.status', 'archived')),
       withTimeout(supabase.from('user_settings').select('*').eq('user_id', userId).single()),
       withTimeout(supabase.from('calendar_notes').select('*, habits_notes:note_id(id, content, note_date, created_at)').order('pinned_date', { ascending: true })),
       withTimeout(supabase.from('habits_notes').select('*').order('created_at', { ascending: false })),
@@ -80,7 +80,10 @@ export const fetchTasksForProjects = async (userId: string, projects: any[], ses
 
   if (projectsWithoutSessions.length === 0) return []
 
-  const projectIds = projectsWithoutSessions.map(p => p.id)
+  const activeProjects = projectsWithoutSessions.filter(p => p.status !== 'archived')
+  if (activeProjects.length === 0) return []
+
+  const projectIds = activeProjects.map(p => p.id)
   const tasksResult = await supabase
     .from('tasks')
     .select(`*, projects!inner(*)`)
