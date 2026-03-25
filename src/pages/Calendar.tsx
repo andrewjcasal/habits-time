@@ -23,9 +23,10 @@ interface CalendarContentProps {
   onSetDeleteHandler: (handler: (meeting: Meeting) => Promise<void>) => void
   onSetHabitTimeChangeHandler: (handler: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>) => void
   onSetHabitSkipHandler: (handler: (habitId: string, date: string) => Promise<void>) => void
+  onSetRemoveTaskHandler: (handler: (taskId: string) => void) => void
 }
 
-const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeChangeHandler, onSetHabitSkipHandler }: CalendarContentProps) => {
+const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeChangeHandler, onSetHabitSkipHandler, onSetRemoveTaskHandler }: CalendarContentProps) => {
 
   const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals } = useModal()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -612,6 +613,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     onSetDeleteHandler(handleDeleteMeeting)
     onSetHabitTimeChangeHandler(handleHabitTimeChangeWithReset)
     onSetHabitSkipHandler(handleHabitSkipWithReset)
+    onSetRemoveTaskHandler(removeTaskFromCalendar)
   }, [handleSaveMeeting, handleDeleteMeeting, onSetSaveHandler, onSetDeleteHandler])
 
   return (
@@ -758,6 +760,7 @@ const Calendar = () => {
   let deleteMeetingHandler: (meeting: Meeting) => Promise<void>
   let habitTimeChangeHandler: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
   let habitSkipHandler: (habitId: string, date: string) => Promise<void>
+  let removeTaskHandler: (taskId: string) => void
 
   return (
     <ModalProvider
@@ -774,7 +777,7 @@ const Calendar = () => {
       onCompleteTask={async (task: any) => { await handleCompleteTask(task) }}
       onDeleteTask={async (task: any) => {
         const deletedId = await handleDeleteTask(task)
-        if (deletedId) removeTaskFromCalendar(deletedId)
+        if (deletedId && removeTaskHandler) removeTaskHandler(deletedId)
       }}
       onHabitTimeChange={async (habitId: string, date: string, newTime: string, newDuration?: number) => {
         if (habitTimeChangeHandler) await habitTimeChangeHandler(habitId, date, newTime, newDuration)
@@ -792,6 +795,7 @@ const Calendar = () => {
         onSetDeleteHandler={(handler) => { deleteMeetingHandler = handler }}
         onSetHabitTimeChangeHandler={(handler) => { habitTimeChangeHandler = handler }}
         onSetHabitSkipHandler={(handler) => { habitSkipHandler = handler }}
+        onSetRemoveTaskHandler={(handler) => { removeTaskHandler = handler }}
       />
     </ModalProvider>
   )
