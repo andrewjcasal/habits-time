@@ -1,7 +1,6 @@
 import React from 'react'
 import { Clock } from 'lucide-react'
 import CalendarEvent from './CalendarEvent'
-import CalendarNotePin from './CalendarNotePin'
 
 // Helper function to format duration without rounding quarter hours
 const formatDuration = (duration: number): string => {
@@ -21,7 +20,7 @@ const getEventStyle = (
   widthFraction: number = 1
 ): React.CSSProperties => ({
   left: `${leftOffset}%`,
-  width: `${93 * widthFraction}%`,
+  width: `calc(${93 * widthFraction}% - 2px)`,
   top: `${topPosition}%`,
   height: `${height - 2}px`, // Reduce height by 2px for separation
   zIndex,
@@ -43,8 +42,7 @@ interface CalendarEventSlotsProps {
   handleSessionClick: (session: any) => void
   handleTaskClick: (task: any) => void
   handleEditMeeting: (meeting: any) => void
-  getNotesForDateTime: (date: Date, timeSlot: string) => any[]
-  removeCalendarNote: (noteId: string) => void
+  onMeetingResizeStart?: (meeting: any, e: React.MouseEvent) => void
 }
 
 function CalendarEventSlots({
@@ -63,8 +61,7 @@ function CalendarEventSlots({
   handleSessionClick,
   handleTaskClick,
   handleEditMeeting,
-  getNotesForDateTime,
-  removeCalendarNote,
+  onMeetingResizeStart,
 }: CalendarEventSlotsProps) {
   return (
     <>
@@ -171,6 +168,7 @@ function CalendarEventSlots({
               e.stopPropagation()
               handleEditMeeting(meeting)
             }}
+            onResizeStart={onMeetingResizeStart ? (e) => onMeetingResizeStart(meeting, e) : undefined}
             eventTitle={meeting.title}
             duration={`${Math.round(meetingDuration)}min`}
           />
@@ -237,25 +235,6 @@ function CalendarEventSlots({
       })}
 
 
-      {/* Calendar Note Pins */}
-      {getNotesForDateTime(date, timeSlot).map(note => {
-        const pinnedTime = new Date(note.pinned_date)
-        const minutesIntoHour = pinnedTime.getMinutes()
-        const topPositionInSlot = (minutesIntoHour / 60) * 100
-
-        return (
-          <CalendarNotePin
-            key={`note-pin-${note.id}`}
-            note={note}
-            style={{
-              top: `${topPositionInSlot}%`,
-              right: '4px',
-              zIndex: 35,
-            }}
-            onRemove={removeCalendarNote}
-          />
-        )
-      })}
     </>
   )
 }

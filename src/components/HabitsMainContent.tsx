@@ -69,7 +69,7 @@ const HabitsMainContent = ({
       >
         {/* Habits List - Outlook style */}
         <div className="border-r border-gray-200 flex flex-col">
-          <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+          <div className="bg-gray-50 px-3 py-0.5 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <button
                 onClick={() => onNavigateDate('prev')}

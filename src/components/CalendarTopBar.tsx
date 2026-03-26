@@ -51,6 +51,8 @@ export default function CalendarTopBar({
   navigateForwardDay,
   navigateForwardWeek,
 }: CalendarTopBarProps) {
+  const showBar = settings ? (settings.metadata?.showWorkHoursBar ?? true) : false
+
   return (
     // Top Bar with Navigation and Work Hours
     <div className="bg-neutral-100 border-b border-neutral-200 px-2 py-0.5 sm:px-0">
@@ -94,8 +96,8 @@ export default function CalendarTopBar({
           <ChevronsRight className="w-2 h-2 text-neutral-600" />
         </button>
 
-        {/* Work Hours Label - desktop only */}
-        <div className="hidden sm:block text-sm text-neutral-700 ml-2 work-hours-tooltip relative">
+        {/* Work Hours Label - desktop only, togglable */}
+        {showBar && <div className="hidden sm:block text-sm text-neutral-700 ml-2 work-hours-tooltip relative">
           {settings ? (
             <div className="flex items-center">
               <span>Work Hours</span>
@@ -140,11 +142,11 @@ export default function CalendarTopBar({
           ) : (
             <span className="text-neutral-400">Loading work hours...</span>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Right side: Planned and Actual hours */}
-      <div className="flex items-center gap-2">
+      {showBar && <div className="flex items-center gap-2">
         <div className="text-sm relative planned-hours-tooltip">
           <span className="text-neutral-600">Planned:</span>
           <span
@@ -322,7 +324,7 @@ export default function CalendarTopBar({
             </div>
           )}
         </div>
-      </div>
+      </div>}
       </div>
     </div>
   )

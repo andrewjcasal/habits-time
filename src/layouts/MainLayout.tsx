@@ -24,7 +24,7 @@ import {
   Notebook,
   Sparkles,
   Zap,
-  Crown,
+
   Tag,
   Target,
   DollarSign,
@@ -50,14 +50,8 @@ const MainLayout = () => {
   const navItems = [
     { path: '/calendar', label: 'Calendar', icon: Calendar },
     { path: '/projects', label: 'Projects', icon: FolderOpen },
-    { path: '/categories', label: 'Categories', icon: Tag },
-    { path: '/buffers', label: 'Buffers', icon: Target },
-    { path: '/todoist', label: 'Todoist Triage', icon: CheckSquare },
-    { path: '/reflections', label: 'Reflections', icon: Sparkles },
     { path: '/habits', label: 'Habits', icon: Heart },
-    { path: '/aspects', label: 'Aspects', icon: Layers },
     { path: '/notes', label: 'Notes', icon: FileText },
-    { path: '/transactions', label: 'Transactions', icon: DollarSign },
   ]
 
   const settingsItem = { path: '/settings', label: 'Settings', icon: Settings }
@@ -68,9 +62,8 @@ const MainLayout = () => {
     <div className="flex min-h-screen bg-neutral-50">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-14 lg:w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
-        <Link to="/dashboard" className="block p-4 md:p-2 lg:p-4">
-          <h1 className="text-lg font-semibold text-primary-700 flex items-center md:justify-center lg:justify-start">
-            <Crown className="w-4 h-4 md:mr-0 lg:mr-2 text-primary-600" />
+        <Link to="/dashboard" className="block px-4 py-1 md:px-1 md:py-1 lg:px-4 lg:py-1">
+          <h1 className="text-lg font-semibold text-primary-700 md:text-center lg:text-left">
             <span className="md:hidden lg:block">Cassian</span>
           </h1>
         </Link>
@@ -84,7 +77,7 @@ const MainLayout = () => {
                   <NavLink
                     to={item.path}
                     className={({ isActive }) =>
-                      `flex items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors md:justify-center lg:justify-start md:px-1 lg:px-2 ${
+                      `flex items-center rounded-md px-2 py-1 text-[13px] font-medium transition-colors md:justify-center lg:justify-start md:px-1 lg:px-2 ${
                         isActive
                           ? 'bg-primary-50 text-primary-700'
                           : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
@@ -92,7 +85,7 @@ const MainLayout = () => {
                     }
                     title={item.label}
                   >
-                    <Icon className="mr-2 h-3 w-3 md:mr-0 lg:mr-2" />
+                    <Icon className="mr-1.5 h-2.5 w-2.5 md:mr-0 lg:mr-1.5" />
                     <span className="md:hidden lg:block">{item.label}</span>
                   </NavLink>
                 </li>
@@ -106,27 +99,27 @@ const MainLayout = () => {
             href="https://ko-fi.com/andrewjcasal"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600 md:justify-center lg:justify-start md:px-1 lg:px-2"
+            className="flex items-center rounded-md px-2 py-1 text-[13px] font-medium text-red-500 hover:bg-red-50 hover:text-red-600 md:justify-center lg:justify-start md:px-1 lg:px-2"
             title="Support"
           >
-            <Heart className="mr-2 h-3 w-3 md:mr-0 lg:mr-2" />
+            <Heart className="mr-1.5 h-2.5 w-2.5 md:mr-0 lg:mr-1.5" />
             <span className="md:hidden lg:block">Support</span>
           </a>
           <div className="flex items-center gap-1 md:flex-col lg:flex-row">
             <NavLink
               to="/settings"
-              className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 flex-1 md:justify-center lg:justify-start md:px-1 lg:px-2"
+              className="flex items-center rounded-md px-2 py-1 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 flex-1 md:justify-center lg:justify-start md:px-1 lg:px-2"
               title="Settings"
             >
-              <Settings className="mr-2 h-3 w-3 md:mr-0 lg:mr-2" />
+              <Settings className="mr-1.5 h-2.5 w-2.5 md:mr-0 lg:mr-1.5" />
               <span className="md:hidden lg:block">Settings</span>
             </NavLink>
             <button
               onClick={signOut}
-              className="flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 md:justify-center md:px-1 lg:px-2"
+              className="flex items-center rounded-md px-2 py-1 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 md:justify-center md:px-1 lg:px-2"
               title="Logout"
             >
-              <LogOut className="h-3 w-3" />
+              <LogOut className="h-2.5 w-2.5" />
             </button>
           </div>
         </div>
@@ -134,8 +127,7 @@ const MainLayout = () => {
 
       {/* Mobile Header with Hamburger */}
       <header className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-neutral-200 px-1 py-1 z-30 flex items-center justify-between">
-        <Link to="/dashboard" className="flex items-center">
-          <Crown className="w-3 h-3 mr-1 text-primary-600" />
+        <Link to="/dashboard" className="flex items-center pl-1">
           <h1 className="text-base font-semibold text-primary-700">Cassian</h1>
         </Link>
         <button

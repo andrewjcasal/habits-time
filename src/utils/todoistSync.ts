@@ -76,6 +76,23 @@ export async function syncTodoistTasks(
     insertedTasks = inserted || []
   }
 
+  // Update existing tasks with latest data from Todoist (due_date, title may change)
+  const existingActive = (existingTasks || []).filter((t) => !t.is_complete)
+  const apiTaskMap = new Map(todoistApiTasks.map((t) => [t.id, t]))
+  for (const dbTask of existingActive) {
+    const apiTask = apiTaskMap.get(dbTask.todoist_task_id)
+    if (!apiTask) continue
+    const newDueDate = apiTask.due?.date || null
+    const newTitle = apiTask.content
+    const newPriority = mapTodoistPriority(apiTask.priority)
+    if (dbTask.due_date !== newDueDate || dbTask.title !== newTitle || dbTask.priority !== newPriority) {
+      await supabase
+        .from('cassian_tasks')
+        .update({ due_date: newDueDate, title: newTitle, priority: newPriority })
+        .eq('id', dbTask.id)
+    }
+  }
+
   // Mark tasks that were completed/deleted in Todoist (in DB but not in API response)
   const removedIds = new Set<string>()
   const removedTasks = (existingTasks || []).filter(
@@ -88,7 +105,7 @@ export async function syncTodoistTasks(
 
     const { error: updateError } = await supabase
       .from('cassian_tasks')
-      .update({ is_complete: true, status: 'done' })
+      .update({ is_complete: true, status: 'completed' })
       .in('id', ids)
 
     if (updateError) {
@@ -97,8 +114,8 @@ export async function syncTodoistTasks(
   }
 
   // Compute active tasks from what we already have (no extra query)
-  const existingActive = (existingTasks || []).filter(
+  const remainingActive = (existingTasks || []).filter(
     (t) => !t.is_complete && !removedIds.has(t.id)
   )
-  return [...existingActive, ...insertedTasks]
+  return [...remainingActive, ...insertedTasks]
 }

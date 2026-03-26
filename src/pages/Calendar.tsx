@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Plus, Info, MapPin } from 'lucide-react'
+import { Plus, Info, FileText, RefreshCw } from 'lucide-react'
+import NoteModal from '../components/NoteModal'
 import { useCalendarData } from '../hooks/useCalendarData'
+import { supabase } from '../lib/supabase'
 import { Meeting } from '../types'
-import CalendarNoteModal from '../components/CalendarNoteModal'
 import TaskScheduleModal from '../components/TaskScheduleModal'
 import {
   handleHabitTimeChange,
@@ -24,11 +25,13 @@ interface CalendarContentProps {
   onSetHabitTimeChangeHandler: (handler: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>) => void
   onSetHabitSkipHandler: (handler: (habitId: string, date: string) => Promise<void>) => void
   onSetRemoveTaskHandler: (handler: (taskId: string) => void) => void
+  onSetRemoveTaskLogHandler: (handler: (logId: string) => void) => void
+  onSetUpdateMeetingEndTimeHandler: (handler: (meetingId: string, newEndTime: string) => Promise<void>) => void
 }
 
-const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeChangeHandler, onSetHabitSkipHandler, onSetRemoveTaskHandler }: CalendarContentProps) => {
+const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeChangeHandler, onSetHabitSkipHandler, onSetRemoveTaskHandler, onSetRemoveTaskLogHandler, onSetUpdateMeetingEndTimeHandler }: CalendarContentProps) => {
 
-  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals } = useModal()
+  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals, openResizeConflictDialog } = useModal()
   const [searchParams, setSearchParams] = useSearchParams()
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [containerHeight, setContainerHeight] = useState(600)
@@ -38,14 +41,18 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   const [showWorkHoursTooltip, setShowWorkHoursTooltip] = useState(false)
   const [showTaskScheduleModal, setShowTaskScheduleModal] = useState(false)
 
-  // Calendar notes state
-  const [showCalendarNoteModal, setShowCalendarNoteModal] = useState(false)
-  const [selectedNoteTimeSlot, setSelectedNoteTimeSlot] = useState<{
-    time: string
-    date: Date
-  } | null>(null)
+  // Note view modal state
+  const [viewingNote, setViewingNote] = useState<any>(null)
+  const [isSyncingTodoist, setIsSyncingTodoist] = useState(false)
+
 
   // Calendar notes come from useCalendarData (merged into single fetch)
+
+  // Meeting resize state
+  const [resizingMeeting, setResizingMeeting] = useState<any>(null)
+  const [resizeNewEndTime, setResizeNewEndTime] = useState<Date | null>(null)
+  const resizeStartYRef = useRef<number>(0)
+  const resizeStartEndTimeRef = useRef<Date | null>(null)
 
   // Drag-to-create meeting state
   const [isDragging, setIsDragging] = useState(false)
@@ -78,7 +85,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
         }
       }
     }
-    return new Date()
+    const twoDaysAgo = new Date()
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+    return twoDaysAgo
   }
 
   const [baseDate, setBaseDate] = useState(getInitialDate)
@@ -112,6 +121,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     addHabitNote,
     removeCalendarNote,
     removeTaskFromCalendar,
+    removeTaskLogFromUI,
+    skipHabitForDate,
+    syncTodoist,
   } = useCalendarData(windowWidth, baseDate)
 
   // Calendar data already includes habits - no need for separate useHabits hook
@@ -183,10 +195,15 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Update container height when component mounts
+  // Update container height and scroll to 2 hours before now
   useEffect(() => {
     if (containerRef.current) {
       setContainerHeight(containerRef.current.clientHeight)
+      const now = new Date()
+      const currentHour = now.getHours()
+      const targetHour = Math.max(0, currentHour - 3)
+      const hoursSince6am = Math.max(0, targetHour - 6)
+      containerRef.current.scrollTop = hoursSince6am * 64
     }
   }, [])
 
@@ -202,7 +219,12 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     if (target.closest('[data-calendar-event]')) {
       return // Don't open meeting modal if clicking on a calendar event
     }
-    openMeetingModal({ time: timeSlot, date })
+    // Calculate the quarter-hour from click position
+    const quarter = getQuarterFromMousePosition(event, event.currentTarget as HTMLElement)
+    const [hour] = timeSlot.split(':')
+    const minutes = quarter * 15
+    const precisetime = `${hour}:${minutes.toString().padStart(2, '0')}`
+    openMeetingModal({ time: precisetime, date })
   }
 
   const handleAddMeeting = () => {
@@ -210,13 +232,15 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   }
 
   const handleEditMeeting = useCallback((meeting: Meeting) => {
+    if (meetingResizedRef.current) {
+      meetingResizedRef.current = false
+      return
+    }
     openMeetingModal(undefined, meeting)
   }, [openMeetingModal])
 
   const handleTimeSlotContextMenu = (event: React.MouseEvent, timeSlot: string, date: Date) => {
-    event.preventDefault() // Prevent browser context menu
-    setSelectedNoteTimeSlot({ time: timeSlot, date })
-    setShowCalendarNoteModal(true)
+    event.preventDefault()
   }
 
   const handleSaveMeeting = async (
@@ -311,6 +335,25 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
         await addMeeting(meetingData)
       }
 
+      // Delete overlapping task daily logs
+      const meetingDateStr = format(startTime, 'yyyy-MM-dd')
+      const meetingStartH = startTime.getHours() + startTime.getMinutes() / 60
+      const meetingEndH = endTime.getHours() + endTime.getMinutes() / 60
+      const overlapping = tasksDailyLogs.filter((log: any) => {
+        if (log.log_date !== meetingDateStr) return false
+        const logTime = log.actual_start_time || log.scheduled_start_time
+        if (!logTime) return false
+        const logStartH = parseInt(logTime.split(':')[0]) + parseInt(logTime.split(':')[1]) / 60
+        const logEndH = logStartH + (log.estimated_hours || 0.5)
+        return logStartH < meetingEndH && logEndH > meetingStartH
+      })
+      if (overlapping.length > 0) {
+        for (const log of overlapping) {
+          await supabase.from('cassian_tasks_daily_logs').delete().eq('id', log.id)
+          removeTaskLogFromUI(log.id)
+        }
+      }
+
       // Modal cleanup handled by ModalContext's closeMeetingModal()
     } catch (error) {
       console.error('Error saving meeting:', error)
@@ -356,8 +399,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   const handleHabitSkipWithReset = async (habitId: string, date: string) => {
     try {
       await handleHabitSkip(habitId, date)
-      // Reload page to regenerate conflict maps and show tasks in skipped habit slots
-      window.location.reload()
+      skipHabitForDate(habitId, date)
     } catch (error) {
       console.error('Error skipping habit:', error)
       throw error
@@ -366,8 +408,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
 
   const closeModal = () => {
     closeAllModals()
-    setShowCalendarNoteModal(false)
-    setSelectedNoteTimeSlot(null)
     setIsDragging(false)
     setDragStart(null)
     setDragEnd(null)
@@ -541,6 +581,82 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   }, [showActualHoursTooltip, showPlannedHoursTooltip, showWorkHoursTooltip])
 
 
+  // Meeting resize handlers
+  const meetingResizedRef = useRef(false)
+  const handleMeetingResizeStart = useCallback((meeting: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    meetingResizedRef.current = true
+    setResizingMeeting(meeting)
+    resizeStartYRef.current = e.clientY
+    resizeStartEndTimeRef.current = new Date(meeting.end_time)
+    setResizeNewEndTime(new Date(meeting.end_time))
+  }, [])
+
+  useEffect(() => {
+    if (!resizingMeeting) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = e.clientY - resizeStartYRef.current
+      const deltaMinutes = Math.round(deltaY / 64 * 60 / 15) * 15 // snap to 15-min
+      const newEnd = new Date(resizeStartEndTimeRef.current!.getTime() + deltaMinutes * 60000)
+      const meetingStart = new Date(resizingMeeting.start_time)
+      // Minimum 15 minutes
+      if (newEnd.getTime() - meetingStart.getTime() >= 15 * 60000) {
+        setResizeNewEndTime(newEnd)
+      }
+    }
+
+    const handleMouseUp = async () => {
+      if (!resizeNewEndTime || !resizingMeeting) {
+        setResizingMeeting(null)
+        return
+      }
+
+      const originalEnd = new Date(resizingMeeting.end_time)
+      if (resizeNewEndTime.getTime() === originalEnd.getTime()) {
+        setResizingMeeting(null)
+        return
+      }
+
+      // Check for overlapping tasks in the extended range
+      const meetingDate = format(new Date(resizingMeeting.start_time), 'yyyy-MM-dd')
+      const newEndHours = resizeNewEndTime.getHours() + resizeNewEndTime.getMinutes() / 60
+      const origEndHours = originalEnd.getHours() + originalEnd.getMinutes() / 60
+
+      // Only check for conflicts if we're extending (not shrinking)
+      if (newEndHours > origEndHours) {
+        const conflicting = tasksDailyLogs.filter((log: any) => {
+          if (log.log_date !== meetingDate) return false
+          const startTime = log.actual_start_time || log.scheduled_start_time
+          if (!startTime) return false
+          const logStartH = parseInt(startTime.split(':')[0]) + parseInt(startTime.split(':')[1]) / 60
+          const logEndH = logStartH + (log.estimated_hours || 0.5)
+          return logStartH < newEndHours && logEndH > origEndHours
+        })
+
+        if (conflicting.length > 0) {
+          openResizeConflictDialog(resizingMeeting, resizeNewEndTime, conflicting)
+          setResizingMeeting(null)
+          setResizeNewEndTime(null)
+          return
+        }
+      }
+
+      // No conflicts — just update
+      await updateMeeting(resizingMeeting.id, { end_time: resizeNewEndTime.toISOString() })
+      setResizingMeeting(null)
+      setResizeNewEndTime(null)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [resizingMeeting, resizeNewEndTime, tasksDailyLogs, updateMeeting])
+
   // Render all calendar events for a time slot
   const renderCalendarEvents = useCallback(
     (timeSlot: string, date: Date) => {
@@ -578,8 +694,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
           handleSessionClick={handleSessionClick}
           handleTaskClick={handleTaskClick}
           handleEditMeeting={handleEditMeeting}
-          getNotesForDateTime={getNotesForDateTime}
-          removeCalendarNote={removeCalendarNote}
+          onMeetingResizeStart={handleMeetingResizeStart}
         />
       )
     },
@@ -596,9 +711,53 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
       handleSessionClick,
       handleTaskClick,
       handleEditMeeting,
-      getNotesForDateTime,
-      removeCalendarNote,
     ]
+  )
+
+  // Pre-index habit notes by date-hour for note badges
+  const noteBadgesIndex = useMemo(() => {
+    const index = new Map<string, any[]>()
+    habitNotes.forEach((note: any) => {
+      const noteTime = new Date(note.start_time || note.created_at)
+      const dateStr = format(noteTime, 'yyyy-MM-dd')
+      const hour = noteTime.getHours()
+      const key = `${dateStr}-${hour}`
+      const arr = index.get(key) || []
+      arr.push({ ...note, minuteInHour: noteTime.getMinutes() })
+      index.set(key, arr)
+    })
+    return index
+  }, [habitNotes])
+
+  const renderNoteBadges = useCallback(
+    (timeSlot: string, date: Date) => {
+      const dateStr = format(date, 'yyyy-MM-dd')
+      const hour = parseInt(timeSlot.split(':')[0])
+      const key = `${dateStr}-${hour}`
+      const notes = noteBadgesIndex.get(key)
+      if (!notes || notes.length === 0) return null
+
+      return notes.map((note: any) => {
+        const topPercent = (note.minuteInHour / 60) * 100
+        return (
+          <div
+            key={`note-badge-${note.id}`}
+            className="absolute left-0 z-30 cursor-pointer"
+            style={{ top: `${topPercent}%` }}
+            onClick={e => {
+              e.stopPropagation()
+              setViewingNote(note)
+            }}
+            title={note.title || note.content?.slice(0, 50)}
+          >
+            <div className="w-[20px] h-[20px] p-[2px] bg-amber-400 hover:bg-amber-300 rounded-full flex items-center justify-center shadow-sm border border-amber-500 -translate-x-1/2">
+              <FileText className="w-full h-full text-amber-900" />
+            </div>
+          </div>
+        )
+      })
+    },
+    [noteBadgesIndex]
   )
 
   const { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown } = useMemo(
@@ -614,6 +773,10 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     onSetHabitTimeChangeHandler(handleHabitTimeChangeWithReset)
     onSetHabitSkipHandler(handleHabitSkipWithReset)
     onSetRemoveTaskHandler(removeTaskFromCalendar)
+    onSetRemoveTaskLogHandler(removeTaskLogFromUI)
+    onSetUpdateMeetingEndTimeHandler(async (meetingId: string, newEndTime: string) => {
+      await updateMeeting(meetingId, { end_time: newEndTime })
+    })
   }, [handleSaveMeeting, handleDeleteMeeting, onSetSaveHandler, onSetDeleteHandler])
 
   return (
@@ -685,21 +848,23 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
           >
             <Plus className="w-3 h-3 text-neutral-600" />
           </button>
-          <button
-            className="p-0.5 hover:bg-neutral-200 rounded transition-colors"
-            title="Pin note"
-            onClick={() => {
-              // Default to today at current time if no specific slot selected
-              const now = new Date()
-              setSelectedNoteTimeSlot({
-                time: format(now, 'HH:mm'),
-                date: now,
-              })
-              setShowCalendarNoteModal(true)
-            }}
-          >
-            <MapPin className="w-3 h-3 text-red-600" />
-          </button>
+          {settings?.todoist_api_key && (
+            <button
+              className="p-0.5 hover:bg-neutral-200 rounded transition-colors"
+              title="Sync Todoist"
+              disabled={isSyncingTodoist}
+              onClick={async () => {
+                setIsSyncingTodoist(true)
+                try {
+                  await syncTodoist()
+                } finally {
+                  setIsSyncingTodoist(false)
+                }
+              }}
+            >
+              <RefreshCw className={`w-3 h-3 text-neutral-600 ${isSyncingTodoist ? 'animate-spin' : ''}`} />
+            </button>
+          )}
         </div>
         {dayColumns.map((column, columnIndex) => (
           <div
@@ -720,6 +885,21 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
         gridCols={gridCols}
         dayColumns={dayColumns}
         renderCalendarEvents={renderCalendarEvents}
+        renderNoteBadges={renderNoteBadges}
+        onAddNoteClick={(timeSlot, date) => {
+          const [hour, minute] = timeSlot.split(':').map(Number)
+          const noteDate = new Date(date)
+          noteDate.setHours(hour, minute, 0, 0)
+          // Create a temporary note — only saved to DB when content is added
+          setViewingNote({
+            id: null,
+            title: '',
+            content: '',
+            start_time: noteDate.toISOString(),
+            created_at: noteDate.toISOString(),
+            _isNew: true,
+          })
+        }}
         handleTimeSlotClick={handleTimeSlotClick}
         handleTimeSlotContextMenu={handleTimeSlotContextMenu}
         handleMouseDown={handleMouseDown}
@@ -733,23 +913,23 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
         getCurrentTimeLinePosition={getCurrentTimeLinePosition}
       />
 
-      <CalendarNoteModal
-        isOpen={showCalendarNoteModal}
-        onClose={closeModal}
-        selectedDate={selectedNoteTimeSlot?.date}
-        selectedTime={selectedNoteTimeSlot?.time}
-        onAddNote={addHabitNote}
-        onPinNote={addCalendarNote}
-        habitNotes={habitNotes}
-        existingNotes={calendarNotes}
-      />
-
       <TaskScheduleModal
         showTaskScheduleModal={showTaskScheduleModal}
         setShowTaskScheduleModal={setShowTaskScheduleModal}
         scheduledTasksCache={scheduledTasksCache}
         allTasks={allTasks}
         tasksDailyLogs={tasksDailyLogs}
+      />
+
+      {/* Note View Modal */}
+      <NoteModal
+        note={viewingNote}
+        isOpen={!!viewingNote}
+        onClose={() => setViewingNote(null)}
+        onDelete={async (noteId) => {
+          await supabase.from('cassian_habits_notes').delete().eq('id', noteId)
+          setViewingNote(null)
+        }}
       />
     </div>
   )
@@ -761,6 +941,8 @@ const Calendar = () => {
   let habitTimeChangeHandler: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
   let habitSkipHandler: (habitId: string, date: string) => Promise<void>
   let removeTaskHandler: (taskId: string) => void
+  let removeTaskLogHandler: (logId: string) => void
+  let updateMeetingEndTimeHandler: (meetingId: string, newEndTime: string) => Promise<void>
 
   return (
     <ModalProvider
@@ -789,6 +971,15 @@ const Calendar = () => {
         console.log('Update session:', sessionId, updates)
       }}
       onTaskLogCreated={() => { window.location.reload() }}
+      onUpdateMeetingEndTime={async (meetingId: string, newEndTime: string) => {
+        if (updateMeetingEndTimeHandler) await updateMeetingEndTimeHandler(meetingId, newEndTime)
+      }}
+      onDeleteTaskLog={async (logId: string) => {
+        await supabase.from('cassian_tasks_daily_logs').delete().eq('id', logId)
+      }}
+      onRemoveTaskLogFromUI={(logId: string) => {
+        if (removeTaskLogHandler) removeTaskLogHandler(logId)
+      }}
     >
       <CalendarContent
         onSetSaveHandler={(handler) => { saveMeetingHandler = handler }}
@@ -796,6 +987,8 @@ const Calendar = () => {
         onSetHabitTimeChangeHandler={(handler) => { habitTimeChangeHandler = handler }}
         onSetHabitSkipHandler={(handler) => { habitSkipHandler = handler }}
         onSetRemoveTaskHandler={(handler) => { removeTaskHandler = handler }}
+        onSetRemoveTaskLogHandler={(handler) => { removeTaskLogHandler = handler }}
+        onSetUpdateMeetingEndTimeHandler={(handler) => { updateMeetingEndTimeHandler = handler }}
       />
     </ModalProvider>
   )

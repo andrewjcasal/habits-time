@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Clock, Save, RotateCcw, Calendar, DollarSign } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Clock, Save, RotateCcw, Calendar, DollarSign, Tag, Target, CheckSquare, Sparkles, Layers } from 'lucide-react'
 import { useSettings } from '../hooks/useSettings'
 
 interface SettingsSectionProps {
@@ -64,6 +65,7 @@ const Settings = () => {
   const [billableHoursEnabled, setBillableHoursEnabled] = useState(false)
   const [defaultHourlyRate, setDefaultHourlyRate] = useState('65.00')
   const [weeklyRevenueTarget, setWeeklyRevenueTarget] = useState('1000.00')
+  const [showWorkHoursBar, setShowWorkHoursBar] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
 
@@ -82,6 +84,7 @@ const Settings = () => {
         billable_hours_enabled: billableHoursEnabled,
         default_hourly_rate: parseFloat(defaultHourlyRate) || 65.00,
         weekly_revenue_target: parseFloat(weeklyRevenueTarget) || 1000.00,
+        metadata: { showWorkHoursBar },
       })
 
       setSaveMessage('Settings saved successfully!')
@@ -120,6 +123,7 @@ const Settings = () => {
       setBillableHoursEnabled(settings.billable_hours_enabled || false)
       setDefaultHourlyRate((settings.default_hourly_rate || 65.00).toString())
       setWeeklyRevenueTarget((settings.weekly_revenue_target || 1000.00).toString())
+      setShowWorkHoursBar(settings.metadata?.showWorkHoursBar ?? true)
     }
   }, [settings])
 
@@ -128,6 +132,30 @@ const Settings = () => {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-4">
         <div className="max-w-2xl mx-auto">
+          {/* Secondary pages */}
+          <div className="flex gap-2 overflow-x-auto pb-3 mb-4">
+            {[
+              { path: '/categories', label: 'Categories', icon: Tag },
+              { path: '/buffers', label: 'Buffers', icon: Target },
+              { path: '/todoist', label: 'Todoist Triage', icon: CheckSquare },
+              { path: '/reflections', label: 'Reflections', icon: Sparkles },
+              { path: '/aspects', label: 'Aspects', icon: Layers },
+              { path: '/transactions', label: 'Transactions', icon: DollarSign },
+            ].map(item => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+                >
+                  <Icon className="w-3 h-3" />
+                  {item.label}
+                </Link>
+              )
+            })}
+          </div>
+
           {loading && (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
@@ -268,6 +296,25 @@ const Settings = () => {
                   })}{' '}
                   {weekEndingTimezone.split('/')[1]?.replace('_', ' ') || weekEndingTimezone}
                 </p>
+              </SettingsSection>
+
+              {/* Calendar Display Section */}
+              <SettingsSection
+                icon={Calendar}
+                title="Calendar Display"
+                description="Toggle what appears in the calendar top bar."
+              >
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={showWorkHoursBar}
+                    onChange={e => setShowWorkHoursBar(e.target.checked)}
+                    className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-neutral-700">
+                    Show work hours, planned/actual, and money in calendar top bar
+                  </span>
+                </label>
               </SettingsSection>
 
               {/* Billable Hours Section */}

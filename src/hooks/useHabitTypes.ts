@@ -13,7 +13,7 @@ export function useHabitTypes() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchHabitTypes = async () => {
+  const fetchHabitTypes = async (cancelled?: () => boolean) => {
     try {
       setLoading(true)
       setError(null)
@@ -22,6 +22,8 @@ export function useHabitTypes() {
         .from('cassian_habits_types')
         .select('*')
         .order('name')
+
+      if (cancelled?.()) return
 
       if (error) throw error
 
@@ -35,13 +37,15 @@ export function useHabitTypes() {
   }
 
   useEffect(() => {
-    fetchHabitTypes()
+    let cancelled = false
+    fetchHabitTypes(() => cancelled)
+    return () => { cancelled = true }
   }, [])
 
   return {
     habitTypes,
     loading,
     error,
-    refetch: fetchHabitTypes,
+    refetch: () => fetchHabitTypes(),
   }
 }

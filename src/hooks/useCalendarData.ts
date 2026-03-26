@@ -15,7 +15,8 @@ import { calculateCategoryBufferBlocks } from '../utils/categoryBufferCalculatio
 import { syncTodoistTasks } from '../utils/todoistSync'
 
 // Todoist tasks are scheduled in personal hours, separate from work tasks
-const TODOIST_HOURS = { start: 19, end: 23 }
+const TODOIST_WEEKDAY_HOURS = { start: 19, end: 23 }
+const TODOIST_WEEKEND_HOURS = { start: 10, end: 22 }
 
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const { user, loading: userLoading } = useUserContext()
@@ -189,37 +190,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings, fetchedCategoryBuffers)
         setCategoryBufferBlocks(calculatedBufferBlocks)
 
-        // Step 8: Schedule todoist tasks from DB immediately, then sync API in background
-        if (fetchedSettings?.todoist_api_key) {
-          // Fetch existing todoist tasks from DB (instant, no API call)
-          const { data: todoistDbTasks } = await supabase
-            .from('cassian_tasks')
-            .select('*')
-            .eq('source', 'todoist')
-            .eq('user_id', user.id)
-            .eq('is_complete', false)
-
-          if (todoistDbTasks && todoistDbTasks.length > 0) {
-            const getTodoistHoursRange = () => TODOIST_HOURS
-            const todoistConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, fetchedTasksDailyLogs)
-            const todoistScheduleResult = await scheduleAllTasks(
-              todoistDbTasks, todoistConflictMaps, dayColumnsList, getTodoistHoursRange,
-              scheduleTaskInAvailableSlots, saveTaskChunks, null, // clearTaskLogsFromTimeForward removed
-              user.id, fetchedTasksDailyLogs, [], null, todoistDbTasks, new Map()
-            )
-            setScheduledTasksCache(prev => {
-              const merged = new Map(prev)
-              todoistScheduleResult.forEach((tasks, dateKey) => {
-                const existing = merged.get(dateKey) || []
-                const existingIds = new Set(existing.map((t: any) => t.id))
-                const newTasks = tasks.filter((t: any) => !existingIds.has(t.id))
-                if (newTasks.length > 0) merged.set(dateKey, [...existing, ...newTasks])
-              })
-              return merged
-            })
-          }
-
-        }
+        // Step 8: Todoist tasks — just read existing daily logs from DB (no API call)
+        // Full sync (API + reschedule) happens via syncTodoist() button
 
       } catch (error) {
         console.error('Error in calendar data loading:', error)
@@ -353,20 +325,16 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     try {
       if (!user) return
 
-      // Re-fetch only tasks (task daily logs shouldn't need re-fetching after meeting changes)
+      // Re-fetch only tasks (task daily logs managed separately)
       const updatedTasks = await fetchTasksForProjects(user.id, projects, sessions)
-      const updatedTasksDailyLogs = tasksDailyLogs // Use existing task daily logs
 
-      
-      
       // Update state with fresh data
       setAllTasks(updatedTasks)
-      setTasksDailyLogs(updatedTasksDailyLogs)
 
       // Recalculate conflict maps with updated meetings
       const today = new Date()
       const todayStr = format(today, 'yyyy-MM-dd')
-      const filteredTasksDailyLogs = updatedTasksDailyLogs.filter(log => log.log_date !== todayStr)
+      const filteredTasksDailyLogs = tasksDailyLogs.filter(log => log.log_date !== todayStr)
       const newConflictMaps = computeConflictMaps(habits, sessions, meetings, dayColumns, filteredTasksDailyLogs)
       setConflictMaps(newConflictMaps)
 
@@ -641,8 +609,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   }
 
   const buffersIndex = useMemo(() => {
+    const generatedBuffers = generateBuffersForDays(dayColumns, meetings)
     const index = new Map<string, any[]>()
-    buffers.forEach((buffer, dateStr) => {
+    generatedBuffers.forEach((buffer, dateStr) => {
       if (!buffer || !buffer.isActive) return
       const hour = parseInt(buffer.startTime.split(':')[0])
       if (hour < 6) return
@@ -651,7 +620,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       index.set(key, [{ ...buffer, topPosition: (minutes / 60) * 100 }])
     })
     return index
-  }, [buffers])
+  }, [dayColumns, meetings])
 
   const categoryBuffersIndex = useMemo(() => {
     const index = new Map<string, any[]>()
@@ -697,7 +666,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const { data, error } = await supabase
       .from('cassian_calendar_notes')
       .insert({ pinned_date: pinnedDate, note_id: noteId })
-      .select('*, habits_notes:cassian_habits_notes!note_id(id, content, note_date, created_at)')
+      .select('*, habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey(id, content, created_at)')
       .single()
     if (error) throw error
     setCalendarNotes(prev => [...prev, data])
@@ -707,7 +676,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const addHabitNote = async (content: string, noteDate: string) => {
     const { data, error } = await supabase
       .from('cassian_habits_notes')
-      .insert({ content, note_date: noteDate })
+      .insert({ content })
       .select()
       .single()
     if (error) throw error
@@ -748,6 +717,135 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     getMeetingsForTimeSlot,
     getHabitsForTimeSlot,
     getSessionsForTimeSlot,
+    syncTodoist: async () => {
+      if (!user) return
+
+      // 1. Call Todoist API
+      const { data: todoistData, error: fnError } = await supabase.functions.invoke('todoist', { body: { action: 'list_all' } })
+      if (fnError || !todoistData?.tasks) return
+
+      const todoistApiTasks = todoistData.tasks
+
+      // 2. Remove @hold_off tasks from DB
+      const holdOffTaskIds = todoistApiTasks
+        .filter((t: any) => t.labels?.includes('hold_off'))
+        .map((t: any) => t.id)
+
+      if (holdOffTaskIds.length > 0) {
+        const { data: holdOffDbTasks } = await supabase
+          .from('cassian_tasks')
+          .select('id')
+          .in('todoist_task_id', holdOffTaskIds)
+
+        if (holdOffDbTasks && holdOffDbTasks.length > 0) {
+          const dbIds = holdOffDbTasks.map((t: any) => t.id)
+          await supabase.from('cassian_tasks_daily_logs').delete().in('task_id', dbIds)
+          await supabase.from('cassian_tasks').delete().in('id', dbIds)
+        }
+      }
+
+      // 3. Sync new/updated tasks to DB (excluding hold_off)
+      const nonHoldOffTasks = todoistApiTasks.filter((t: any) => !t.labels?.includes('hold_off'))
+      await syncTodoistTasks(nonHoldOffTasks, user.id)
+
+      // 4. Fetch all active todoist tasks from DB
+      const { data: todoistDbTasks } = await supabase
+        .from('cassian_tasks')
+        .select('*')
+        .eq('source', 'todoist')
+        .eq('user_id', user.id)
+        .eq('is_complete', false)
+
+      if (!todoistDbTasks || todoistDbTasks.length === 0) return
+
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
+      const todoistDbIds = todoistDbTasks.map((t: any) => t.id)
+
+      // 5. Delete ALL todoist daily logs from today onwards
+      await supabase
+        .from('cassian_tasks_daily_logs')
+        .delete()
+        .in('task_id', todoistDbIds)
+        .gte('log_date', todayStr)
+
+      // 6. Sort by priority: overdue/today > @urgent > rest
+      const urgentTodoistIds = new Set(
+        todoistApiTasks
+          .filter((t: any) => t.labels?.includes('urgent'))
+          .map((t: any) => t.id)
+      )
+      const urgentDbIds = new Set(
+        todoistDbTasks
+          .filter((t: any) => urgentTodoistIds.has(t.todoist_task_id))
+          .map((t: any) => t.id)
+      )
+
+      const isOverdueOrToday = (t: any) => t.due_date && t.due_date <= todayStr
+      const isUrgent = (t: any) => urgentDbIds.has(t.id)
+      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
+
+      const overdueOrToday = todoistDbTasks.filter(
+        (t: any) => isOverdueOrToday(t) && !isUrgent(t)
+      )
+      const urgent = todoistDbTasks.filter(
+        (t: any) => isUrgent(t) && !isOverdueOrToday(t)
+      )
+      const overdueAndUrgent = todoistDbTasks.filter(
+        (t: any) => isOverdueOrToday(t) && isUrgent(t)
+      )
+      const rest = todoistDbTasks.filter(
+        (t: any) => !isUrgent(t) && !isOverdueOrToday(t)
+      )
+
+      // Sort each bucket by priority (high > medium > low)
+      const byPriority = (a: any, b: any) => (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2)
+      overdueOrToday.sort(byPriority)
+      urgent.sort(byPriority)
+      rest.sort(byPriority)
+
+      const prioritizedTasks = [...overdueAndUrgent, ...overdueOrToday, ...urgent, ...rest]
+
+      // 7. Schedule in priority order
+      const futureDayColumns = dayColumns.filter((col: any) => col.dateStr >= todayStr)
+      const todoistConflictMaps = computeConflictMaps(habits, sessions, meetings, futureDayColumns, tasksDailyLogs)
+      const weekendDayNames = settings?.weekend_days || ['saturday', 'sunday']
+
+      const getTodoistHoursForDate = (date?: Date) => {
+        if (date) {
+          const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+          if (weekendDayNames.includes(dayName)) return TODOIST_WEEKEND_HOURS
+        }
+        return TODOIST_WEEKDAY_HOURS
+      }
+
+      const todoistScheduleResult = await scheduleAllTasks(
+        prioritizedTasks, todoistConflictMaps, futureDayColumns, getTodoistHoursForDate,
+        scheduleTaskInAvailableSlots, saveTaskChunks, null,
+        user.id, tasksDailyLogs, [], null, prioritizedTasks, new Map()
+      )
+
+      // 8. Update UI state
+      setScheduledTasksCache(prev => {
+        const merged = new Map(prev)
+        todoistScheduleResult.forEach((tasks, dateKey) => {
+          const existing = merged.get(dateKey) || []
+          const existingIds = new Set(existing.map((t: any) => t.id))
+          const newTasks = tasks.filter((t: any) => !existingIds.has(t.id))
+          if (newTasks.length > 0) merged.set(dateKey, [...existing, ...newTasks])
+        })
+        return merged
+      })
+
+      // 9. Re-fetch daily logs to update UI
+      const { data: refreshedLogs } = await supabase
+        .from('cassian_tasks_daily_logs')
+        .select('*, cassian_tasks(*)')
+        .eq('user_id', user.id)
+
+      if (refreshedLogs) {
+        setTasksDailyLogs(refreshedLogs)
+      }
+    },
     getTasksDailyLogsForTimeSlot,
     getBuffersForCalendarTimeSlot,
     getCategoryBuffersForTimeSlot,
@@ -760,6 +858,22 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     addCalendarNote,
     addHabitNote,
     removeCalendarNote,
+    skipHabitForDate: (habitId: string, date: string) => {
+      setHabits(prev => prev.map(h => {
+        if (h.id !== habitId) return h
+        const existingLogs = h.habits_daily_logs || []
+        const hasLog = existingLogs.some((log: any) => log.log_date === date)
+        return {
+          ...h,
+          habits_daily_logs: hasLog
+            ? existingLogs.map((log: any) => log.log_date === date ? { ...log, is_skipped: true } : log)
+            : [...existingLogs, { habit_id: habitId, log_date: date, is_skipped: true }]
+        }
+      }))
+    },
+    removeTaskLogFromUI: (logId: string) => {
+      setTasksDailyLogs(prev => prev.filter(log => log.id !== logId))
+    },
     removeTaskFromCalendar: (taskId: string) => {
       setTasksDailyLogs(prev => prev.filter(log => log.task_id !== taskId))
       setScheduledTasksCache(prev => {

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Search, FileText, ArrowLeft, MoreVertical, Tag, X, Trash2, Target } from 'lucide-react'
+import { MoreVertical, Tag, X, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import AddButton from '../components/AddButton'
@@ -38,13 +38,16 @@ const Notes = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [showMobileDetail, setShowMobileDetail] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const [newTag, setNewTag] = useState('')
   const [addingTag, setAddingTag] = useState(false)
   const [aspects, setAspects] = useState<Aspect[]>([])
   const [selectedAspectId, setSelectedAspectId] = useState<string>('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingDate, setEditingDate] = useState(false)
+  const [cardDropdownId, setCardDropdownId] = useState<string | null>(null)
+  const cardDropdownRef = useRef<HTMLDivElement | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const dropdownRef = useRef<HTMLDivElement | null>(null)
 
@@ -59,17 +62,17 @@ const Notes = () => {
         .select(
           `
           *,
-          note_tags (
+          note_tags:cassian_note_tags (
             tag_id,
-            tags (
+            tags:cassian_tags (
               id,
               name,
               color
             )
           ),
-          note_aspects (
+          note_aspects:cassian_note_aspects (
             aspect_id,
-            aspects (
+            aspects:cassian_aspects (
               id,
               title
             )
@@ -135,7 +138,7 @@ const Notes = () => {
       const newNote = data as Note
       setNotes(prev => [newNote, ...prev])
       setSelectedNote(newNote)
-      setShowMobileDetail(true)
+      setModalOpen(true)
     } catch (err) {
       console.error('Error creating note:', err)
     }
@@ -164,7 +167,6 @@ const Notes = () => {
 
       // Extract wins from the note content (async, non-blocking)
       if (user && content.trim().length > 20) {
-        // Only extract if substantial content
         supabase.functions
           .invoke('extract-wins', {
             body: {
@@ -175,8 +177,6 @@ const Notes = () => {
           })
           .catch(err => console.error('Win extraction failed:', err))
       }
-
-      // Don't update selectedNote during autosave to preserve cursor position
     } catch (err) {
       console.error('Error saving note:', err)
     } finally {
@@ -185,6 +185,34 @@ const Notes = () => {
   }
 
   // Save note title
+  // Save note date
+  const saveNoteDate = async (noteId: string, dateStr: string) => {
+    try {
+      setSaving(true)
+      const isoDate = new Date(dateStr).toISOString()
+      const { error } = await supabase
+        .from('cassian_habits_notes')
+        .update({ start_time: isoDate })
+        .eq('id', noteId)
+
+      if (error) throw error
+
+      setNotes(prev =>
+        prev.map(note =>
+          note.id === noteId ? { ...note, start_time: isoDate } : note
+        )
+      )
+
+      if (selectedNote?.id === noteId) {
+        setSelectedNote(prev => prev ? { ...prev, start_time: isoDate } : null)
+      }
+    } catch (err) {
+      console.error('Error saving note date:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const saveNoteTitle = async (noteId: string, title: string) => {
     try {
       setSaving(true)
@@ -198,14 +226,12 @@ const Notes = () => {
 
       if (error) throw error
 
-      // Update local state
       setNotes(prev =>
         prev.map(note =>
           note.id === noteId ? { ...note, title, updated_at: new Date().toISOString() } : note
         )
       )
 
-      // Update selected note
       if (selectedNote?.id === noteId) {
         setSelectedNote(prev =>
           prev ? { ...prev, title, updated_at: new Date().toISOString() } : null
@@ -228,13 +254,11 @@ const Notes = () => {
       const currentTags = note?.tags || []
       const normalizedTagName = tagName.trim().toLowerCase()
 
-      // Check if tag already exists on this note
       if (currentTags.some(tag => tag.name.toLowerCase() === normalizedTagName)) {
         setSaving(false)
-        return // Tag already exists on this note
+        return
       }
 
-      // First, find or create the tag
       let tag: Tag
       const { data: existingTag, error: findError } = await supabase
         .from('cassian_tags')
@@ -247,7 +271,6 @@ const Notes = () => {
       if (existingTag) {
         tag = existingTag
       } else {
-        // Create new tag
         const { data: newTag, error: createError } = await supabase
           .from('cassian_tags')
           .insert({ name: normalizedTagName })
@@ -258,7 +281,6 @@ const Notes = () => {
         tag = newTag
       }
 
-      // Create the note-tag relationship
       const { error: linkError } = await supabase.from('cassian_note_tags').insert({
         note_id: noteId,
         tag_id: tag.id,
@@ -266,7 +288,6 @@ const Notes = () => {
 
       if (linkError) throw linkError
 
-      // Update local state
       const updatedTags = [...currentTags, tag]
       setNotes(prev =>
         prev.map(note =>
@@ -276,7 +297,6 @@ const Notes = () => {
         )
       )
 
-      // Update selected note
       if (selectedNote?.id === noteId) {
         setSelectedNote(prev =>
           prev ? { ...prev, tags: updatedTags, updated_at: new Date().toISOString() } : null
@@ -294,7 +314,6 @@ const Notes = () => {
     try {
       setSaving(true)
 
-      // Remove the note-tag relationship
       const { error } = await supabase
         .from('cassian_note_tags')
         .delete()
@@ -303,7 +322,6 @@ const Notes = () => {
 
       if (error) throw error
 
-      // Update local state
       setNotes(prev =>
         prev.map(note =>
           note.id === noteId
@@ -316,7 +334,6 @@ const Notes = () => {
         )
       )
 
-      // Update selected note
       if (selectedNote?.id === noteId) {
         setSelectedNote(prev =>
           prev
@@ -343,21 +360,18 @@ const Notes = () => {
       setSaving(true)
       const note = notes.find(n => n.id === noteId)
       const currentAspects = note?.aspects || []
-      
-      // Check if aspect already exists on this note
+
       if (currentAspects.some(aspect => aspect.id === aspectId)) {
         setSaving(false)
-        return // Aspect already exists on this note
+        return
       }
 
-      // Find the aspect details
       const aspect = aspects.find(a => a.id === aspectId)
       if (!aspect) {
         setSaving(false)
         return
       }
 
-      // Create the note-aspect relationship
       const { error: linkError } = await supabase
         .from('cassian_note_aspects')
         .insert({
@@ -367,7 +381,6 @@ const Notes = () => {
 
       if (linkError) throw linkError
 
-      // Update local state
       const updatedAspects = [...currentAspects, aspect]
       setNotes(prev =>
         prev.map(note =>
@@ -375,7 +388,6 @@ const Notes = () => {
         )
       )
 
-      // Update selected note
       if (selectedNote?.id === noteId) {
         setSelectedNote(prev => prev ? { ...prev, aspects: updatedAspects, updated_at: new Date().toISOString() } : null)
       }
@@ -391,7 +403,6 @@ const Notes = () => {
     try {
       setSaving(true)
 
-      // Remove the note-aspect relationship
       const { error } = await supabase
         .from('cassian_note_aspects')
         .delete()
@@ -400,26 +411,24 @@ const Notes = () => {
 
       if (error) throw error
 
-      // Update local state
       setNotes(prev =>
         prev.map(note =>
-          note.id === noteId 
-            ? { 
-                ...note, 
-                aspects: note.aspects?.filter(aspect => aspect.id !== aspectId) || [], 
-                updated_at: new Date().toISOString() 
-              } 
+          note.id === noteId
+            ? {
+                ...note,
+                aspects: note.aspects?.filter(aspect => aspect.id !== aspectId) || [],
+                updated_at: new Date().toISOString()
+              }
             : note
         )
       )
 
-      // Update selected note
       if (selectedNote?.id === noteId) {
-        setSelectedNote(prev => 
-          prev ? { 
-            ...prev, 
-            aspects: prev.aspects?.filter(aspect => aspect.id !== aspectId) || [], 
-            updated_at: new Date().toISOString() 
+        setSelectedNote(prev =>
+          prev ? {
+            ...prev,
+            aspects: prev.aspects?.filter(aspect => aspect.id !== aspectId) || [],
+            updated_at: new Date().toISOString()
           } : null
         )
       }
@@ -434,18 +443,15 @@ const Notes = () => {
   const handleContentChange = (content: string) => {
     if (!selectedNote) return
 
-    // Update selected note immediately for UI responsiveness
     setSelectedNote(prev => (prev ? { ...prev, content } : null))
 
-    // Clear existing timeout
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
     }
 
-    // Set new timeout for autosave
     autosaveTimeoutRef.current = setTimeout(() => {
       saveNote(selectedNote.id, content)
-    }, 500) // 500ms delay
+    }, 500)
   }
 
   // Get note title from database or content (first line)
@@ -457,22 +463,33 @@ const Notes = () => {
     return firstLine || 'Untitled Note'
   }
 
-  // Get note preview (first few words)
-  const getNotePreview = (content: string) => {
-    const text = content.replace(/[#*`]/g, '').trim()
-    const words = text.split(' ').slice(0, 10).join(' ')
-    return words || 'No additional text'
+  // Get note preview (first few lines of content, excluding title line)
+  const getNotePreview = (note: Note) => {
+    return note.content.replace(/[#*`]/g, '').trim() || 'No additional text'
   }
 
-  // Handle note selection (mobile-aware)
+  // Handle note selection - open modal
   const handleNoteSelect = (note: Note) => {
     setSelectedNote(note)
-    setShowMobileDetail(true)
+    setModalOpen(true)
   }
 
-  // Handle back to list (mobile only)
-  const handleBackToList = () => {
-    setShowMobileDetail(false)
+  // Close modal
+  const closeModal = () => {
+    // Flush any pending autosave
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+      if (selectedNote) {
+        saveNote(selectedNote.id, selectedNote.content)
+      }
+    }
+    setModalOpen(false)
+    setSelectedNote(null)
+    setEditingTitle(false)
+    setEditingDate(false)
+    setShowDropdown(false)
+    setAddingTag(false)
+    setNewTag('')
   }
 
   // Handle adding new tag
@@ -496,16 +513,13 @@ const Notes = () => {
 
       if (error) throw error
 
-      // Update local state
       setNotes(prev => prev.filter(note => note.id !== noteId))
 
-      // Clear selected note if it was deleted
       if (selectedNote?.id === noteId) {
+        setModalOpen(false)
         setSelectedNote(null)
-        setShowMobileDetail(false)
       }
 
-      // Close dropdown
       setShowDropdown(false)
     } catch (err) {
       console.error('Error deleting note:', err)
@@ -522,13 +536,16 @@ const Notes = () => {
         setAddingTag(false)
         setNewTag('')
       }
+      if (cardDropdownRef.current && !cardDropdownRef.current.contains(event.target as Node)) {
+        setCardDropdownId(null)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Filter notes based on search (content, title, tags, and aspects)
+  // Filter notes based on search
   const filteredNotes = notes.filter(note => {
     const searchLower = searchTerm.toLowerCase()
     const titleMatch = note.title?.toLowerCase().includes(searchLower)
@@ -538,6 +555,19 @@ const Notes = () => {
 
     return titleMatch || contentMatch || tagMatch || aspectMatch
   })
+
+  // Group filtered notes by month
+  const notesByMonth = useMemo(() => {
+    const grouped = new Map<string, typeof filteredNotes>()
+    filteredNotes.forEach(note => {
+      const d = new Date(note.start_time || note.created_at)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const arr = grouped.get(key) || []
+      arr.push(note)
+      grouped.set(key, arr)
+    })
+    return [...grouped.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  }, [filteredNotes])
 
   useEffect(() => {
     fetchNotes()
@@ -551,7 +581,7 @@ const Notes = () => {
       const note = notes.find(n => n.id === noteId)
       if (note) {
         setSelectedNote(note)
-        setShowMobileDetail(true) // Show detail on mobile if note is selected
+        setModalOpen(true)
       }
     }
   }, [notes, searchParams, setSearchParams])
@@ -570,133 +600,150 @@ const Notes = () => {
   }
 
   return (
-    <div className="flex grid grid-cols-5 h-screen bg-white overflow-hidden max-w-full">
-      {/* Left Sidebar - Full width on mobile, fixed width on desktop */}
-      <aside
-        className={`col-span-5 md:col-span-2 border-r border-neutral-200 bg-neutral-50 flex flex-col flex-shrink-0 md:flex ${
-          showMobileDetail ? 'hidden' : 'flex'
-        }`}
-      >
-        {/* Header */}
-        <div className="p-1 border-b border-neutral-200">
-          <div className="flex items-center justify-between mb-1">
-            <h1 className="text-lg font-semibold text-neutral-900">Notes</h1>
-            <AddButton onClick={createNewNote} />
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-1 top-1/2 transform -translate-y-1/2 text-neutral-400 w-2 h-2" />
+    <div className="min-h-screen bg-neutral-50">
+      {/* Header */}
+      <div className="bg-white border-b border-neutral-200 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <div className="flex items-center gap-2">
             <input
               type="text"
               placeholder="Search notes, titles, tags, aspects..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-4 pr-1 py-1 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             />
+            <AddButton onClick={createNewNote} />
           </div>
         </div>
+      </div>
 
-        {/* Info Banner */}
-        <div className="px-3 py-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-700">
-          <div className="flex items-start gap-2">
-            <FileText className="w-3 h-3 mt-0.5 flex-shrink-0 text-blue-500" />
-            <p className="leading-relaxed">
-              Notes written here contribute to AI reflection generation and enhance Reddit link
-              suggestions based on your content.
-            </p>
+      {/* Card Grid */}
+      <div className="max-w-6xl mx-auto px-4 pt-4 pb-6">
+        {filteredNotes.length === 0 ? (
+          <div className="text-center py-12 text-neutral-500 text-sm">
+            {searchTerm ? 'No notes found' : 'No notes yet. Create one to get started!'}
           </div>
-        </div>
-
-        {/* Notes List */}
-        <div className="flex-1 overflow-y-auto w-full max-w-full">
-          {filteredNotes.length === 0 ? (
-            <div className="p-1 text-neutral-500 text-sm text-center">
-              {searchTerm ? 'No notes found' : 'No notes yet'}
-            </div>
-          ) : (
-            filteredNotes.map(note => (
+        ) : (
+          <div className="space-y-6">
+            {notesByMonth.map(([monthKey, monthNotes]) => {
+              const [year, month] = monthKey.split('-').map(Number)
+              const monthLabel = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+              return (
+                <div key={monthKey}>
+                  <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-2">{monthLabel}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {monthNotes.map(note => (
               <div
                 key={note.id}
                 onClick={() => handleNoteSelect(note)}
-                className={`p-1.5 border-b border-neutral-100 cursor-pointer hover:bg-neutral-100 transition-colors w-full max-w-full ${
-                  selectedNote?.id === note.id ? 'bg-primary-50 border-primary-200' : ''
-                }`}
+                className="bg-white border border-neutral-200 rounded-lg p-2 cursor-pointer hover:shadow-md hover:border-neutral-300 transition-all group relative"
               >
-                <div className="flex items-center gap-1 mb-0.5">
-                  {note.tags && note.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-0.5 flex-shrink-0 -ml-0.5">
-                      {note.tags.slice(0, 2).map(tag => (
-                        <span
-                          key={tag.id}
-                          className="inline-flex items-center px-1 py-0 text-xs font-medium rounded"
-                          style={{
-                            backgroundColor: `${tag.color}20`,
-                            color: tag.color,
+                {/* Card dropdown */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="relative" ref={cardDropdownId === note.id ? cardDropdownRef : undefined}>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        setCardDropdownId(cardDropdownId === note.id ? null : note.id)
+                      }}
+                      className="p-1 text-neutral-400 hover:text-neutral-700 rounded hover:bg-neutral-100 transition-colors"
+                    >
+                      <MoreVertical className="w-3 h-3" />
+                    </button>
+                    {cardDropdownId === note.id && (
+                      <div className="absolute right-0 top-6 bg-white border border-neutral-200 rounded-md shadow-lg z-10 whitespace-nowrap">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            setCardDropdownId(null)
+                            deleteNote(note.id)
                           }}
+                          className="flex items-center gap-1 w-full px-2 py-1 text-xs text-red-600 hover:bg-red-50 transition-colors"
                         >
-                          {tag.name}
-                        </span>
-                      ))}
-                      {note.tags.length > 2 && (
-                        <span className="inline-flex items-center px-1 py-0 text-xs font-medium bg-neutral-100 text-neutral-600 rounded">
-                          +{note.tags.length - 2}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="text-sm font-medium text-neutral-900 truncate flex-1 min-w-0">
-                    {getNoteTitle(note)}
+                          <Trash2 className="w-3 h-3" />
+                          Delete note
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-                {note.aspects && note.aspects.length > 0 && (
-                  <div className="text-xs text-green-700 mb-0.5 font-medium">
-                    ASPECTS: {note.aspects.map(aspect => aspect.title.toUpperCase()).join(', ')}
+
+                {/* Tags */}
+                {note.tags && note.tags.length > 0 && (
+                  <div className="absolute -top-2 left-0 flex flex-wrap gap-1">
+                    {note.tags.slice(0, 3).map(tag => (
+                      <span
+                        key={tag.id}
+                        className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded shadow-sm"
+                        style={{
+                          backgroundColor: tag.color,
+                          color: '#fff',
+                        }}
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                    {note.tags.length > 3 && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-neutral-500 text-white rounded shadow-sm">
+                        +{note.tags.length - 3}
+                      </span>
+                    )}
                   </div>
                 )}
-                <div className="text-xs text-neutral-600 mb-0.5">
+
+
+
+                {/* Aspects */}
+                {note.aspects && note.aspects.length > 0 && (
+                  <div className="text-xs text-green-700 mb-1.5 font-medium truncate">
+                    {note.aspects.map(aspect => aspect.title).join(', ')}
+                  </div>
+                )}
+
+                {/* Preview */}
+                <p
+                  className="text-xs text-neutral-500 mb-2 overflow-hidden"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 6,
+                    WebkitBoxOrient: 'vertical' as const,
+                    wordWrap: 'break-word',
+                  }}
+                >
+                  {getNotePreview(note)}
+                </p>
+
+                {/* Date */}
+                <div className="text-xs text-neutral-400">
                   {new Date(note.updated_at).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric',
                   })}
                 </div>
-                <div
-                  className="text-xs text-neutral-500 overflow-hidden w-full max-w-full"
-                  style={{
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical' as const,
-                    wordWrap: 'break-word',
-                  }}
-                >
-                  {getNotePreview(note.content)}
-                </div>
               </div>
-            ))
-          )}
-        </div>
-      </aside>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* Main Content - Full width on mobile when showing detail, hidden when showing list on mobile */}
-      <main
-        className={`col-span-5 md:col-span-3 flex-col min-w-0 overflow-hidden md:flex ${
-          showMobileDetail ? 'flex w-full' : 'hidden md:flex md:w-0'
-        }`}
-      >
-        {selectedNote ? (
-          <>
-            {/* Note Header */}
-            <div className="px-1 py-1 border-b border-neutral-200 bg-white flex-shrink-0">
+      {/* Note Modal */}
+      {modalOpen && selectedNote && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={e => {
+            if (e.target === e.currentTarget) closeModal()
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-5 py-3 border-b border-neutral-200 flex-shrink-0">
               <div className="flex items-center justify-between">
-                {/* Back button - only visible on mobile */}
-                <button
-                  onClick={handleBackToList}
-                  className="md:hidden mr-1 p-0 text-neutral-600 hover:text-neutral-900 transition-colors"
-                >
-                  <ArrowLeft className="w-3 h-3" />
-                </button>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 mr-3">
                   {editingTitle ? (
                     <input
                       type="text"
@@ -725,7 +772,6 @@ const Notes = () => {
                         }
                         if (e.key === 'Escape') {
                           setEditingTitle(false)
-                          // Reset to original title
                           const originalNote = notes.find(n => n.id === selectedNote.id)
                           if (originalNote && selectedNote) {
                             setSelectedNote(prev =>
@@ -747,16 +793,54 @@ const Notes = () => {
                       {getNoteTitle(selectedNote)}
                     </h2>
                   )}
-                  <p className="text-sm text-neutral-500">
-                    Last updated{' '}
-                    {new Date(selectedNote.updated_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </p>
+                  {editingDate ? (
+                    <input
+                      type="datetime-local"
+                      value={(() => {
+                        const d = new Date(selectedNote.start_time || selectedNote.created_at)
+                        const year = d.getFullYear()
+                        const month = String(d.getMonth() + 1).padStart(2, '0')
+                        const day = String(d.getDate()).padStart(2, '0')
+                        const hours = String(d.getHours()).padStart(2, '0')
+                        const mins = String(d.getMinutes()).padStart(2, '0')
+                        return `${year}-${month}-${day}T${hours}:${mins}`
+                      })()}
+                      onChange={e => {
+                        const val = e.target.value
+                        setSelectedNote(prev => prev ? { ...prev, start_time: new Date(val).toISOString() } : null)
+                      }}
+                      onBlur={() => {
+                        setEditingDate(false)
+                        if (selectedNote) {
+                          saveNoteDate(selectedNote.id, selectedNote.start_time || selectedNote.created_at)
+                        }
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === 'Escape') {
+                          setEditingDate(false)
+                          if (e.key === 'Enter' && selectedNote) {
+                            saveNoteDate(selectedNote.id, selectedNote.start_time || selectedNote.created_at)
+                          }
+                        }
+                      }}
+                      autoFocus
+                      className="text-sm text-neutral-500 bg-transparent border-b-2 border-primary-500 outline-none"
+                    />
+                  ) : (
+                    <p
+                      className="text-sm text-neutral-500 cursor-pointer hover:text-primary-600 transition-colors"
+                      onClick={() => setEditingDate(true)}
+                      title="Click to edit date"
+                    >
+                      {new Date(selectedNote.start_time || selectedNote.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {saving && <div className="text-sm text-neutral-500">Saving...</div>}
@@ -836,7 +920,7 @@ const Notes = () => {
                           >
                             <option value="">Add aspect...</option>
                             {aspects
-                              .filter(aspect => 
+                              .filter(aspect =>
                                 !selectedNote.aspects?.some(noteAspect => noteAspect.id === aspect.id)
                               )
                               .map(aspect => (
@@ -895,17 +979,23 @@ const Notes = () => {
                       </div>
                     )}
                   </div>
+                  <button
+                    onClick={closeModal}
+                    className="p-1 text-neutral-500 hover:text-neutral-700 transition-colors rounded hover:bg-neutral-100"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             </div>
 
             {/* Note Editor */}
-            <div className="flex-1 p-1 overflow-auto min-h-0">
+            <div className="flex-1 p-5 overflow-auto min-h-0">
               <textarea
                 value={selectedNote.content}
                 onChange={e => handleContentChange(e.target.value)}
                 placeholder="Start writing your note..."
-                className="w-full h-full resize-none border-none outline-none text-neutral-900 placeholder-neutral-400 text-base leading-relaxed block"
+                className="w-full h-full min-h-[40vh] resize-none border-none outline-none text-neutral-900 placeholder-neutral-400 text-base leading-relaxed block"
                 style={{
                   fontFamily: 'system-ui, -apple-system, sans-serif',
                   wordWrap: 'break-word',
@@ -913,19 +1003,9 @@ const Notes = () => {
                 }}
               />
             </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-neutral-500">
-            <div className="text-center">
-              <div className="mb-4">
-                <FileText className="w-16 h-16 mx-auto text-neutral-300" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">Select a note to start editing</h3>
-              <p className="text-sm">Choose a note from the sidebar or create a new one</p>
-            </div>
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   )
 }

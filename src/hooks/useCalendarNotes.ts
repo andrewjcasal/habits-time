@@ -13,10 +13,9 @@ export const useCalendarNotes = () => {
         .from('cassian_calendar_notes')
         .select(`
           *,
-          habits_notes:cassian_habits_notes!note_id (
+          habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey (
             id,
             content,
-            note_date,
             created_at
           )
         `)
@@ -55,10 +54,9 @@ export const useCalendarNotes = () => {
         })
         .select(`
           *,
-          habits_notes:cassian_habits_notes!note_id (
+          habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey (
             id,
             content,
-            note_date,
             created_at
           )
         `)
@@ -80,7 +78,6 @@ export const useCalendarNotes = () => {
         .from('cassian_habits_notes')
         .insert({
           content,
-          note_date: noteDate,
         })
         .select()
         .single()

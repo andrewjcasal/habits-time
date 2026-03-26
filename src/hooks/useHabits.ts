@@ -11,39 +11,35 @@ export function useHabits(selectedDate?: string) {
   const [error, setError] = useState<string | null>(null)
   const [sleepStartTime, setSleepStartTime] = useState<string | null>(null)
 
-  const fetchHabits = async () => {
+  const fetchHabits = async (cancelled?: () => boolean) => {
     if (!user) return
 
     try {
       setLoading(true)
       setError(null)
 
-      // Check if we should auto-uncheck habits based on sleep start time
-      await checkAndResetHabitsAfterSleep()
-
-      // Also check visible habits
-      const { data: visibleHabits, error: visibleError } = await supabase
-        .from('cassian_habits')
-        .select('*')
-        .eq('is_visible', true)
-
-      
-
-      // Get the most recent sleep start time from habits_time_logs
+      // Get the most recent sleep log (with start_time and end_time for reset logic)
       const { data: recentSleep } = await supabase
         .from('cassian_habits_time_logs')
-        .select('start_time')
+        .select('start_time, end_time')
         .eq('user_id', user.id)
         .eq('activity_type_id', '951bc26a-a863-4996-8a02-f4da2d148aa9') // sleep activity type
         .order('start_time', { ascending: false })
         .limit(1)
         .single()
 
+      if (cancelled?.()) return
+
+      // Check if we should auto-uncheck habits based on sleep start time
+      // Reuse the sleep data we already fetched
+      await checkAndResetHabitsAfterSleep(recentSleep)
+
+      if (cancelled?.()) return
+
       let currentSleepStartTime: string | null = null
       if (recentSleep?.start_time) {
         const sleepDate = new Date(recentSleep.start_time)
         currentSleepStartTime = sleepDate.toTimeString().split(' ')[0] // Get HH:MM:SS format
-        
       }
 
       setSleepStartTime(currentSleepStartTime)
@@ -54,8 +50,8 @@ export function useHabits(selectedDate?: string) {
         .select(
           `
           *,
-          habits_types (*),
-          habits_daily_logs (
+          habits_types:cassian_habits_types (*),
+          habits_daily_logs:cassian_habits_daily_logs (
             *
           )
         `
@@ -67,6 +63,8 @@ export function useHabits(selectedDate?: string) {
         .gte('habits_daily_logs.log_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
 
       const { data, error } = await query.order('current_start_time', { ascending: true })
+
+      if (cancelled?.()) return
 
       if (error) throw error
 
@@ -344,25 +342,15 @@ export function useHabits(selectedDate?: string) {
     }
   }
 
-  const checkAndResetHabitsAfterSleep = async () => {
+  const checkAndResetHabitsAfterSleep = async (sleepLog: { start_time: string; end_time: string | null } | null) => {
     if (!user) return
 
     try {
       const today = new Date().toISOString().split('T')[0]
 
-      // Get the most recent sleep log
-      const { data: sleepLog, error: sleepError } = await supabase
-        .from('cassian_habits_time_logs')
-        .select('start_time, end_time')
-        .eq('user_id', user.id)
-        .eq('activity_type_id', '951bc26a-a863-4996-8a02-f4da2d148aa9')
-        .order('start_time', { ascending: false })
-        .limit(1)
-        .single()
-
       // Only reset if we found a sleep log AND it has ended (indicating wake up)
-      if (sleepError || !sleepLog || !sleepLog.end_time) {
-        
+      if (!sleepLog || !sleepLog.end_time) {
+
         return
       }
 
@@ -397,7 +385,9 @@ export function useHabits(selectedDate?: string) {
   }
 
   useEffect(() => {
-    fetchHabits()
+    let cancelled = false
+    fetchHabits(() => cancelled)
+    return () => { cancelled = true }
   }, [user, selectedDate])
 
   // Get next habit coming up (uncompleted habit with earliest start time after sleep)
@@ -451,7 +441,8 @@ export function useHabits(selectedDate?: string) {
     deleteHabit,
     createHabit,
     updateHabitStartTimes,
-    refetch: fetchHabits,
+    refetch: () => fetchHabits(),
     getNextHabit,
+    lastSleepTime: sleepStartTime,
   }
 }

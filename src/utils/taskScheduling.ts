@@ -3,22 +3,22 @@ import { calculateWorkHours } from './workHoursCalculation'
 import { supabase } from '../lib/supabase'
 
 export const getAvailableTimeBlocks = (
-  date: Date, 
-  conflictMaps: any, 
-  getWorkHoursRange: () => { start: number; end: number },
+  date: Date,
+  conflictMaps: any,
+  getWorkHoursRange: (date?: Date) => { start: number; end: number },
   alreadyScheduledTasks: any[] = [],
   weekendDays: string[] = []
 ) => {
   const dateStr = format(date, 'yyyy-MM-dd')
-  
+
   // Skip weekend days for task scheduling
   const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
   if (weekendDays.includes(dayOfWeek)) {
     return []
   }
-  
+
   const blocks = []
-  const { start, end } = getWorkHoursRange()
+  const { start, end } = getWorkHoursRange(date)
   
   // Filter by current time for today - start from next 15-minute block
   const now = new Date()
@@ -254,12 +254,10 @@ const scheduleTasksWithoutBillableLogic = async (
           )
           task.remainingHours -= totalScheduledHours
 
-          if (task.remainingHours <= 0) {
-            remainingTasks = remainingTasks.filter(t => t.id !== task.id)
-            scheduledOnThisDay = true
-          } else {
-            scheduledOnThisDay = true
-          }
+          // Always remove the task once any chunks are scheduled
+          // This prevents small tasks from splitting across multiple days
+          remainingTasks = remainingTasks.filter(t => t.id !== task.id)
+          scheduledOnThisDay = true
           break
         }
       }
@@ -461,14 +459,9 @@ export const scheduleAllTasks = async (
           )
           task.remainingHours -= totalScheduledHours
 
-          if (task.remainingHours <= 0) {
-            remainingTasks = remainingTasks.filter(t => t.id !== task.id)
-            scheduledOnThisDay = true
-          } else {
-            scheduledOnThisDay = true
-          }
+          remainingTasks = remainingTasks.filter(t => t.id !== task.id)
+          scheduledOnThisDay = true
           break
-        } else {
         }
       }
     }

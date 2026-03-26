@@ -4,6 +4,7 @@ interface CalendarEventProps {
   type: 'habit' | 'session' | 'task' | 'placeholder' | 'meeting' | 'tasklog' | 'buffer' | 'reduced-buffer' | 'category-buffer' | 'todoist'
   style: React.CSSProperties
   onClick?: (e: React.MouseEvent) => void
+  onResizeStart?: (e: React.MouseEvent) => void
   className?: string
   title?: string
   eventTitle: string
@@ -13,10 +14,11 @@ interface CalendarEventProps {
   children?: React.ReactNode
 }
 
-const CalendarEvent: React.FC<CalendarEventProps> = ({ 
-  type, 
-  style, 
-  onClick, 
+const CalendarEvent: React.FC<CalendarEventProps> = ({
+  type,
+  style,
+  onClick,
+  onResizeStart,
   className = '',
   title,
   eventTitle,
@@ -86,6 +88,16 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
             </div>
           )}
         </>
+      )}
+      {onResizeStart && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize hover:bg-black/10 transition-colors"
+          onMouseDown={e => {
+            e.stopPropagation()
+            e.preventDefault()
+            onResizeStart(e)
+          }}
+        />
       )}
     </div>
   )

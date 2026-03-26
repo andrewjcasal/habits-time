@@ -170,14 +170,7 @@ const HabitsList = ({
                         Cancel
                       </button>
                     </div>
-                  ) : (
-                    <span className="font-mono text-xs text-neutral-600">
-                      {(() => {
-                        const { label, time } = getHabitScheduleDisplay(habit, dailyLog)
-                        return `${label}: ${formatTime(time)}`
-                      })()}
-                    </span>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>

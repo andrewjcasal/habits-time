@@ -17,14 +17,14 @@ export const fetchAllCalendarData = async (userId: string) => {
   try {
     // Fetch all data sources in parallel with timeout protection
     const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, tasksResult, settingsResult, calendarNotesResult, habitNotesResult, categoryBuffersResult] = await Promise.allSettled([
-      withTimeout(supabase.from('cassian_habits').select('*, habits_daily_logs:cassian_habits_daily_logs(*), habits_types:cassian_habits_types(*)').eq('user_id', userId).eq('is_visible', true)),
+      withTimeout(supabase.from('cassian_habits').select('*, habits_daily_logs:cassian_habits_daily_logs(*), habits_types:cassian_habits_types(*)').eq('user_id', userId).eq('is_visible', true).or('is_archived.eq.false,is_archived.is.null')),
       withTimeout(supabase.from('cassian_sessions').select('*, projects:cassian_projects(*)').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_projects').select('*').eq('user_id', userId).neq('status', 'archived')),
       withTimeout(supabase.from('cassian_meetings').select('*').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_tasks_daily_logs').select('*, tasks:cassian_tasks!inner(*, projects:cassian_projects(*))').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_tasks').select('*, projects:cassian_projects!inner(*)').eq('user_id', userId).neq('projects.status', 'archived')),
       withTimeout(supabase.from('cassian_user_settings').select('*').eq('user_id', userId).single()),
-      withTimeout(supabase.from('cassian_calendar_notes').select('*, habits_notes:cassian_habits_notes!note_id(id, content, note_date, created_at)').order('pinned_date', { ascending: true })),
+      withTimeout(supabase.from('cassian_calendar_notes').select('*, habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey(id, content, created_at)').order('pinned_date', { ascending: true })),
       withTimeout(supabase.from('cassian_habits_notes').select('*').order('created_at', { ascending: false })),
       withTimeout(supabase.from('cassian_category_buffers').select('*, meeting_categories:cassian_meeting_categories(id, name, color)').eq('user_id', userId))
     ])

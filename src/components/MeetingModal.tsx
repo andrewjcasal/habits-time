@@ -36,6 +36,10 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
     { title: string; count: number; lastUsed: Date }[]
   >([])
   const [showTitleDropdown, setShowTitleDropdown] = useState(false)
+  const [showLocationField, setShowLocationField] = useState(false)
+  const [showDescriptionField, setShowDescriptionField] = useState(false)
+  const [showFullForm, setShowFullForm] = useState(false)
+  const [loadingTitles, setLoadingTitles] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriesFetched, setCategoriesFetched] = useState(false)
   const [showTaskLogModal, setShowTaskLogModal] = useState(false)
@@ -52,7 +56,10 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
   useEffect(() => {
     if (showMeetingModal) {
       setLocalTitle(meeting.title)
-      setShowTaskLogForm(false) // Reset task log form state
+      setShowTaskLogForm(false)
+      setShowLocationField(false)
+      setShowDescriptionField(false)
+      setShowFullForm(false)
     }
   }, [showMeetingModal, meeting.title])
 
@@ -66,7 +73,8 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
   // Fetch previous meeting titles when modal opens (only for new meetings, memoized)
   useEffect(() => {
     if (showMeetingModal && !editingMeeting && previousTitles.length === 0) {
-      fetchPreviousTitles()
+      setLoadingTitles(true)
+      fetchPreviousTitles().finally(() => setLoadingTitles(false))
     }
   }, [showMeetingModal, editingMeeting, previousTitles.length])
 
@@ -321,91 +329,55 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
         maxWidth={selectedTimeSlot ? 'lg' : 'md'}
       >
         {!showTaskLogForm ? (
+          !editingMeeting && !showFullForm && (previousTitles.length > 0 || loadingTitles) ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-1.5">
+                {previousTitles.slice(0, 12).map((titleData, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => {
+                      setLocalTitle(titleData.title)
+                      const updatedMeeting = { ...meeting, title: titleData.title }
+                      setNewMeeting(updatedMeeting)
+                      handleSaveMeeting(new Event('submit') as any, updatedMeeting)
+                    }}
+                    className="px-3 py-1.5 rounded-full text-xs border bg-neutral-50 border-neutral-200 text-neutral-700 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors"
+                  >
+                    {titleData.title.length > 25 ? titleData.title.slice(0, 25) + '…' : titleData.title}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFullForm(true)}
+                className="text-xs text-primary-600 hover:text-primary-800"
+              >
+                + Different meeting
+              </button>
+            </div>
+          ) : (
           <form
             onSubmit={e => {
               e.preventDefault()
-              // Update the meeting with the local title and submit
               const updatedMeeting = { ...meeting, title: localTitle }
               setNewMeeting(updatedMeeting)
-              // Pass the updated meeting data to handleSaveMeeting
               handleSaveMeeting(e, updatedMeeting)
             }}
             className="space-y-1"
           >
-            <div className="relative title-dropdown-container">
+            <div className="relative">
               <div className="relative">
                 <input
                   type="text"
                   placeholder="Meeting title"
                   value={localTitle}
-                  onChange={e => {
-                    const newTitle = e.target.value
-                    setLocalTitle(newTitle)
-                    // Show/hide dropdown based on title length
-                    if (newTitle.length > 3) {
-                      setShowTitleDropdown(false)
-                    } else if (
-                      newTitle.length <= 3 &&
-                      !editingMeeting &&
-                      previousTitles.length > 0
-                    ) {
-                      setShowTitleDropdown(true)
-                    }
-                  }}
-                  onFocus={() => {
-                    // Only show dropdown if not editing, has previous titles, and title is 3 chars or less
-                    const shouldShow =
-                      !editingMeeting && previousTitles.length > 0 && localTitle.length <= 3
-                    setShowTitleDropdown(shouldShow)
-                  }}
-                  className="w-full px-1 py-1 pr-6 border border-neutral-300 rounded-md text-xs"
+                  onChange={e => setLocalTitle(e.target.value)}
+                  className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
                   autoFocus
                   required
                 />
-                {!editingMeeting && previousTitles.length > 0 && localTitle.length <= 3 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowTitleDropdown(!showTitleDropdown)}
-                    className="absolute right-1 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
-                  >
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                )}
               </div>
-
-              {!editingMeeting &&
-                showTitleDropdown &&
-                previousTitles.length > 0 &&
-                localTitle.length <= 3 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-md shadow-lg z-50 max-h-32 overflow-y-auto">
-                    {filteredTitles.length === 0 ? (
-                      <div className="px-2 py-1 text-xs text-neutral-500">
-                        No matching titles found
-                      </div>
-                    ) : (
-                      filteredTitles.map((titleData, index) => {
-                        const isRecent = titleData.recentCount > 0
-                        return (
-                          <button
-                            key={index}
-                            type="button"
-                            onClick={() => {
-                              setLocalTitle(titleData.title)
-                              setShowTitleDropdown(false)
-                            }}
-                            className="w-full text-left px-2 py-1 text-xs hover:bg-neutral-50 flex items-center justify-between"
-                          >
-                            <span className="truncate">{titleData.title}</span>
-                            <div className="flex items-center gap-1 text-neutral-400 flex-shrink-0">
-                              {isRecent && <span className="text-blue-500 text-xs">●</span>}
-                              <span className="text-xs">{titleData.count}</span>
-                            </div>
-                          </button>
-                        )
-                      })
-                    )}
-                  </div>
-                )}
             </div>
 
             <div className="flex gap-1">
@@ -605,21 +577,42 @@ onChange={e => {
               </select>
             </div>
 
-            <input
-              type="text"
-              placeholder="Location (optional)"
-              value={meeting.location}
-              onChange={e => setNewMeeting({ ...meeting, location: e.target.value })}
-              className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
-            />
+            {(meeting.location || showLocationField) ? (
+              <input
+                type="text"
+                placeholder="Location"
+                value={meeting.location}
+                onChange={e => setNewMeeting({ ...meeting, location: e.target.value })}
+                className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
+                autoFocus={showLocationField && !meeting.location}
+              />
+            ) : null}
 
-            <textarea
-              placeholder="Description (optional)"
-              value={meeting.description}
-              onChange={e => setNewMeeting({ ...meeting, description: e.target.value })}
-              className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs resize-none"
-              rows={2}
-            />
+            {(meeting.description || showDescriptionField) ? (
+              <textarea
+                placeholder="Description"
+                value={meeting.description}
+                onChange={e => setNewMeeting({ ...meeting, description: e.target.value })}
+                className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs resize-none"
+                rows={2}
+                autoFocus={showDescriptionField && !meeting.description}
+              />
+            ) : null}
+
+            {(!meeting.location && !showLocationField || !meeting.description && !showDescriptionField) && (
+              <div className="flex gap-2">
+                {!meeting.location && !showLocationField && (
+                  <button type="button" onClick={() => setShowLocationField(true)} className="text-xs text-neutral-400 hover:text-neutral-600">
+                    + Location
+                  </button>
+                )}
+                {!meeting.description && !showDescriptionField && (
+                  <button type="button" onClick={() => setShowDescriptionField(true)} className="text-xs text-neutral-400 hover:text-neutral-600">
+                    + Description
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-1 justify-between pt-1">
               {editingMeeting && (
@@ -648,6 +641,7 @@ onChange={e => {
               </div>
             </div>
           </form>
+          )
         ) : (
           <div className="space-y-1">
             <p className="text-xs text-neutral-600 mb-2">

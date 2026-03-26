@@ -1,4 +1,5 @@
 import React from 'react'
+import { Plus } from 'lucide-react'
 
 // Helper function to get quarter-hour from mouse position within a time slot
 export const getQuarterFromMousePosition = (event: React.MouseEvent, element: HTMLElement) => {
@@ -58,6 +59,8 @@ interface CalendarGridProps {
   gridCols: string
   dayColumns: Array<{ date: Date; dateStr: string }>
   renderCalendarEvents: (timeSlot: string, date: Date) => React.ReactNode
+  renderNoteBadges?: (timeSlot: string, date: Date) => React.ReactNode
+  onAddNoteClick?: (timeSlot: string, date: Date) => void
   handleTimeSlotClick: (e: React.MouseEvent, time: string, date: Date) => void
   handleTimeSlotContextMenu: (e: React.MouseEvent, time: string, date: Date) => void
   handleMouseDown: (e: React.MouseEvent, time: string, date: Date, hourIndex: number, columnIndex: number) => void
@@ -77,6 +80,8 @@ export default function CalendarGrid({
   gridCols,
   dayColumns,
   renderCalendarEvents,
+  renderNoteBadges,
+  onAddNoteClick,
   handleTimeSlotClick,
   handleTimeSlotContextMenu,
   handleMouseDown,
@@ -163,6 +168,34 @@ export default function CalendarGrid({
                       ))}
                     </div>
                   </div>
+
+                  {/* Add note hover zones on left edge, every 15 min */}
+                  {onAddNoteClick && [0, 1, 2, 3].map(quarter => {
+                    const minutes = quarter * 15
+                    const quarterTime = `${hour.time.split(':')[0]}:${minutes.toString().padStart(2, '0')}`
+                    return (
+                      <div
+                        key={`add-note-zone-${quarter}`}
+                        className="group/quarter absolute z-20"
+                        style={{ top: `${quarter * 25}%`, left: '1px', width: '10px', height: '25%' }}
+                      >
+                        <div
+                          className="absolute left-0 top-0 -translate-y-1/2 opacity-0 group-hover/quarter:opacity-100 transition-opacity cursor-pointer"
+                          onClick={e => {
+                            e.stopPropagation()
+                            onAddNoteClick(quarterTime, column.date)
+                          }}
+                        >
+                          <div className="w-[20px] h-[20px] p-[2px] bg-amber-400 hover:bg-amber-300 rounded-full flex items-center justify-center shadow-sm border border-amber-500 -translate-x-1/2 pointer-events-none">
+                            <Plus className="w-full h-full text-amber-900" />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Note badges on left border */}
+                  {renderNoteBadges && renderNoteBadges(hour.time, column.date)}
 
                   {/* Render calendar events */}
                   {renderCalendarEvents(hour.time, column.date)}

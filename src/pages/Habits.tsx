@@ -27,6 +27,7 @@ const Habits = () => {
     updateHabitStartTimes,
     createHabit,
     getNextHabit,
+    lastSleepTime,
   } = useHabits(selectedDate)
 
   const [routineLogs, setRoutineLogs] = useState<any[]>([])
@@ -161,7 +162,7 @@ const Habits = () => {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
-  const fetchRoutineLogs = async () => {
+  const fetchRoutineLogs = async (cancelled?: () => boolean) => {
     if (!user) return
 
     try {
@@ -174,6 +175,7 @@ const Habits = () => {
         .order('start_time', { ascending: false })
         .limit(10)
 
+      if (cancelled?.()) return
       if (sleepError) throw sleepError
 
       // Get routine logs from the last 14 days to account for sleep boundaries
@@ -189,7 +191,7 @@ const Habits = () => {
           actual_start_time,
           actual_end_time,
           created_at,
-          habits!inner (
+          habits:cassian_habits!inner (
             id,
             name
           )
@@ -204,6 +206,7 @@ const Habits = () => {
         ])
         .order('log_date', { ascending: false })
 
+      if (cancelled?.()) return
       if (error) throw error
 
       // Group logs by sleep cycles instead of calendar days
@@ -249,7 +252,9 @@ const Habits = () => {
   }
 
   useEffect(() => {
-    fetchRoutineLogs()
+    let cancelled = false
+    fetchRoutineLogs(() => cancelled)
+    return () => { cancelled = true }
   }, [user])
 
   useEffect(() => {
@@ -277,7 +282,7 @@ const Habits = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <TabNavigation activeTab={activeTopTab} onTabChange={setActiveTopTab} />
+      {/* <TabNavigation activeTab={activeTopTab} onTabChange={setActiveTopTab} /> */}
 
       {activeTopTab === 'aspects' ? (
         <Aspects />

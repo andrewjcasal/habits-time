@@ -36,6 +36,12 @@ interface ModalState {
   // Session Modal
   showSessionModal: boolean
   selectedSession: any | null
+
+  // Resize Conflict Dialog
+  showResizeConflictDialog: boolean
+  resizeConflictingTasks: any[]
+  resizeConflictMeeting: any | null
+  resizeConflictNewEndTime: Date | null
 }
 
 interface ModalActions {
@@ -60,6 +66,11 @@ interface ModalActions {
 
   // Global close
   closeAllModals: () => void
+
+  // Resize conflict actions
+  openResizeConflictDialog: (meeting: any, newEndTime: Date, conflictingTasks: any[]) => void
+  closeResizeConflictDialog: () => void
+  confirmResizeConflict: (deleteTasks: boolean) => Promise<void>
 
   // Cross-modal actions
   addMeetingFromHabit: () => void
@@ -92,6 +103,10 @@ const initialModalState: ModalState = {
   selectedTask: null,
   showSessionModal: false,
   selectedSession: null,
+  showResizeConflictDialog: false,
+  resizeConflictingTasks: [],
+  resizeConflictMeeting: null,
+  resizeConflictNewEndTime: null,
 }
 
 interface ModalProviderProps {
@@ -105,9 +120,12 @@ interface ModalProviderProps {
   onHabitSkip: (habit: any, date: Date) => Promise<void>
   onUpdateSession: (sessionId: string, updates: any) => Promise<void>
   onTaskLogCreated: () => void
+  onUpdateMeetingEndTime: (meetingId: string, newEndTime: string) => Promise<void>
+  onDeleteTaskLog: (logId: string) => Promise<void>
+  onRemoveTaskLogFromUI: (logId: string) => void
 }
 
-export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onCompleteTask, onDeleteTask, onHabitTimeChange, onHabitSkip, onUpdateSession, onTaskLogCreated }: ModalProviderProps) => {
+export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onCompleteTask, onDeleteTask, onHabitTimeChange, onHabitSkip, onUpdateSession, onTaskLogCreated, onUpdateMeetingEndTime, onDeleteTaskLog, onRemoveTaskLogFromUI }: ModalProviderProps) => {
   const { user } = useUserContext()
   const [modalState, setModalState] = useState<ModalState>(initialModalState)
   const [userSettings, setUserSettings] = useState<any>(null)
@@ -151,6 +169,10 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
     selectedHabitDate: null,
     selectedTask: null,
     selectedSession: null,
+    showResizeConflictDialog: false,
+    resizeConflictingTasks: [],
+    resizeConflictMeeting: null,
+    resizeConflictNewEndTime: null,
   }), [])
 
   const openMeetingModal = useCallback((timeSlot?: { time: string; date: Date; endTime?: string }, editing?: Meeting) => {
@@ -297,6 +319,40 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
     setModalState(initialModalState)
   }
 
+  // Resize conflict actions
+  const openResizeConflictDialog = (meeting: any, newEndTime: Date, conflictingTasks: any[]) => {
+    setModalState(prev => ({
+      ...getClosedModalState(prev),
+      showResizeConflictDialog: true,
+      resizeConflictMeeting: meeting,
+      resizeConflictNewEndTime: newEndTime,
+      resizeConflictingTasks: conflictingTasks,
+    }))
+  }
+
+  const closeResizeConflictDialog = () => {
+    setModalState(prev => ({
+      ...prev,
+      showResizeConflictDialog: false,
+      resizeConflictingTasks: [],
+      resizeConflictMeeting: null,
+      resizeConflictNewEndTime: null,
+    }))
+  }
+
+  const confirmResizeConflict = async (deleteTasks: boolean) => {
+    const { resizeConflictMeeting: meeting, resizeConflictNewEndTime: newEndTime, resizeConflictingTasks: tasks } = modalState
+    if (!meeting || !newEndTime) return
+    if (deleteTasks) {
+      for (const task of tasks) {
+        await onDeleteTaskLog(task.id)
+        onRemoveTaskLogFromUI(task.id)
+      }
+    }
+    await onUpdateMeetingEndTime(meeting.id, newEndTime.toISOString())
+    closeResizeConflictDialog()
+  }
+
   // Cross-modal actions
   const addMeetingFromHabit = () => {
     if (modalState.selectedHabit && modalState.selectedHabitDate) {
@@ -346,6 +402,9 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
     openSessionModal,
     closeSessionModal,
     closeAllModals,
+    openResizeConflictDialog,
+    closeResizeConflictDialog,
+    confirmResizeConflict,
     addMeetingFromHabit,
     addMeetingFromTask,
   }
@@ -378,6 +437,42 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
             closeSessionModal();
           }}
         />
+      )}
+      {/* Resize conflict dialog */}
+      {modalState.showResizeConflictDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 w-full max-w-sm mx-4">
+            <h3 className="text-sm font-semibold text-neutral-900 mb-2">Task Conflict</h3>
+            <p className="text-xs text-neutral-600 mb-3">
+              Extending this meeting overlaps with {modalState.resizeConflictingTasks.length} task{modalState.resizeConflictingTasks.length !== 1 ? 's' : ''}:
+            </p>
+            <ul className="text-xs text-neutral-700 mb-3 space-y-1">
+              {modalState.resizeConflictingTasks.map((task: any, i: number) => (
+                <li key={i} className="truncate">• {task.tasks?.title || 'Task'}</li>
+              ))}
+            </ul>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={closeResizeConflictDialog}
+                className="px-3 py-1.5 text-xs bg-neutral-200 text-neutral-700 rounded hover:bg-neutral-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => confirmResizeConflict(false)}
+                className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Extend & Keep Tasks
+              </button>
+              <button
+                onClick={() => confirmResizeConflict(true)}
+                className="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Extend & Delete Tasks
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {children}
     </ModalContext.Provider>

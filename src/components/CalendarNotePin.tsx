@@ -58,9 +58,9 @@ const CalendarNotePin: React.FC<CalendarNotePinProps> = ({
                   <div className="text-neutral-700 break-words">
                     {note.habits_notes?.content || 'Note content unavailable'}
                   </div>
-                  {note.habits_notes?.note_date && (
+                  {note.habits_notes?.created_at && (
                     <div className="text-neutral-500 mt-1">
-                      Created: {format(new Date(note.habits_notes.note_date), 'MMM d, yyyy')}
+                      Created: {format(new Date(note.habits_notes.created_at), 'MMM d, yyyy')}
                     </div>
                   )}
                 </div>

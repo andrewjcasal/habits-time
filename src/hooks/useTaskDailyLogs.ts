@@ -28,8 +28,12 @@ export function useTaskDailyLogs() {
       setLoading(true)
       setError(null)
 
+      // Filter out placeholder tasks (they don't exist in the DB)
+      const realChunks = chunks.filter(chunk => !chunk.isPlaceholder)
+      if (realChunks.length === 0) return null
+
       // Convert chunks to task daily log entries
-      const taskLogs: Omit<TaskDailyLog, 'id' | 'created_at' | 'updated_at'>[] = chunks.map(chunk => {
+      const taskLogs: Omit<TaskDailyLog, 'id' | 'created_at' | 'updated_at'>[] = realChunks.map(chunk => {
         const startTime = `${Math.floor(chunk.startTime).toString().padStart(2, '0')}:${Math.round((chunk.startTime % 1) * 60).toString().padStart(2, '0')}:00`
         const endTime = `${Math.floor(chunk.startTime + chunk.estimated_hours).toString().padStart(2, '0')}:${Math.round(((chunk.startTime + chunk.estimated_hours) % 1) * 60).toString().padStart(2, '0')}:00`
         

@@ -41,6 +41,19 @@
 - REDDIT_CLIENT_SECRET
 - REDDIT_REDIRECT_URI (should be the generate-reflection function URL)
 
+## Modal & Dialog Architecture
+
+- All modals and dialogs are managed by `ModalContext` (`src/contexts/ModalContext.tsx`)
+- Modal components are rendered inside the `ModalProvider`, not in individual pages
+- Pages call `openXxxModal()` from `useModal()` — they never render modal components directly
+- Only one modal can be open at a time — `getClosedModalState()` closes all others before opening a new one
+- Calendar-specific UI state (tooltips, drag state, note modals) can stay local to Calendar.tsx
+
+## Code Style
+
+- Do not use anonymous functions (IIFEs) inside JSX — extract logic into `useMemo`, named functions, or variables before the return statement
+- Prefer `useMemo` for derived data that needs computation (e.g., grouping, filtering, sorting)
+
 ## Database Table Naming
 
 - All Supabase tables used by this project must have the `cassian_` prefix
