@@ -28,7 +28,7 @@ const Wins = () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
-        .from('wins')
+        .from('cassian_wins')
         .select('*')
         .eq('user_id', user.id)
         .order('extracted_at', { ascending: false })

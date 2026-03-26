@@ -31,7 +31,7 @@ export function useAutoReflection() {
         const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
         
         const { data: completedHabits } = await supabase
-          .from('habits_daily_logs')
+          .from('cassian_habits_daily_logs')
           .select('*')
           .eq('user_id', user.id)
           .gte('log_date', threeDaysAgo)
@@ -40,7 +40,7 @@ export function useAutoReflection() {
 
         // Check if any tasks were completed in the last 3 days
         const { data: completedTasks } = await supabase
-          .from('tasks')
+          .from('cassian_tasks')
           .select('*')
           .eq('user_id', user.id)
           .eq('status', 'completed')

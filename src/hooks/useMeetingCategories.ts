@@ -25,7 +25,7 @@ export const useMeetingCategories = () => {
 
       // Fetch categories
       const { data: categoriesData, error: categoriesError } = await supabase
-        .from('meeting_categories')
+        .from('cassian_meeting_categories')
         .select('*')
         .eq('user_id', user.id)
         .order('name')
@@ -37,7 +37,7 @@ export const useMeetingCategories = () => {
 
       // Fetch all meetings
       const { data: meetingsData, error: meetingsError } = await supabase
-        .from('meetings')
+        .from('cassian_meetings')
         .select('*')
         .eq('user_id', user.id)
         .order('start_time', { ascending: true })
@@ -72,7 +72,7 @@ export const useMeetingCategories = () => {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('meeting_categories')
+        .from('cassian_meeting_categories')
         .insert([{ ...categoryData, user_id: user.id }])
         .select()
         .single()
@@ -90,7 +90,7 @@ export const useMeetingCategories = () => {
   const updateCategory = async (id: string, updates: Partial<MeetingCategory>) => {
     try {
       const { data, error } = await supabase
-        .from('meeting_categories')
+        .from('cassian_meeting_categories')
         .update(updates)
         .eq('id', id)
         .select()
@@ -109,7 +109,7 @@ export const useMeetingCategories = () => {
   const deleteCategory = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('meeting_categories')
+        .from('cassian_meeting_categories')
         .delete()
         .eq('id', id)
 

@@ -26,7 +26,7 @@ export const handleHabitTimeChange = async (
     }
 
     // Insert or update the daily log with the new scheduled start time and optionally duration
-    const { error } = await supabase.from('habits_daily_logs').upsert(
+    const { error } = await supabase.from('cassian_habits_daily_logs').upsert(
       updateData,
       {
         onConflict: 'habit_id,user_id,log_date',
@@ -51,7 +51,7 @@ export const handleHabitSkip = async (
     if (!user) throw new Error('User not authenticated')
 
     // Insert or update the daily log to mark as skipped
-    const { error } = await supabase.from('habits_daily_logs').upsert(
+    const { error } = await supabase.from('cassian_habits_daily_logs').upsert(
       {
         habit_id: habitId,
         user_id: user.id,
@@ -79,7 +79,7 @@ export const handleCompleteTask = async (selectedTask: any) => {
       : selectedTask.id
 
     const { error } = await supabase
-      .from('tasks')
+      .from('cassian_tasks')
       .update({ is_complete: true })
       .eq('id', originalTaskId)
 
@@ -98,9 +98,9 @@ export const handleDeleteTask = async (selectedTask: any): Promise<string | null
       : selectedTask.id
 
     // Delete task daily logs first (FK constraint)
-    await supabase.from('tasks_daily_logs').delete().eq('task_id', originalTaskId)
+    await supabase.from('cassian_tasks_daily_logs').delete().eq('task_id', originalTaskId)
 
-    const { error } = await supabase.from('tasks').delete().eq('id', originalTaskId)
+    const { error } = await supabase.from('cassian_tasks').delete().eq('id', originalTaskId)
     if (error) throw error
     return originalTaskId
   } catch (error) {

@@ -25,7 +25,7 @@ export function useBehaviors() {
       }
 
       const { data, error: fetchError } = await supabase
-        .from('behaviors')
+        .from('cassian_behaviors')
         .select('*')
         .eq('user_id', user.id)
         .order('category', { ascending: true })
@@ -54,7 +54,7 @@ export function useBehaviors() {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('behaviors')
+        .from('cassian_behaviors')
         .insert([{ ...behavior, user_id: user.id }])
         .select()
         .single()
@@ -74,7 +74,7 @@ export function useBehaviors() {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('behaviors')
+        .from('cassian_behaviors')
         .update(updates)
         .eq('id', id)
         .select()
@@ -91,7 +91,7 @@ export function useBehaviors() {
 
   const deleteBehavior = async (id: string) => {
     try {
-      const { error } = await supabase.from('behaviors').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_behaviors').delete().eq('id', id)
 
       if (error) throw error
 

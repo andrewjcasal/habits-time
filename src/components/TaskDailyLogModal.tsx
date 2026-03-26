@@ -57,12 +57,12 @@ const TaskDailyLogModal = ({
       if (!user) return
 
       const { data, error } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .select(`
           id,
           title,
           estimated_hours,
-          projects (
+          projects:cassian_projects (
             name,
             color
           )
@@ -100,7 +100,7 @@ const TaskDailyLogModal = ({
       const scheduled_end_time = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`
 
       const { error } = await supabase
-        .from('tasks_daily_logs')
+        .from('cassian_tasks_daily_logs')
         .insert({
           task_id: newTaskLog.task_id,
           user_id: user.id,

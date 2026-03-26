@@ -12,7 +12,7 @@ export async function createCategoryBuffer(
   if (!user) return null
 
   const { data, error } = await supabase
-    .from('category_buffers')
+    .from('cassian_category_buffers')
     .insert({
       user_id: user.id,
       category_id: categoryId,
@@ -37,7 +37,7 @@ export async function updateCategoryBuffer(
   weeklyHours: number
 ): Promise<CategoryBuffer | null> {
   const { data, error } = await supabase
-    .from('category_buffers')
+    .from('cassian_category_buffers')
     .update({ weekly_hours: weeklyHours })
     .eq('id', bufferId)
     .select()
@@ -56,7 +56,7 @@ export async function updateCategoryBuffer(
  */
 export async function deleteCategoryBuffer(bufferId: string): Promise<boolean> {
   const { error } = await supabase
-    .from('category_buffers')
+    .from('cassian_category_buffers')
     .delete()
     .eq('id', bufferId)
 
@@ -76,7 +76,7 @@ export async function getCategoryBuffers(): Promise<CategoryBuffer[]> {
   if (!user) return []
 
   const { data, error } = await supabase
-    .from('category_buffers')
+    .from('cassian_category_buffers')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: true })

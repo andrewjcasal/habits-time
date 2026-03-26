@@ -193,7 +193,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         if (fetchedSettings?.todoist_api_key) {
           // Fetch existing todoist tasks from DB (instant, no API call)
           const { data: todoistDbTasks } = await supabase
-            .from('tasks')
+            .from('cassian_tasks')
             .select('*')
             .eq('source', 'todoist')
             .eq('user_id', user.id)
@@ -695,9 +695,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   const addCalendarNote = async (pinnedDate: string, noteId: string) => {
     const { data, error } = await supabase
-      .from('calendar_notes')
+      .from('cassian_calendar_notes')
       .insert({ pinned_date: pinnedDate, note_id: noteId })
-      .select('*, habits_notes:note_id(id, content, note_date, created_at)')
+      .select('*, habits_notes:cassian_habits_notes!note_id(id, content, note_date, created_at)')
       .single()
     if (error) throw error
     setCalendarNotes(prev => [...prev, data])
@@ -706,7 +706,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   const addHabitNote = async (content: string, noteDate: string) => {
     const { data, error } = await supabase
-      .from('habits_notes')
+      .from('cassian_habits_notes')
       .insert({ content, note_date: noteDate })
       .select()
       .single()
@@ -717,7 +717,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   const removeCalendarNote = async (calendarNoteId: string) => {
     const { error } = await supabase
-      .from('calendar_notes')
+      .from('cassian_calendar_notes')
       .delete()
       .eq('id', calendarNoteId)
     if (error) throw error

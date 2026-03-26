@@ -19,7 +19,7 @@ export function useHabitTypes() {
       setError(null)
 
       const { data, error } = await supabase
-        .from('habits_types')
+        .from('cassian_habits_types')
         .select('*')
         .order('name')
 

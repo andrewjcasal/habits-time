@@ -41,4 +41,12 @@
 - REDDIT_CLIENT_SECRET
 - REDDIT_REDIRECT_URI (should be the generate-reflection function URL)
 
+## Database Table Naming
+
+- All Supabase tables used by this project must have the `cassian_` prefix
+- Example: `cassian_tasks`, `cassian_habits`, `cassian_user_settings`
+- When creating new tables, always use the `cassian_` prefix
+- When referencing tables in `.from()` calls, always use the prefixed name
+- PostgREST join references in `.select()` also use the prefixed names (e.g., `cassian_projects(*)`)
+
 Always follow user CLAUDE.md unless overridden by this file.

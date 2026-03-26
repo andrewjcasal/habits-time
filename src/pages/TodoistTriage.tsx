@@ -35,13 +35,13 @@ const TodoistTriage = () => {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('todoist-triage', {
+      const { data, error: fnError } = await supabase.functions.invoke('todoist', {
         body: { action: 'list' },
       })
       if (fnError) {
         // Extract the actual error body - try text first since it may not be JSON
         const errorText = await fnError.context?.text?.().catch(() => null)
-        console.error('todoist-triage response:', errorText)
+        console.error('todoist response:', errorText)
         let errorMsg = fnError.message
         try {
           const parsed = errorText ? JSON.parse(errorText) : null
@@ -96,7 +96,7 @@ const TodoistTriage = () => {
   }, [loading, currentTask, isPaused, currentIndex])
 
   const invokeAction = async (actionName: string, extra: Record<string, string> = {}) => {
-    const { data, error: fnError } = await supabase.functions.invoke('todoist-triage', {
+    const { data, error: fnError } = await supabase.functions.invoke('todoist', {
       body: { action: actionName, taskId: currentTask!.id, ...extra },
     })
     if (fnError) {

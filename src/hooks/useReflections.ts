@@ -62,7 +62,7 @@ export function useReflections() {
       const today = new Date().toISOString().split('T')[0]
 
       const { data, error } = await supabase
-        .from('daily_reflections')
+        .from('cassian_daily_reflections')
         .select('*')
         .eq('user_id', user.id)
         .eq('reflection_date', today)

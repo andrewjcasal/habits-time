@@ -38,7 +38,7 @@ export function useProjects(user?: any, projectName?: string) {
       }
 
       let query = supabase
-        .from('projects')
+        .from('cassian_projects')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -70,7 +70,7 @@ export function useProjects(user?: any, projectName?: string) {
       const decodedProjectName = decodeURIComponent(name.replace(/\+/g, ' '))
 
       const { data, error: fetchError } = await supabase
-        .from('projects')
+        .from('cassian_projects')
         .select('*')
         .eq('name', decodedProjectName)
         .eq('is_shareable', true)
@@ -101,7 +101,7 @@ export function useProjects(user?: any, projectName?: string) {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('projects')
+        .from('cassian_projects')
         .insert([{ ...project, user_id: user.id }])
         .select()
         .single()
@@ -121,7 +121,7 @@ export function useProjects(user?: any, projectName?: string) {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('projects')
+        .from('cassian_projects')
         .update(updates)
         .eq('id', id)
         .select()
@@ -138,7 +138,7 @@ export function useProjects(user?: any, projectName?: string) {
 
   const deleteProject = async (id: string) => {
     try {
-      const { error } = await supabase.from('projects').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_projects').delete().eq('id', id)
 
       if (error) throw error
 
@@ -188,7 +188,7 @@ export function usePublicTasks(projectId?: string) {
 
       // Fetch all tasks for the project (public access, no user_id filter)
       const { data, error: fetchError } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
@@ -262,7 +262,7 @@ export function useTasks(projectId?: string) {
 
       // Fetch all tasks for the project
       const { data, error: fetchError } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .select('*')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
@@ -308,7 +308,7 @@ export function useTasks(projectId?: string) {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .insert([{ ...task, user_id: user.id }])
         .select()
         .single()
@@ -328,7 +328,7 @@ export function useTasks(projectId?: string) {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .update(updates)
         .eq('id', id)
         .select()
@@ -345,7 +345,7 @@ export function useTasks(projectId?: string) {
 
   const deleteTask = async (id: string) => {
     try {
-      const { error } = await supabase.from('tasks').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_tasks').delete().eq('id', id)
 
       if (error) throw error
 

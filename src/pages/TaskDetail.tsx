@@ -28,7 +28,7 @@ const TaskDetail = () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .select(`
           *,
           projects (
@@ -61,7 +61,7 @@ const TaskDetail = () => {
     try {
       setSaving(true)
       const { error } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .update(updates)
         .eq('id', task.id)
 
@@ -88,7 +88,7 @@ const TaskDetail = () => {
     try {
       setSaving(true)
       const { data, error } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .insert({
           title: newSubtask.title.trim(),
           description: newSubtask.description.trim() || null,
@@ -131,7 +131,7 @@ const TaskDetail = () => {
     try {
       setSaving(true)
       const { error } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .delete()
         .eq('id', task.id)
 

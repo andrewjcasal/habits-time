@@ -29,7 +29,7 @@ const HabitContext: React.FC<HabitContextProps> = ({ habitId, habitName, initial
     try {
       setSaving(true)
       const { error } = await supabase
-        .from('habits')
+        .from('cassian_habits')
         .update({
           background: newContext.background,
           benefits: newContext.benefits,

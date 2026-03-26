@@ -151,7 +151,7 @@ const Projects = () => {
       }))
 
       const { error: sessionTasksError } = await supabase
-        .from('session_tasks')
+        .from('cassian_session_tasks')
         .upsert(sessionTasksData, {
           onConflict: 'session_id,task_id',
           ignoreDuplicates: true,

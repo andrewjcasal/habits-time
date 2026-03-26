@@ -76,7 +76,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: settings, error: settingsError } = await supabase
-      .from('user_settings')
+      .from('cassian_user_settings')
       .select('todoist_api_key')
       .eq('user_id', userId)
       .single()

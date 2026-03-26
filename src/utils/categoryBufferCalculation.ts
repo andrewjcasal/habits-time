@@ -22,10 +22,10 @@ export const calculateCategoryBufferBlocks = async (
     let buffers = prefetchedBuffers
     if (!buffers) {
       const { data, error: buffersError } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .select(`
           *,
-          meeting_categories(id, name, color)
+          meeting_categories:cassian_meeting_categories(id, name, color)
         `)
         .eq('user_id', userId)
 
@@ -43,7 +43,7 @@ export const calculateCategoryBufferBlocks = async (
     
     // Calculate utilization by querying actual meetings this week
     const { data: weeklyMeetings, error: meetingsError } = await supabase
-      .from('meetings')
+      .from('cassian_meetings')
       .select('category_id, start_time, end_time')
       .eq('user_id', userId)
       .gte('start_time', weekStart.toISOString())

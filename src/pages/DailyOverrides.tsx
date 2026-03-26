@@ -72,7 +72,7 @@ const DailyOverrides = () => {
   const fetchEssentials = async () => {
     try {
       const { data, error } = await supabase
-        .from('essentials')
+        .from('cassian_essentials')
         .select(
           `
           *,
@@ -103,7 +103,7 @@ const DailyOverrides = () => {
       const endDate = addDays(startDate, 4)
 
       const { data, error } = await supabase
-        .from('habits_daily_overrides')
+        .from('cassian_habits_daily_overrides')
         .select('*')
         .eq('user_id', user?.id)
         .gte('date', format(startDate, 'yyyy-MM-dd'))
@@ -131,7 +131,7 @@ const DailyOverrides = () => {
       if (existingOverride) {
         // Update existing override
         const { error } = await supabase
-          .from('habits_daily_overrides')
+          .from('cassian_habits_daily_overrides')
           .update({
             minutes,
             updated_at: new Date().toISOString(),
@@ -145,7 +145,7 @@ const DailyOverrides = () => {
       } else {
         // Create new override
         const { data, error } = await supabase
-          .from('habits_daily_overrides')
+          .from('cassian_habits_daily_overrides')
           .insert({
             user_id: user?.id,
             essential_id: essentialId,
@@ -184,7 +184,7 @@ const DailyOverrides = () => {
       if (existingOverride) {
         // Delete the override
         const { error } = await supabase
-          .from('habits_daily_overrides')
+          .from('cassian_habits_daily_overrides')
           .delete()
           .eq('id', existingOverride.id)
 

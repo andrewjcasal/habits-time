@@ -25,7 +25,7 @@ export function useSocialPosts() {
       }
 
       let query = supabase
-        .from('social_posts')
+        .from('cassian_social_posts')
         .select('*')
         .eq('user_id', user.id)
 
@@ -63,7 +63,7 @@ export function useSocialPosts() {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('social_posts')
+        .from('cassian_social_posts')
         .insert([{ ...post, user_id: user.id }])
         .select()
         .single()
@@ -87,7 +87,7 @@ export function useSocialPosts() {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('social_posts')
+        .from('cassian_social_posts')
         .update(updates)
         .eq('id', id)
         .select()
@@ -108,7 +108,7 @@ export function useSocialPosts() {
 
   const deletePost = async (id: string) => {
     try {
-      const { error } = await supabase.from('social_posts').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_social_posts').delete().eq('id', id)
 
       if (error) throw error
 
@@ -130,7 +130,7 @@ export function useSocialPosts() {
     try {
       // First, update the post with new engagement counts
       const { data: postData, error: postError } = await supabase
-        .from('social_posts')
+        .from('cassian_social_posts')
         .update({
           likes_count: engagement.likes_count,
           replies_count: engagement.replies_count,
@@ -144,7 +144,7 @@ export function useSocialPosts() {
 
       // Then, record the engagement history
       const { data: historyData, error: historyError } = await supabase
-        .from('social_post_engagement_history')
+        .from('cassian_social_post_engagement_history')
         .insert([{
           social_post_id: postId,
           likes_count: engagement.likes_count || 0,
@@ -174,7 +174,7 @@ export function useSocialPosts() {
   const fetchEngagementHistory = async (postId: string): Promise<SocialPostEngagementHistory[]> => {
     try {
       const { data, error } = await supabase
-        .from('social_post_engagement_history')
+        .from('cassian_social_post_engagement_history')
         .select('*')
         .eq('social_post_id', postId)
         .order('recorded_at', { ascending: false })

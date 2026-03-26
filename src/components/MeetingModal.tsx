@@ -82,7 +82,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       if (!user) return
 
       const { data, error } = await supabase
-        .from('meeting_categories')
+        .from('cassian_meeting_categories')
         .select('id, name, color')
         .eq('user_id', user.id)
         .order('name')
@@ -104,7 +104,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       if (!user) return
 
       const { data, error } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .select('id, title, estimated_hours')
         .eq('user_id', user.id)
         .eq('status', 'todo')
@@ -135,7 +135,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       const scheduled_end_time = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`
 
       const { error } = await supabase
-        .from('tasks_daily_logs')
+        .from('cassian_tasks_daily_logs')
         .insert({
           task_id: taskLogForm.task_id,
           user_id: user.id,
@@ -175,7 +175,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       const twoWeeksAgo = subWeeks(new Date(), 2)
 
       const { data: meetings, error } = await supabase
-        .from('meetings')
+        .from('cassian_meetings')
         .select('title, start_time')
         .eq('user_id', user.id)
         .not('title', 'is', null)

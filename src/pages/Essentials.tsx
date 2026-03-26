@@ -46,7 +46,7 @@ const Essentials = () => {
   const fetchEssentials = async () => {
     try {
       const { data, error } = await supabase
-        .from('essentials')
+        .from('cassian_essentials')
         .select(
           `
           *,
@@ -75,7 +75,7 @@ const Essentials = () => {
   const fetchActivityTypes = async () => {
     try {
       const { data, error } = await supabase
-        .from('habits_activity_types')
+        .from('cassian_habits_activity_types')
         .select('id, name')
         .eq('user_id', user?.id)
         .order('name')
@@ -102,7 +102,7 @@ const Essentials = () => {
 
     try {
       const { data, error } = await supabase
-        .from('essentials')
+        .from('cassian_essentials')
         .insert({
           user_id: user?.id,
           activity_type_id: newEssential.activity_type_id,
@@ -134,7 +134,7 @@ const Essentials = () => {
   const updateEssential = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('essentials')
+        .from('cassian_essentials')
         .update({
           activity_type_id: editForm.activity_type_id,
           daily_minutes: editForm.daily_minutes,
@@ -170,7 +170,7 @@ const Essentials = () => {
     if (!confirm('Are you sure you want to delete this essential?')) return
 
     try {
-      const { error } = await supabase.from('essentials').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_essentials').delete().eq('id', id)
 
       if (error) throw error
 

@@ -34,6 +34,14 @@
 - Focus on shorter, actionable posts rather than long personal stories
 - Reflection tone should be coaching/momentum-building, not therapeutic
 
+## Database Table Naming
+
+- All Supabase tables used by this project must have the `cassian_` prefix
+- Example: `cassian_tasks`, `cassian_habits`, `cassian_user_settings`
+- When creating new tables, always use the `cassian_` prefix
+- When referencing tables in `.from()` calls, always use the prefixed name
+- PostgREST join references in `.select()` also use the prefixed names (e.g., `cassian_projects(*)`)
+
 ## Environment Variables Needed
 
 - OPENAI_API_KEY

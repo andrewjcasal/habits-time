@@ -74,6 +74,7 @@ export type Habit = {
   habit_type_id: string | null
   default_start_time: string | null
   current_start_time: string | null
+  is_archived: boolean
 }
 
 export type HabitDailyLog = {

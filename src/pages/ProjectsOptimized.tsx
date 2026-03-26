@@ -77,7 +77,7 @@ const ProjectsOptimized = () => {
     async (projectId: string, data: any) => {
       // For now, keep the original update logic since it's not in the optimized hook yet
       const { error } = await supabase
-        .from('projects')
+        .from('cassian_projects')
         .update(data)
         .eq('id', projectId)
 
@@ -122,7 +122,7 @@ const ProjectsOptimized = () => {
       }))
 
       const { error: sessionTasksError } = await supabase
-        .from('session_tasks')
+        .from('cassian_session_tasks')
         .upsert(sessionTasksData, {
           onConflict: 'session_id,task_id',
           ignoreDuplicates: true,
@@ -139,7 +139,7 @@ const ProjectsOptimized = () => {
         : `Completed tasks: ${taskNames}`
 
       await supabase
-        .from('sessions')
+        .from('cassian_sessions')
         .update({
           notes: updatedNotes,
           status: 'completed',
@@ -534,7 +534,7 @@ const ProjectsOptimized = () => {
         onUpdateTask={updateTask}
         onDeleteTask={async (id: string) => {
           // Implement delete task in the optimized hook if needed
-          await supabase.from('tasks').delete().eq('id', id)
+          await supabase.from('cassian_tasks').delete().eq('id', id)
           await refetchTasks()
         }}
         onRefetchTasks={refetchTasks}
@@ -561,7 +561,7 @@ const ProjectsOptimized = () => {
                 onCopyToClipboard={handleCopyToClipboard}
                 onUpdateSession={async (id: string, updates: any) => {
                   // Implement session update if needed
-                  await supabase.from('sessions').update(updates).eq('id', id)
+                  await supabase.from('cassian_sessions').update(updates).eq('id', id)
                 }}
                 onCompleteSessionTasks={handleCompleteSessionTasks}
               />

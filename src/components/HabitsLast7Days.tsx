@@ -69,14 +69,14 @@ const HabitsLast7Days = () => {
       const endDate = format(weeks[weeks.length - 1].weekEnd, 'yyyy-MM-dd')
 
       const { data: logs, error } = await supabase
-        .from('habits_daily_logs')
+        .from('cassian_habits_daily_logs')
         .select(`
           log_date,
           actual_start_time,
           actual_end_time,
           created_at,
           is_completed,
-          habits!inner (
+          habits:cassian_habits!inner (
             id,
             name,
             duration

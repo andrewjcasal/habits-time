@@ -37,7 +37,7 @@ const AspectDetail = () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
-        .from('aspects')
+        .from('cassian_aspects')
         .select(`
           *,
           subhabits (
@@ -71,7 +71,7 @@ const AspectDetail = () => {
       if (!user) return
       
       let query = supabase
-        .from('subhabit_comments')
+        .from('cassian_subhabit_comments')
         .select(`
           id,
           comment,

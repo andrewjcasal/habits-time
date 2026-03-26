@@ -43,7 +43,7 @@ export const useSettings = (): UseSettingsReturn => {
       if (!user) throw new Error('No authenticated user')
 
       const { data, error } = await supabase
-        .from('user_settings')
+        .from('cassian_user_settings')
         .select('*')
         .eq('user_id', user.id)
         .single()
@@ -68,7 +68,7 @@ export const useSettings = (): UseSettingsReturn => {
         }
 
         const { data: newSettings, error: createError } = await supabase
-          .from('user_settings')
+          .from('cassian_user_settings')
           .insert([defaultSettings])
           .select()
           .single()
@@ -111,7 +111,7 @@ export const useSettings = (): UseSettingsReturn => {
       if (!user) throw new Error('No authenticated user')
 
       const { data, error } = await supabase
-        .from('user_settings')
+        .from('cassian_user_settings')
         .update(updates)
         .eq('user_id', user.id)
         .select()

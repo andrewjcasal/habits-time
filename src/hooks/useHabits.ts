@@ -23,7 +23,7 @@ export function useHabits(selectedDate?: string) {
 
       // Also check visible habits
       const { data: visibleHabits, error: visibleError } = await supabase
-        .from('habits')
+        .from('cassian_habits')
         .select('*')
         .eq('is_visible', true)
 
@@ -31,7 +31,7 @@ export function useHabits(selectedDate?: string) {
 
       // Get the most recent sleep start time from habits_time_logs
       const { data: recentSleep } = await supabase
-        .from('habits_time_logs')
+        .from('cassian_habits_time_logs')
         .select('start_time')
         .eq('user_id', user.id)
         .eq('activity_type_id', '951bc26a-a863-4996-8a02-f4da2d148aa9') // sleep activity type
@@ -50,7 +50,7 @@ export function useHabits(selectedDate?: string) {
 
       // Build the query - show all habits and include recent daily logs for pull-back calculation
       let query = supabase
-        .from('habits')
+        .from('cassian_habits')
         .select(
           `
           *,
@@ -62,6 +62,7 @@ export function useHabits(selectedDate?: string) {
         )
         .or(`user_id.eq.${user.id},user_id.is.null`)
         .eq('is_visible', true)
+        .or('is_archived.eq.false,is_archived.is.null')
         // Include logs from the last 30 days for pull-back calculations
         .gte('habits_daily_logs.log_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
 
@@ -102,7 +103,7 @@ export function useHabits(selectedDate?: string) {
         notes: notes,
       }
 
-      const { error } = await supabase.from('habits_daily_logs').upsert(logData, {
+      const { error } = await supabase.from('cassian_habits_daily_logs').upsert(logData, {
         onConflict: 'habit_id,user_id,log_date',
       })
 
@@ -138,7 +139,7 @@ export function useHabits(selectedDate?: string) {
 
     try {
       const { error } = await supabase
-        .from('habits')
+        .from('cassian_habits')
         .update({ current_start_time: newTime })
         .eq('id', habitId)
         .eq('user_id', user.id)
@@ -161,7 +162,7 @@ export function useHabits(selectedDate?: string) {
 
     try {
       const { error } = await supabase
-        .from('habits')
+        .from('cassian_habits')
         .update({ habit_type_id: habitTypeId })
         .eq('id', habitId)
         .eq('user_id', user.id)
@@ -180,7 +181,7 @@ export function useHabits(selectedDate?: string) {
 
     try {
       const { error } = await supabase
-        .from('habits')
+        .from('cassian_habits')
         .update({ duration: newDuration })
         .eq('id', habitId)
         .eq('user_id', user.id)
@@ -202,7 +203,7 @@ export function useHabits(selectedDate?: string) {
     if (!user) return
     try {
       const { error } = await supabase
-        .from('habits')
+        .from('cassian_habits')
         .update({ name: newName })
         .eq('id', habitId)
         .eq('user_id', user.id)
@@ -222,7 +223,7 @@ export function useHabits(selectedDate?: string) {
     if (!user) return
     try {
       const { error } = await supabase
-        .from('habits')
+        .from('cassian_habits')
         .update({ 
           default_start_time: newStartTime,
           current_start_time: newStartTime 
@@ -245,12 +246,32 @@ export function useHabits(selectedDate?: string) {
     }
   }
 
+  const archiveHabit = async (habitId: string) => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('cassian_habits')
+        .update({ is_archived: true })
+        .eq('id', habitId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      // Remove from local state
+      setHabits(prevHabits => prevHabits.filter(habit => habit.id !== habitId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to archive habit')
+      throw err
+    }
+  }
+
   const deleteHabit = async (habitId: string) => {
     if (!user) return
 
     try {
       const { error } = await supabase
-        .from('habits')
+        .from('cassian_habits')
         .update({ is_visible: false })
         .eq('id', habitId)
         .eq('user_id', user.id)
@@ -294,7 +315,7 @@ export function useHabits(selectedDate?: string) {
         insertData.current_start_time = habitData.default_start_time
       }
 
-      const { error } = await supabase.from('habits').insert(insertData)
+      const { error } = await supabase.from('cassian_habits').insert(insertData)
 
       if (error) throw error
 
@@ -331,7 +352,7 @@ export function useHabits(selectedDate?: string) {
 
       // Get the most recent sleep log
       const { data: sleepLog, error: sleepError } = await supabase
-        .from('habits_time_logs')
+        .from('cassian_habits_time_logs')
         .select('start_time, end_time')
         .eq('user_id', user.id)
         .eq('activity_type_id', '951bc26a-a863-4996-8a02-f4da2d148aa9')
@@ -359,7 +380,7 @@ export function useHabits(selectedDate?: string) {
         
         // Reset all habit completions for today
         const { error: resetError } = await supabase
-          .from('habits_daily_logs')
+          .from('cassian_habits_daily_logs')
           .update({ is_completed: false })
           .eq('user_id', user.id)
           .eq('log_date', today)
@@ -426,6 +447,7 @@ export function useHabits(selectedDate?: string) {
     updateHabitDuration,
     updateHabitName,
     updateHabitDefaultStartTime,
+    archiveHabit,
     deleteHabit,
     createHabit,
     updateHabitStartTimes,

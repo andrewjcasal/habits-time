@@ -30,7 +30,7 @@ export async function syncTodoistTasks(
 ) {
   // Fetch existing todoist tasks from DB
   const { data: existingTasks, error: fetchError } = await supabase
-    .from('tasks')
+    .from('cassian_tasks')
     .select('*')
     .eq('source', 'todoist')
     .eq('user_id', userId)
@@ -66,7 +66,7 @@ export async function syncTodoistTasks(
     }))
 
     const { data: inserted, error: insertError } = await supabase
-      .from('tasks')
+      .from('cassian_tasks')
       .insert(rows)
       .select()
 
@@ -87,7 +87,7 @@ export async function syncTodoistTasks(
     ids.forEach((id) => removedIds.add(id))
 
     const { error: updateError } = await supabase
-      .from('tasks')
+      .from('cassian_tasks')
       .update({ is_complete: true, status: 'done' })
       .in('id', ids)
 

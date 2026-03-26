@@ -23,7 +23,7 @@ const DashboardHome = () => {
 
     const fetchProjects = async () => {
       const { data, error } = await supabase
-        .from('projects')
+        .from('cassian_projects')
         .select('id, name, color, status, hourly_rate')
         .eq('user_id', user.id)
         .eq('status', 'active')
@@ -37,7 +37,7 @@ const DashboardHome = () => {
 
       // Fetch total hours per project from sessions
       const { data: sessions } = await supabase
-        .from('sessions')
+        .from('cassian_sessions')
         .select('project_id, scheduled_hours')
         .eq('user_id', user.id)
 

@@ -22,7 +22,7 @@ const FeedbackModal = ({ isOpen, onClose }: FeedbackModalProps) => {
     setIsSubmitting(true)
     try {
       const { error } = await supabase
-        .from('feedback')
+        .from('cassian_feedback')
         .insert({
           user_id: user.id,
           feedback_text: feedback.trim(),

@@ -36,7 +36,7 @@ const Aspects = () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
-        .from('aspects')
+        .from('cassian_aspects')
         .select(`
           *,
           subhabits (
@@ -66,7 +66,7 @@ const Aspects = () => {
       if (!user) return
       
       let query = supabase
-        .from('subhabit_comments')
+        .from('cassian_subhabit_comments')
         .select(`
           id,
           comment,
@@ -112,7 +112,7 @@ const Aspects = () => {
 
     try {
       const { data, error } = await supabase
-        .from('aspects')
+        .from('cassian_aspects')
         .insert({
           title: newAspectTitle.trim()
         })

@@ -167,7 +167,7 @@ const Habits = () => {
     try {
       // Get sleep logs to determine day boundaries
       const { data: sleepLogs, error: sleepError } = await supabase
-        .from('habits_time_logs')
+        .from('cassian_habits_time_logs')
         .select('start_time')
         .eq('user_id', user.id)
         .eq('activity_type_id', '951bc26a-a863-4996-8a02-f4da2d148aa9')
@@ -182,7 +182,7 @@ const Habits = () => {
       const endDate = new Date()
 
       const { data, error } = await supabase
-        .from('habits_daily_logs')
+        .from('cassian_habits_daily_logs')
         .select(
           `
           log_date,

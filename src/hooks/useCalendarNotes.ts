@@ -10,10 +10,10 @@ export const useCalendarNotes = () => {
   const fetchCalendarNotes = async () => {
     try {
       const { data: notesData, error: notesError } = await supabase
-        .from('calendar_notes')
+        .from('cassian_calendar_notes')
         .select(`
           *,
-          habits_notes:note_id (
+          habits_notes:cassian_habits_notes!note_id (
             id,
             content,
             note_date,
@@ -33,7 +33,7 @@ export const useCalendarNotes = () => {
   const fetchHabitNotes = async () => {
     try {
       const { data: habitNotesData, error: habitNotesError } = await supabase
-        .from('habits_notes')
+        .from('cassian_habits_notes')
         .select('*')
         .order('created_at', { ascending: false })
 
@@ -48,14 +48,14 @@ export const useCalendarNotes = () => {
   const addCalendarNote = async (pinnedDate: string, noteId: string) => {
     try {
       const { data, error } = await supabase
-        .from('calendar_notes')
+        .from('cassian_calendar_notes')
         .insert({
           pinned_date: pinnedDate,
           note_id: noteId,
         })
         .select(`
           *,
-          habits_notes:note_id (
+          habits_notes:cassian_habits_notes!note_id (
             id,
             content,
             note_date,
@@ -77,7 +77,7 @@ export const useCalendarNotes = () => {
   const addHabitNote = async (content: string, noteDate: string) => {
     try {
       const { data, error } = await supabase
-        .from('habits_notes')
+        .from('cassian_habits_notes')
         .insert({
           content,
           note_date: noteDate,
@@ -98,7 +98,7 @@ export const useCalendarNotes = () => {
   const removeCalendarNote = async (calendarNoteId: string) => {
     try {
       const { error } = await supabase
-        .from('calendar_notes')
+        .from('cassian_calendar_notes')
         .delete()
         .eq('id', calendarNoteId)
 

@@ -25,7 +25,7 @@ export function useContracts() {
       }
 
       const { data, error: fetchError } = await supabase
-        .from('contracts')
+        .from('cassian_contracts')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -53,7 +53,7 @@ export function useContracts() {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('contracts')
+        .from('cassian_contracts')
         .insert([{ ...contract, user_id: user.id }])
         .select()
         .single()
@@ -73,7 +73,7 @@ export function useContracts() {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('contracts')
+        .from('cassian_contracts')
         .update(updates)
         .eq('id', id)
         .select()
@@ -90,7 +90,7 @@ export function useContracts() {
 
   const deleteContract = async (id: string) => {
     try {
-      const { error } = await supabase.from('contracts').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_contracts').delete().eq('id', id)
 
       if (error) throw error
 
@@ -109,7 +109,7 @@ export function useContracts() {
 
       // First, try to find existing contract
       const { data: existingContract, error: findError } = await supabase
-        .from('contracts')
+        .from('cassian_contracts')
         .select('*')
         .eq('user_id', user.id)
         .eq('name', name)
@@ -126,7 +126,7 @@ export function useContracts() {
 
       // If not found, create new contract
       const { data: newContract, error: createError } = await supabase
-        .from('contracts')
+        .from('cassian_contracts')
         .insert([{ name, user_id: user.id, status: 'active' }])
         .select()
         .single()
@@ -176,11 +176,11 @@ export function useSessions(projectId?: string) {
       }
 
       let query = supabase
-        .from('sessions')
+        .from('cassian_sessions')
         .select(`
           *, 
-          projects(name, color),
-          session_tasks(id, task_id, tasks(id, title, status))
+          projects:cassian_projects(name, color),
+          session_tasks:cassian_session_tasks(id, task_id, tasks:cassian_tasks(id, title, status))
         `)
         .eq('user_id', user.id)
 
@@ -213,7 +213,7 @@ export function useSessions(projectId?: string) {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('sessions')
+        .from('cassian_sessions')
         .insert([{ ...session, user_id: user.id }])
         .select()
         .single()
@@ -233,7 +233,7 @@ export function useSessions(projectId?: string) {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('sessions')
+        .from('cassian_sessions')
         .update(updates)
         .eq('id', id)
         .select()
@@ -250,7 +250,7 @@ export function useSessions(projectId?: string) {
 
   const deleteSession = async (id: string) => {
     try {
-      const { error } = await supabase.from('sessions').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_sessions').delete().eq('id', id)
 
       if (error) throw error
 
@@ -263,7 +263,7 @@ export function useSessions(projectId?: string) {
   const linkSessionToContract = async (sessionId: string, contractId: string) => {
     try {
       const { data, error } = await supabase
-        .from('contract_sessions')
+        .from('cassian_contract_sessions')
         .insert([{ session_id: sessionId, contract_id: contractId }])
         .select()
         .single()
@@ -289,7 +289,7 @@ export function useSessions(projectId?: string) {
 
       // Find or create contract
       const { data: contract, error: contractError } = await supabase
-        .from('contracts')
+        .from('cassian_contracts')
         .select('*')
         .eq('user_id', user.id)
         .eq('name', contractName)
@@ -300,7 +300,7 @@ export function useSessions(projectId?: string) {
       if (contractError && contractError.code === 'PGRST116') {
         // Contract doesn't exist, create it
         const { data: newContract, error: createError } = await supabase
-          .from('contracts')
+          .from('cassian_contracts')
           .insert([{ name: contractName, user_id: user.id, status: 'active' }])
           .select()
           .single()
@@ -324,7 +324,7 @@ export function useSessions(projectId?: string) {
       }))
 
       const { data: newSessions, error: sessionsError } = await supabase
-        .from('sessions')
+        .from('cassian_sessions')
         .insert(sessionsToInsert)
         .select()
 
@@ -337,7 +337,7 @@ export function useSessions(projectId?: string) {
       }))
 
       const { error: linkError } = await supabase
-        .from('contract_sessions')
+        .from('cassian_contract_sessions')
         .insert(contractSessionsToInsert)
 
       if (linkError) throw linkError
@@ -385,11 +385,11 @@ export function usePublicSessions(projectId?: string) {
       }
 
       let query = supabase
-        .from('sessions')
+        .from('cassian_sessions')
         .select(`
           *, 
-          projects(name, color),
-          session_tasks(id, task_id, tasks(id, title, status))
+          projects:cassian_projects(name, color),
+          session_tasks:cassian_session_tasks(id, task_id, tasks:cassian_tasks(id, title, status))
         `)
         .eq('project_id', projectId)
 

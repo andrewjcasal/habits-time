@@ -21,7 +21,7 @@ export const useBuffers = () => {
       }
 
       const { data, error: fetchError } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -51,7 +51,7 @@ export const useBuffers = () => {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .insert([{ ...bufferData, user_id: user.id }])
         .select()
         .single()
@@ -69,7 +69,7 @@ export const useBuffers = () => {
   const updateBuffer = async (id: string, updates: Partial<Omit<CategoryBuffer, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => {
     try {
       const { data, error } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .update(updates)
         .eq('id', id)
         .select()
@@ -88,7 +88,7 @@ export const useBuffers = () => {
   const deleteBuffer = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .delete()
         .eq('id', id)
 
@@ -135,7 +135,7 @@ export const useBuffers = () => {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .select(`
           *,
           meeting_categories (

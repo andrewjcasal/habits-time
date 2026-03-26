@@ -57,10 +57,10 @@ const ProjectSettingsModal = ({
     // Check how many future task_daily_logs exist for this project's tasks
     const today = format(new Date(), 'yyyy-MM-dd')
     const { count } = await supabase
-      .from('tasks_daily_logs')
+      .from('cassian_tasks_daily_logs')
       .select('id', { count: 'exact', head: true })
       .in('task_id',
-        (await supabase.from('tasks').select('id').eq('project_id', selectedProject.id)).data?.map(t => t.id) || []
+        (await supabase.from('cassian_tasks').select('id').eq('project_id', selectedProject.id)).data?.map(t => t.id) || []
       )
       .gte('log_date', today)
 
@@ -75,10 +75,10 @@ const ProjectSettingsModal = ({
     try {
       if (deleteFutureEvents) {
         const today = format(new Date(), 'yyyy-MM-dd')
-        const taskIds = (await supabase.from('tasks').select('id').eq('project_id', selectedProject.id)).data?.map(t => t.id) || []
+        const taskIds = (await supabase.from('cassian_tasks').select('id').eq('project_id', selectedProject.id)).data?.map(t => t.id) || []
         if (taskIds.length > 0) {
           await supabase
-            .from('tasks_daily_logs')
+            .from('cassian_tasks_daily_logs')
             .delete()
             .in('task_id', taskIds)
             .gte('log_date', today)

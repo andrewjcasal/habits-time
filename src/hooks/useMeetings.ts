@@ -36,7 +36,7 @@ export const useMeetings = (date?: Date) => {
         return
       }
 
-      let query = supabase.from('meetings').select('*').eq('user_id', user.id)
+      let query = supabase.from('cassian_meetings').select('*').eq('user_id', user.id)
 
       // If date is provided, filter by that date
       if (date) {
@@ -79,7 +79,7 @@ export const useMeetings = (date?: Date) => {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('meetings')
+        .from('cassian_meetings')
         .insert([{ ...meetingData, user_id: user.id }])
         .select()
         .single()
@@ -110,7 +110,7 @@ export const useMeetings = (date?: Date) => {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('meetings')
+        .from('cassian_meetings')
         .update(updates)
         .eq('id', id)
         .select()
@@ -134,7 +134,7 @@ export const useMeetings = (date?: Date) => {
 
   const deleteMeeting = async (id: string) => {
     try {
-      const { error } = await supabase.from('meetings').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_meetings').delete().eq('id', id)
 
       if (error) throw error
 

@@ -30,7 +30,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
 
       console.log('123 fetching')
       let query = supabase
-        .from('projects')
+        .from('cassian_projects')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -87,18 +87,18 @@ export function useProjectsPageData(selectedProjectId?: string) {
         // Fetch tasks and sessions in parallel with a single user context
         const [tasksResponse, sessionsResponse] = await Promise.all([
           supabase
-            .from('tasks')
+            .from('cassian_tasks')
             .select('*')
             .eq('project_id', selectedProjectId)
             .eq('user_id', user.id)
             .order('created_at', { ascending: false }),
           
           supabase
-            .from('sessions')
+            .from('cassian_sessions')
             .select(`
               *, 
-              projects(name, color),
-              session_tasks(id, task_id, tasks(id, title, status))
+              projects:cassian_projects(name, color),
+              session_tasks:cassian_session_tasks(id, task_id, tasks:cassian_tasks(id, title, status))
             `)
             .eq('project_id', selectedProjectId)
             .eq('user_id', user.id)
@@ -157,7 +157,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     if (!user) throw new Error('User not authenticated')
 
     const { data, error } = await supabase
-      .from('projects')
+      .from('cassian_projects')
       .insert([{ ...projectData, user_id: user.id }])
       .select()
       .single()
@@ -173,7 +173,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     updates: Partial<Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
   ) => {
     const { data, error } = await supabase
-      .from('projects')
+      .from('cassian_projects')
       .update(updates)
       .eq('id', id)
       .select()
@@ -186,7 +186,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
   }
 
   const deleteProject = async (id: string) => {
-    const { error } = await supabase.from('projects').delete().eq('id', id)
+    const { error } = await supabase.from('cassian_projects').delete().eq('id', id)
 
     if (error) throw error
 
@@ -197,7 +197,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     if (!user) throw new Error('User not authenticated')
 
     const { data, error } = await supabase
-      .from('tasks')
+      .from('cassian_tasks')
       .insert([{ ...taskData, user_id: user.id }])
       .select()
       .single()
@@ -213,7 +213,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     updates: Partial<Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
   ) => {
     const { data, error } = await supabase
-      .from('tasks')
+      .from('cassian_tasks')
       .update(updates)
       .eq('id', id)
       .select()
@@ -226,7 +226,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
   }
 
   const deleteTask = async (id: string) => {
-    const { error } = await supabase.from('tasks').delete().eq('id', id)
+    const { error } = await supabase.from('cassian_tasks').delete().eq('id', id)
 
     if (error) throw error
 
@@ -238,7 +238,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     updates: Partial<Omit<Session, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
   ) => {
     const { data, error } = await supabase
-      .from('sessions')
+      .from('cassian_sessions')
       .update(updates)
       .eq('id', id)
       .select()
@@ -259,7 +259,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
 
     // Find or create contract
     const { data: contract, error: contractError } = await supabase
-      .from('contracts')
+      .from('cassian_contracts')
       .select('*')
       .eq('user_id', user.id)
       .eq('name', contractName)
@@ -270,7 +270,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     if (contractError && contractError.code === 'PGRST116') {
       // Contract doesn't exist, create it
       const { data: newContract, error: createError } = await supabase
-        .from('contracts')
+        .from('cassian_contracts')
         .insert([{ name: contractName, user_id: user.id, status: 'active' }])
         .select()
         .single()
@@ -294,7 +294,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     }))
 
     const { data: newSessions, error: sessionsError } = await supabase
-      .from('sessions')
+      .from('cassian_sessions')
       .insert(sessionsToInsert)
       .select()
 
@@ -307,7 +307,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     }))
 
     const { error: linkError } = await supabase
-      .from('contract_sessions')
+      .from('cassian_contract_sessions')
       .insert(contractSessionsToInsert)
 
     if (linkError) throw linkError
@@ -322,7 +322,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     if (!user || !selectedProjectId) return
 
     const { data, error: fetchError } = await supabase
-      .from('tasks')
+      .from('cassian_tasks')
       .select('*')
       .eq('project_id', selectedProjectId)
       .eq('user_id', user.id)
@@ -357,7 +357,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
     if (!user || !selectedProjectId) return
 
     const { data, error: fetchError } = await supabase
-      .from('sessions')
+      .from('cassian_sessions')
       .select(`
         *, 
         projects(name, color),

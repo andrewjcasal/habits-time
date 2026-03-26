@@ -30,7 +30,7 @@ export function useExperiences(personId?: string) {
 
       // First, get experience IDs for this person
       const { data: experienceIds, error: idsError } = await supabase
-        .from('experience_attendees')
+        .from('cassian_experience_attendees')
         .select('experience_id')
         .eq('person_id', personId)
 
@@ -48,15 +48,15 @@ export function useExperiences(personId?: string) {
 
       // Then, get the experiences with attendees
       const { data, error: fetchError } = await supabase
-        .from('experiences')
+        .from('cassian_experiences')
         .select(
           `
           *,
-          attendees:experience_attendees(
+          attendees:cassian_experience_attendees(
             id,
             person_id,
             created_at,
-            person:people(*)
+            person:cassian_people(*)
           )
         `
         )
@@ -89,7 +89,7 @@ export function useExperiences(personId?: string) {
 
       // First, create the experience
       const { data: experienceData, error: experienceError } = await supabase
-        .from('experiences')
+        .from('cassian_experiences')
         .insert([{ ...experience, user_id: user.id }])
         .select()
         .single()
@@ -104,7 +104,7 @@ export function useExperiences(personId?: string) {
         }))
 
         const { error: attendeeError } = await supabase
-          .from('experience_attendees')
+          .from('cassian_experience_attendees')
           .insert(attendeeRecords)
 
         if (attendeeError) throw attendeeError
@@ -112,15 +112,15 @@ export function useExperiences(personId?: string) {
 
       // Fetch the complete experience with attendees
       const { data: completeExperience, error: fetchError } = await supabase
-        .from('experiences')
+        .from('cassian_experiences')
         .select(
           `
           *,
-          attendees:experience_attendees(
+          attendees:cassian_experience_attendees(
             id,
             person_id,
             created_at,
-            person:people(*)
+            person:cassian_people(*)
           )
         `
         )
@@ -146,7 +146,7 @@ export function useExperiences(personId?: string) {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('experiences')
+        .from('cassian_experiences')
         .update(updates)
         .eq('id', id)
         .select()
@@ -169,7 +169,7 @@ export function useExperiences(personId?: string) {
 
   const deleteExperience = async (id: string) => {
     try {
-      const { error } = await supabase.from('experiences').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_experiences').delete().eq('id', id)
 
       if (error) throw error
 

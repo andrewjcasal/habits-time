@@ -119,7 +119,7 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
 
       try {
         const { data: settings, error } = await supabase
-          .from('user_settings')
+          .from('cassian_user_settings')
           .select('*')
           .eq('user_id', user.id)
           .single()

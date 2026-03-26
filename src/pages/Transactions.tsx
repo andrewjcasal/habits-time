@@ -174,7 +174,7 @@ const Transactions = () => {
 
       // Upsert the transaction in our database
       const { error } = await supabase
-        .from('transactions')
+        .from('cassian_transactions')
         .upsert({
           user_id: user.id,
           ynab_transaction_id: transactionId,
@@ -210,7 +210,7 @@ const Transactions = () => {
       try {
         const transactionIds = transactions.map(t => t.id)
         const { data, error } = await supabase
-          .from('transactions')
+          .from('cassian_transactions')
           .select('ynab_transaction_id, custom_category')
           .eq('user_id', user.id)
           .eq('ynab_budget_id', selectedBudget)

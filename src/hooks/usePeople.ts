@@ -25,7 +25,7 @@ export function usePeople() {
       }
 
       const { data, error: fetchError } = await supabase
-        .from('people')
+        .from('cassian_people')
         .select('*')
         .eq('user_id', user.id)
         .order('name', { ascending: true })
@@ -53,7 +53,7 @@ export function usePeople() {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('people')
+        .from('cassian_people')
         .insert([{ ...person, user_id: user.id }])
         .select()
         .single()
@@ -75,7 +75,7 @@ export function usePeople() {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('people')
+        .from('cassian_people')
         .update(updates)
         .eq('id', id)
         .select()
@@ -94,7 +94,7 @@ export function usePeople() {
 
   const deletePerson = async (id: string) => {
     try {
-      const { error } = await supabase.from('people').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_people').delete().eq('id', id)
 
       if (error) throw error
 

@@ -46,7 +46,7 @@ export function useTaskDailyLogs() {
 
       // Upsert into tasks_daily_logs table to handle conflicts
       const { data, error: insertError } = await supabase
-        .from('tasks_daily_logs')
+        .from('cassian_tasks_daily_logs')
         .upsert(taskLogs, { 
           onConflict: 'task_id,user_id,log_date,scheduled_start_time' 
         })
@@ -75,7 +75,7 @@ export function useTaskDailyLogs() {
       setError(null)
 
       const { error: deleteError } = await supabase
-        .from('tasks_daily_logs')
+        .from('cassian_tasks_daily_logs')
         .delete()
         .eq('user_id', userId)
         .eq('log_date', format(date, 'yyyy-MM-dd'))
@@ -103,7 +103,7 @@ export function useTaskDailyLogs() {
       setError(null)
 
       const { error: deleteError } = await supabase
-        .from('tasks_daily_logs')
+        .from('cassian_tasks_daily_logs')
         .delete()
         .eq('user_id', userId)
         .eq('log_date', format(date, 'yyyy-MM-dd'))
@@ -132,7 +132,7 @@ export function useTaskDailyLogs() {
       setError(null)
 
       const { error: deleteError } = await supabase
-        .from('tasks_daily_logs')
+        .from('cassian_tasks_daily_logs')
         .delete()
         .eq('user_id', userId)
         .gte('log_date', format(startDate, 'yyyy-MM-dd'))
@@ -161,7 +161,7 @@ export function useTaskDailyLogs() {
       setError(null)
 
       const { data, error: fetchError } = await supabase
-        .from('tasks_daily_logs')
+        .from('cassian_tasks_daily_logs')
         .select('*')
         .eq('user_id', userId)
         .gte('log_date', format(startDate, 'yyyy-MM-dd'))

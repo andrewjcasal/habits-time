@@ -25,7 +25,7 @@ export function useSocials() {
       }
 
       const { data, error: fetchError } = await supabase
-        .from('socials')
+        .from('cassian_socials')
         .select('*')
         .eq('user_id', user.id)
         .order('platform', { ascending: true })
@@ -53,7 +53,7 @@ export function useSocials() {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('socials')
+        .from('cassian_socials')
         .insert([{ ...social, user_id: user.id }])
         .select()
         .single()
@@ -75,7 +75,7 @@ export function useSocials() {
   ) => {
     try {
       const { data, error } = await supabase
-        .from('socials')
+        .from('cassian_socials')
         .update(updates)
         .eq('id', id)
         .select()
@@ -94,7 +94,7 @@ export function useSocials() {
 
   const deleteSocial = async (id: string) => {
     try {
-      const { error } = await supabase.from('socials').delete().eq('id', id)
+      const { error } = await supabase.from('cassian_socials').delete().eq('id', id)
 
       if (error) throw error
 

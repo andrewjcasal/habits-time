@@ -7,7 +7,7 @@ export const addMeeting = async (meetingData: any) => {
     if (!user) throw new Error('User not authenticated')
 
     const { data, error } = await supabase
-      .from('meetings')
+      .from('cassian_meetings')
       .insert({ ...meetingData, user_id: user.id })
       .select()
       .single()
@@ -48,10 +48,10 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
     
 
     const { data: conflictingTaskLogs, error: taskLogsError } = await supabase
-      .from('tasks_daily_logs')
+      .from('cassian_tasks_daily_logs')
       .select(`
         *,
-        tasks!inner(*)
+        tasks:cassian_tasks!inner(*)
       `)
       .eq('user_id', userId)
       .eq('log_date', queryDate)
@@ -125,7 +125,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
           // Task is completely within meeting time - mark as conflicted
           
           await supabase
-            .from('tasks_daily_logs')
+            .from('cassian_tasks_daily_logs')
             .update({
               notes: log.notes ? `${log.notes} [Completely conflicted with meeting: ${meeting.title}]` : `Completely conflicted with meeting: ${meeting.title}`,
               updated_at: new Date().toISOString()
@@ -151,7 +151,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
             
             
             await supabase
-              .from('tasks_daily_logs')
+              .from('cassian_tasks_daily_logs')
               .update({
                 scheduled_end_time: newEndTime,
                 estimated_hours: beforeMeetingHours,
@@ -162,7 +162,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
           } else {
             // No time before meeting, mark existing log as conflicted
             await supabase
-              .from('tasks_daily_logs')
+              .from('cassian_tasks_daily_logs')
               .update({
                 notes: log.notes ? `${log.notes} [Start time conflicted with meeting: ${meeting.title}]` : `Start time conflicted with meeting: ${meeting.title}`,
                 updated_at: new Date().toISOString()
@@ -181,7 +181,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
             
             // Query for existing task logs in the proposed time range
             const { data: existingLogs, error: existingLogsError } = await supabase
-              .from('tasks_daily_logs')
+              .from('cassian_tasks_daily_logs')
               .select('*')
               .eq('user_id', userId)
               .eq('log_date', log.log_date)
@@ -209,7 +209,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
                 
                 
                 const { error: insertError } = await supabase
-                  .from('tasks_daily_logs')
+                  .from('cassian_tasks_daily_logs')
                   .insert({
                     task_id: log.task_id,
                     user_id: userId,
@@ -240,7 +240,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
             
             
             await supabase
-              .from('tasks_daily_logs')
+              .from('cassian_tasks_daily_logs')
               .update({
                 scheduled_end_time: newEndTime,
                 estimated_hours: newDuration,
@@ -255,7 +255,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
             const newDuration = logEndHour - meetingEndHour
             
             await supabase
-              .from('tasks_daily_logs')
+              .from('cassian_tasks_daily_logs')
               .update({
                 scheduled_start_time: newStartTime,
                 estimated_hours: newDuration,
@@ -279,7 +279,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
       
 
       const { data: currentTask, error: fetchError } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .select('id, title, estimated_hours, hours_completed, hours_remaining')
         .eq('id', taskId)
         .single()
@@ -301,7 +301,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
       })
 
       const { error: updateTaskError } = await supabase
-        .from('tasks')
+        .from('cassian_tasks')
         .update({
           hours_remaining: newRemainingHours,
           updated_at: new Date().toISOString()
@@ -324,7 +324,7 @@ export const handleTaskRolloverForPastMeeting = async (meeting: any, userId: str
 export const updateMeeting = async (id: string, meetingData: any) => {
   try {
     const { data, error } = await supabase
-      .from('meetings')
+      .from('cassian_meetings')
       .update(meetingData)
       .eq('id', id)
       .select()
@@ -341,7 +341,7 @@ export const updateMeeting = async (id: string, meetingData: any) => {
 export const deleteMeeting = async (id: string) => {
   try {
     const { error } = await supabase
-      .from('meetings')
+      .from('cassian_meetings')
       .delete()
       .eq('id', id)
 

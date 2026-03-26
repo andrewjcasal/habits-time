@@ -29,10 +29,10 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
       }
 
       const { data, error: fetchError } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .select(`
           *,
-          meeting_categories(id, name, color)
+          meeting_categories:cassian_meeting_categories(id, name, color)
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -82,7 +82,7 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
       if (!user) throw new Error('User not authenticated')
 
       const { data, error } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .insert([{
           user_id: user.id,
           category_id: categoryId,
@@ -90,7 +90,7 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
         }])
         .select(`
           *,
-          meeting_categories(id, name, color)
+          meeting_categories:cassian_meeting_categories(id, name, color)
         `)
         .single()
 
@@ -107,12 +107,12 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
   const updateBuffer = async (bufferId: string, weeklyHours: number) => {
     try {
       const { data, error } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .update({ weekly_hours: weeklyHours })
         .eq('id', bufferId)
         .select(`
           *,
-          meeting_categories(id, name, color)
+          meeting_categories:cassian_meeting_categories(id, name, color)
         `)
         .single()
 
@@ -129,7 +129,7 @@ export const useCategoryBuffers = (currentWeekStart: Date) => {
   const deleteBuffer = async (bufferId: string) => {
     try {
       const { error } = await supabase
-        .from('category_buffers')
+        .from('cassian_category_buffers')
         .delete()
         .eq('id', bufferId)
 

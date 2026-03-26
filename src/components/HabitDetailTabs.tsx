@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, MessageSquare, Trash2, Plus, X, Target, FileText, Edit2, ArrowLeft, CheckCircle2, Circle } from 'lucide-react'
+import { Settings, MessageSquare, Trash2, Archive, Plus, X, Target, FileText, Edit2, ArrowLeft, CheckCircle2, Circle } from 'lucide-react'
 import HabitContext from './HabitContext'
 import { useHabits } from '../hooks/useHabits'
 import { useHabitTypes } from '../hooks/useHabitTypes'
@@ -49,7 +49,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const [subhabitComments, setSubhabitComments] = useState<{[key: string]: string}>({})
   const [savingComments, setSavingComments] = useState<{[key: string]: boolean}>({})
   const commentTimeoutRefs = useRef<{[key: string]: NodeJS.Timeout}>({})
-  const { habits, updateHabitType, updateHabitDuration, updateHabitName, updateHabitDefaultStartTime, deleteHabit } = useHabits()
+  const { habits, updateHabitType, updateHabitDuration, updateHabitName, updateHabitDefaultStartTime, archiveHabit, deleteHabit } = useHabits()
   const { habitTypes } = useHabitTypes()
   
   const currentHabit = habits.find(h => h.id === habitId)
@@ -60,10 +60,10 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const fetchSubhabits = async () => {
     try {
       const { data, error } = await supabase
-        .from('subhabits')
+        .from('cassian_subhabits')
         .select(`
           *,
-          aspects (
+          aspects:cassian_aspects (
             id,
             title
           )
@@ -81,7 +81,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const fetchAspects = async () => {
     try {
       const { data, error } = await supabase
-        .from('aspects')
+        .from('cassian_aspects')
         .select('*')
         .order('title', { ascending: true })
 
@@ -96,7 +96,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     try {
       // First, get the aspect IDs from this habit's subhabits
       const { data: habitSubhabits, error: subhabitsError } = await supabase
-        .from('subhabits')
+        .from('cassian_subhabits')
         .select('aspect_id')
         .eq('habit_id', habitId)
         .not('aspect_id', 'is', null)
@@ -113,7 +113,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
 
       // Get notes that are connected to these aspects
       const { data: noteAspects, error: noteAspectsError } = await supabase
-        .from('note_aspects')
+        .from('cassian_note_aspects')
         .select('note_id')
         .in('aspect_id', aspectIds)
 
@@ -128,14 +128,14 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
 
       // Get the actual notes with their aspect information
       const { data: notes, error: notesError } = await supabase
-        .from('habits_notes')
+        .from('cassian_habits_notes')
         .select(`
           id,
           title,
           content,
           created_at,
-          note_aspects!inner (
-            aspects!inner (
+          note_aspects:cassian_note_aspects!inner (
+            aspects:cassian_aspects!inner (
               id,
               title
             )
@@ -167,7 +167,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
       if (!user) return
 
       const { data, error } = await supabase
-        .from('subhabit_comments')
+        .from('cassian_subhabit_comments')
         .select('subhabit_id, comment')
         .eq('comment_date', today)
         .eq('user_id', user.id)
@@ -199,7 +199,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
       }
       
       const { error } = await supabase
-        .from('subhabit_comments')
+        .from('cassian_subhabit_comments')
         .upsert({
           subhabit_id: subhabitId,
           user_id: user.id,
@@ -249,7 +249,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
 
     try {
       const { data, error } = await supabase
-        .from('subhabits')
+        .from('cassian_subhabits')
         .insert({
           habit_id: habitId,
           title: newSubhabitTitle.trim(),
@@ -257,7 +257,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
         })
         .select(`
           *,
-          aspects (
+          aspects:cassian_aspects (
             id,
             title
           )
@@ -279,7 +279,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const handleDeleteSubhabit = async (subhabitId: string) => {
     try {
       const { error } = await supabase
-        .from('subhabits')
+        .from('cassian_subhabits')
         .delete()
         .eq('id', subhabitId)
 
@@ -311,6 +311,15 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
       })
     }
   }, [])
+
+  const handleArchiveHabit = async () => {
+    try {
+      await archiveHabit(habitId)
+      onHabitDeleted?.()
+    } catch (error) {
+      console.error('Error archiving habit:', error)
+    }
+  }
 
   const handleDeleteHabit = async () => {
     try {
@@ -500,6 +509,23 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                   </button>
                 </div>
               )}
+
+              {/* Archive Habit Section */}
+              <div className="pt-2 border-t border-gray-200">
+                <div className="space-y-1">
+                  <h4 className="text-xs font-medium text-gray-700">Archive</h4>
+                  <p className="text-xs text-gray-600">
+                    Archive this habit to hide it from your daily list. You can restore it later.
+                  </p>
+                  <button
+                    onClick={handleArchiveHabit}
+                    className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-xs"
+                  >
+                    <Archive className="w-3 h-3" />
+                    Archive Habit
+                  </button>
+                </div>
+              </div>
 
               {/* Delete Habit Section */}
               <div className="pt-2 border-t border-gray-200">

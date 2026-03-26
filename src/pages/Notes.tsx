@@ -55,7 +55,7 @@ const Notes = () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
-        .from('habits_notes')
+        .from('cassian_habits_notes')
         .select(
           `
           *,
@@ -100,7 +100,7 @@ const Notes = () => {
   const fetchAspects = async () => {
     try {
       const { data, error } = await supabase
-        .from('aspects')
+        .from('cassian_aspects')
         .select('*')
         .order('title', { ascending: true })
 
@@ -118,7 +118,7 @@ const Notes = () => {
     try {
       const now = new Date().toISOString()
       const { data, error } = await supabase
-        .from('habits_notes')
+        .from('cassian_habits_notes')
         .insert({
           user_id: user.id,
           content: '',
@@ -146,7 +146,7 @@ const Notes = () => {
     try {
       setSaving(true)
       const { error } = await supabase
-        .from('habits_notes')
+        .from('cassian_habits_notes')
         .update({
           content,
           updated_at: new Date().toISOString(),
@@ -189,7 +189,7 @@ const Notes = () => {
     try {
       setSaving(true)
       const { error } = await supabase
-        .from('habits_notes')
+        .from('cassian_habits_notes')
         .update({
           title,
           updated_at: new Date().toISOString(),
@@ -237,7 +237,7 @@ const Notes = () => {
       // First, find or create the tag
       let tag: Tag
       const { data: existingTag, error: findError } = await supabase
-        .from('tags')
+        .from('cassian_tags')
         .select('*')
         .eq('name', normalizedTagName)
         .maybeSingle()
@@ -249,7 +249,7 @@ const Notes = () => {
       } else {
         // Create new tag
         const { data: newTag, error: createError } = await supabase
-          .from('tags')
+          .from('cassian_tags')
           .insert({ name: normalizedTagName })
           .select()
           .single()
@@ -259,7 +259,7 @@ const Notes = () => {
       }
 
       // Create the note-tag relationship
-      const { error: linkError } = await supabase.from('note_tags').insert({
+      const { error: linkError } = await supabase.from('cassian_note_tags').insert({
         note_id: noteId,
         tag_id: tag.id,
       })
@@ -296,7 +296,7 @@ const Notes = () => {
 
       // Remove the note-tag relationship
       const { error } = await supabase
-        .from('note_tags')
+        .from('cassian_note_tags')
         .delete()
         .eq('note_id', noteId)
         .eq('tag_id', tagId)
@@ -359,7 +359,7 @@ const Notes = () => {
 
       // Create the note-aspect relationship
       const { error: linkError } = await supabase
-        .from('note_aspects')
+        .from('cassian_note_aspects')
         .insert({
           note_id: noteId,
           aspect_id: aspectId
@@ -393,7 +393,7 @@ const Notes = () => {
 
       // Remove the note-aspect relationship
       const { error } = await supabase
-        .from('note_aspects')
+        .from('cassian_note_aspects')
         .delete()
         .eq('note_id', noteId)
         .eq('aspect_id', aspectId)
@@ -492,7 +492,7 @@ const Notes = () => {
 
     try {
       setSaving(true)
-      const { error } = await supabase.from('habits_notes').delete().eq('id', noteId)
+      const { error } = await supabase.from('cassian_habits_notes').delete().eq('id', noteId)
 
       if (error) throw error
 
