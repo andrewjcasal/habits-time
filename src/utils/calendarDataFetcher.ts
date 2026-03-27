@@ -41,6 +41,12 @@ export const fetchAllCalendarData = async (userId: string) => {
     const habitNotes = habitNotesResult.status === 'fulfilled' ? (habitNotesResult.value.data || []) : []
     const categoryBuffers = categoryBuffersResult.status === 'fulfilled' ? (categoryBuffersResult.value.data || []) : []
 
+    // Debug: check if tasks join is populated
+    const logsWithoutTasks = tasksDailyLogs.filter((l: any) => !l.tasks)
+    if (logsWithoutTasks.length > 0) {
+      console.warn('⚠️ Daily logs missing tasks join:', logsWithoutTasks.length, 'of', tasksDailyLogs.length)
+    }
+
     console.log('📦 Calendar data fetched:', {
       habits: habits.length,
       sessions: sessions.length,

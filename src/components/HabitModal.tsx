@@ -62,6 +62,23 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
 
   const fetchSubhabits = async () => {
     if (!habit) return
+
+    // Check if habit has todoist import configured
+    if (habit.todoist_filter_labels?.length > 0) {
+      const { data: todoistTasks } = await supabase
+        .from('cassian_habit_todoist_tasks')
+        .select('*')
+        .eq('habit_id', habit.id)
+        .order('sort_order', { ascending: true })
+      // Map to same shape as subhabits for the timer
+      setSubhabits((todoistTasks || []).map(t => ({
+        id: t.id,
+        title: t.title,
+        duration_minutes: t.duration_minutes,
+      })))
+      return
+    }
+
     const { data } = await supabase
       .from('cassian_subhabits')
       .select('*')

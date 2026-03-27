@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, MessageSquare, Trash2, Archive, Plus, X, Target, FileText, Edit2, ArrowLeft, CheckCircle2, Circle, GripVertical, Pencil } from 'lucide-react'
+import { Settings, MessageSquare, Trash2, Archive, Plus, X, Target, FileText, Edit2, ArrowLeft, CheckCircle2, Circle, GripVertical, Pencil, RefreshCw } from 'lucide-react'
 import HabitContext from './HabitContext'
 import InlineEdit from './InlineEdit'
 import { useHabits } from '../hooks/useHabits'
@@ -52,6 +52,11 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const [editTitle, setEditTitle] = useState('')
   const [editMinutes, setEditMinutes] = useState('')
   const [aspectNotes, setAspectNotes] = useState<any[]>([])
+  // Todoist import state
+  const [todoistLabels, setTodoistLabels] = useState<string>('')
+  const [todoistDefaultDuration, setTodoistDefaultDuration] = useState<number>(3)
+  const [todoistTasks, setTodoistTasks] = useState<any[]>([])
+  const [syncingTodoist, setSyncingTodoist] = useState(false)
   const [subhabitComments, setSubhabitComments] = useState<{[key: string]: string}>({})
   const [savingComments, setSavingComments] = useState<{[key: string]: boolean}>({})
   const commentTimeoutRefs = useRef<{[key: string]: NodeJS.Timeout}>({})
@@ -91,6 +96,85 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     } catch (err) {
       console.error('Error fetching aspects:', err)
     }
+  }
+
+  // Fetch imported todoist tasks for this habit
+  const fetchTodoistTasks = async () => {
+    const { data } = await supabase
+      .from('cassian_habit_todoist_tasks')
+      .select('*')
+      .eq('habit_id', habitId)
+      .order('sort_order', { ascending: true })
+    setTodoistTasks(data || [])
+  }
+
+  // Sync todoist tasks: pull from API, wipe & repopulate
+  const syncTodoistTasks = async () => {
+    if (!currentHabit?.todoist_filter_labels?.length) return
+    setSyncingTodoist(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Call todoist edge function to get all tasks
+      const { data: todoistData, error: fnError } = await supabase.functions.invoke('todoist', { body: { action: 'list_all' } })
+      if (fnError || !todoistData?.tasks) return
+
+      const labels = currentHabit.todoist_filter_labels
+      const matchingTasks = todoistData.tasks.filter(
+        (t: any) => t.labels?.some((l: string) => labels.includes(l))
+      )
+
+      // Get existing tasks to preserve overridden durations
+      const { data: existing } = await supabase
+        .from('cassian_habit_todoist_tasks')
+        .select('todoist_task_id, duration_minutes')
+        .eq('habit_id', habitId)
+      const existingDurations = new Map(
+        (existing || []).map((e: any) => [e.todoist_task_id, e.duration_minutes])
+      )
+
+      // Wipe existing
+      await supabase.from('cassian_habit_todoist_tasks').delete().eq('habit_id', habitId)
+
+      // Insert new
+      if (matchingTasks.length > 0) {
+        const defaultDuration = currentHabit.todoist_task_duration || 3
+        const rows = matchingTasks.map((t: any, i: number) => ({
+          habit_id: habitId,
+          todoist_task_id: t.id,
+          title: t.content,
+          duration_minutes: existingDurations.get(t.id) || defaultDuration,
+          sort_order: i + 1,
+          user_id: user.id,
+        }))
+        await supabase.from('cassian_habit_todoist_tasks').insert(rows)
+      }
+
+      await fetchTodoistTasks()
+    } catch (err) {
+      console.error('Error syncing todoist tasks:', err)
+    } finally {
+      setSyncingTodoist(false)
+    }
+  }
+
+  // Save todoist filter config on the habit
+  const saveTodoistConfig = async () => {
+    const labelsArray = todoistLabels.split(',').map(l => l.trim()).filter(Boolean)
+    await supabase
+      .from('cassian_habits')
+      .update({
+        todoist_filter_labels: labelsArray.length > 0 ? labelsArray : null,
+        todoist_task_duration: todoistDefaultDuration,
+      })
+      .eq('id', habitId)
+  }
+
+  // Update duration of a single imported task
+  const updateTodoistTaskDuration = async (taskId: string, duration: number) => {
+    await supabase.from('cassian_habit_todoist_tasks').update({ duration_minutes: duration }).eq('id', taskId)
+    setTodoistTasks(prev => prev.map(t => t.id === taskId ? { ...t, duration_minutes: duration } : t))
   }
 
   const fetchAspectNotes = async () => {
@@ -325,7 +409,16 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     fetchSubhabits()
     fetchAspects()
     fetchAspectNotes()
+    fetchTodoistTasks()
   }, [habitId])
+
+  // Load todoist config from habit
+  useEffect(() => {
+    if (currentHabit) {
+      setTodoistLabels((currentHabit.todoist_filter_labels || []).join(', '))
+      setTodoistDefaultDuration(currentHabit.todoist_task_duration || 3)
+    }
+  }, [currentHabit?.id])
 
   // Fetch comments after subhabits are loaded
   useEffect(() => {
@@ -803,6 +896,75 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                       )}
                     </div>
                   ))
+                )}
+              </div>
+
+              {/* Todoist Import Section */}
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-medium text-gray-700">Todoist Import</h3>
+                  {currentHabit?.todoist_filter_labels?.length > 0 && (
+                    <button
+                      onClick={syncTodoistTasks}
+                      disabled={syncingTodoist}
+                      className="flex items-center gap-1 px-2 py-0.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      <RefreshCw className={`w-2.5 h-2.5 ${syncingTodoist ? 'animate-spin' : ''}`} />
+                      Sync
+                    </button>
+                  )}
+                </div>
+
+                {/* Config */}
+                <div className="space-y-2 mb-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Labels (comma-separated)</label>
+                    <input
+                      type="text"
+                      value={todoistLabels}
+                      onChange={e => setTodoistLabels(e.target.value)}
+                      onBlur={saveTodoistConfig}
+                      placeholder="comms, waiting_for"
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Default duration (min)</label>
+                    <input
+                      type="number"
+                      value={todoistDefaultDuration}
+                      onChange={e => setTodoistDefaultDuration(parseInt(e.target.value) || 3)}
+                      onBlur={saveTodoistConfig}
+                      min="1"
+                      className="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Imported tasks list */}
+                {todoistTasks.length > 0 && (
+                  <div className="space-y-1">
+                    {todoistTasks.map(task => (
+                      <div key={task.id} className="flex items-center justify-between px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs">
+                        <span className="text-gray-800 truncate flex-1">{task.title}</span>
+                        <input
+                          type="number"
+                          value={task.duration_minutes}
+                          onChange={e => updateTodoistTaskDuration(task.id, parseInt(e.target.value) || 1)}
+                          min="1"
+                          className="w-12 px-1 py-0.5 text-xs border border-amber-300 rounded text-center bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                        <span className="text-gray-400 ml-0.5">min</span>
+                      </div>
+                    ))}
+                    <p className="text-xs text-gray-400 mt-1">
+                      {todoistTasks.reduce((sum: number, t: any) => sum + t.duration_minutes, 0)} min total
+                    </p>
+                  </div>
+                )}
+
+                {todoistTasks.length === 0 && currentHabit?.todoist_filter_labels?.length > 0 && (
+                  <p className="text-xs text-gray-400 text-center py-2">No imported tasks. Click Sync to pull from Todoist.</p>
                 )}
               </div>
             </div>

@@ -717,27 +717,31 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
       const todoistApiTasks = todoistData.tasks
 
-      // 2. Remove @hold_off tasks from DB
-      const holdOffTaskIds = todoistApiTasks
-        .filter((t: any) => t.labels?.includes('hold_off'))
+      // 2. Remove excluded tasks from DB (hold_off + habit-imported labels)
+      const habitImportedLabels = habits
+        .flatMap((h: any) => h.todoist_filter_labels || [])
+      const excludedLabels = new Set(['hold_off', ...habitImportedLabels])
+
+      const excludedTaskIds = todoistApiTasks
+        .filter((t: any) => t.labels?.some((l: string) => excludedLabels.has(l)))
         .map((t: any) => t.id)
 
-      if (holdOffTaskIds.length > 0) {
-        const { data: holdOffDbTasks } = await supabase
+      if (excludedTaskIds.length > 0) {
+        const { data: excludedDbTasks } = await supabase
           .from('cassian_tasks')
           .select('id')
-          .in('todoist_task_id', holdOffTaskIds)
+          .in('todoist_task_id', excludedTaskIds)
 
-        if (holdOffDbTasks && holdOffDbTasks.length > 0) {
-          const dbIds = holdOffDbTasks.map((t: any) => t.id)
+        if (excludedDbTasks && excludedDbTasks.length > 0) {
+          const dbIds = excludedDbTasks.map((t: any) => t.id)
           await supabase.from('cassian_tasks_daily_logs').delete().in('task_id', dbIds)
           await supabase.from('cassian_tasks').delete().in('id', dbIds)
         }
       }
-
-      // 3. Sync new/updated tasks to DB (excluding hold_off)
-      const nonHoldOffTasks = todoistApiTasks.filter((t: any) => !t.labels?.includes('hold_off'))
-      await syncTodoistTasks(nonHoldOffTasks, user.id)
+      const tasksForScheduling = todoistApiTasks.filter(
+        (t: any) => !t.labels?.some((l: string) => excludedLabels.has(l))
+      )
+      await syncTodoistTasks(tasksForScheduling, user.id)
 
       // 4. Fetch all active todoist tasks from DB
       const { data: todoistDbTasks } = await supabase
@@ -862,7 +866,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       // 9. Re-fetch daily logs to update UI
       const { data: refreshedLogs } = await supabase
         .from('cassian_tasks_daily_logs')
-        .select('*, cassian_tasks(*)')
+        .select('*, tasks:cassian_tasks(*, projects:cassian_projects(*))')
         .eq('user_id', user.id)
 
       if (refreshedLogs) {
