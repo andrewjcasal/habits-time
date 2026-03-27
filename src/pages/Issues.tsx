@@ -3,6 +3,7 @@ import { MoreVertical, Trash2, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import LoadingSpinner from '../components/LoadingSpinner'
+import InlineEdit from '../components/InlineEdit'
 
 interface Issue {
   id: string
@@ -207,17 +208,14 @@ const Issues = () => {
                         )}
                       </div>
                       {editingIssueId === issue.id ? (
-                        <input
-                          type="text"
-                          value={editingName}
-                          onChange={e => setEditingName(e.target.value)}
-                          onBlur={() => renameIssue(issue.id, editingName)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') renameIssue(issue.id, editingName)
-                            if (e.key === 'Escape') setEditingIssueId(null)
-                          }}
-                          autoFocus
-                          className="text-sm text-neutral-800 bg-transparent border-b border-primary-500 outline-none flex-1 min-w-0"
+                        <InlineEdit
+                          fields={[{
+                            value: editingName,
+                            onChange: setEditingName,
+                            placeholder: 'Issue name',
+                          }]}
+                          onSave={() => renameIssue(issue.id, editingName)}
+                          onCancel={() => setEditingIssueId(null)}
                         />
                       ) : (
                         <span className="truncate" title={issue.name}>{issue.name}</span>

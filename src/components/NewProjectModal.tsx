@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { X, FolderOpen } from 'lucide-react'
 import { Project } from '../types'
 
 interface NewProjectModalProps {
@@ -8,7 +8,6 @@ interface NewProjectModalProps {
   onCreateProject: (projectData: {
     name: string
     description: string
-    color: string
     status: string
   }) => Promise<Project>
   onProjectSelect: (project: Project) => void
@@ -20,74 +19,101 @@ const NewProjectModal = ({
   onCreateProject,
   onProjectSelect,
 }: NewProjectModalProps) => {
-  const [newProject, setNewProject] = useState({ name: '', description: '', color: '#3B82F6' })
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [loading, setLoading] = useState(false)
+  const nameRef = useRef<HTMLInputElement>(null)
 
-  const handleCreateProject = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => nameRef.current?.focus(), 50)
+    }
+  }, [isOpen])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!name.trim()) return
+    setLoading(true)
     try {
       const project = await onCreateProject({
-        name: newProject.name,
-        description: newProject.description,
-        color: newProject.color,
+        name: name.trim(),
+        description: description.trim(),
         status: 'active',
       })
       onProjectSelect(project)
-      setNewProject({ name: '', description: '', color: '#3B82F6' })
+      setName('')
+      setDescription('')
       onClose()
     } catch (error) {
       console.error('Error creating project:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-neutral-900">Create New Project</h2>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-700">
-            <X className="w-5 h-5" />
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="px-4 py-2.5 border-b border-neutral-100 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <FolderOpen className="w-3.5 h-3.5 text-primary-600" />
+            <h2 className="text-sm font-semibold text-neutral-900">New Project</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-0.5 text-neutral-400 hover:text-neutral-600 rounded hover:bg-neutral-100 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
-        <form onSubmit={handleCreateProject} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Project name"
-            value={newProject.name}
-            onChange={e => setNewProject({ ...newProject, name: e.target.value })}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
-            required
-          />
-          <textarea
-            placeholder="Description (optional)"
-            value={newProject.description}
-            onChange={e => setNewProject({ ...newProject, description: e.target.value })}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm resize-none"
-            rows={3}
-          />
-          <div className="flex items-center gap-2">
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Name</label>
             <input
-              type="color"
-              value={newProject.color}
-              onChange={e => setNewProject({ ...newProject, color: e.target.value })}
-              className="w-8 h-8 border border-neutral-300 rounded"
+              ref={nameRef}
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Project name"
+              className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+              required
             />
-            <span className="text-sm text-neutral-600">Project color</span>
           </div>
-          <div className="flex gap-2 justify-end">
+
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Optional"
+              className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
+              rows={2}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-neutral-600 text-sm hover:text-neutral-800"
+              className="px-3 py-1.5 text-xs text-neutral-600 hover:text-neutral-800 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
+              disabled={loading || !name.trim()}
+              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Create Project
+              {loading ? 'Creating...' : 'Create'}
             </button>
           </div>
         </form>

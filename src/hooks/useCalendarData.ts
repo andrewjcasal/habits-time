@@ -255,14 +255,25 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const currentHour = currentTime.getHours()
     const currentMinute = currentTime.getMinutes()
 
-    // Show line for hours 6am-4am (the full grid range)
-    const adjustedHour = currentHour < 5 ? currentHour + 24 : currentHour
-    if (adjustedHour < 6 || adjustedHour > 28) return null
+    // Grid layout: 6am-11pm (hours 6-23), then 12am-4am (hours 0-4)
+    // Hours 0-4 visually belong to the PREVIOUS day's column
+    const isLateNight = currentHour >= 0 && currentHour < 5
+    const todayStr = format(currentTime, 'yyyy-MM-dd')
+    const dateStr = format(date, 'yyyy-MM-dd')
 
-    const isToday = format(date, 'yyyy-MM-dd') === format(currentTime, 'yyyy-MM-dd')
-    if (!isToday) return null
+    if (isLateNight) {
+      // At 12:15am Mar 27, the line should show in the Mar 26 column
+      const yesterday = new Date(currentTime)
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = format(yesterday, 'yyyy-MM-dd')
+      if (dateStr !== yesterdayStr) return null
+    } else {
+      if (dateStr !== todayStr) return null
+      if (currentHour < 6) return null // 5am gap — not on grid
+    }
 
-    const hourIndex = currentHour - 6
+    // Calculate position: hours 6-23 = index 0-17, hours 0-4 = index 18-22
+    const hourIndex = isLateNight ? (currentHour + 18) : (currentHour - 6)
     const minutePercentage = currentMinute / 60
     const totalPosition = (hourIndex + minutePercentage) * 64
 

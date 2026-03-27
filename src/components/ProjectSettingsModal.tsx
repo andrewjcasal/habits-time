@@ -139,22 +139,6 @@ const ProjectSettingsModal = ({
             </div>
           </div>
 
-          <div>
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={projectSettings.has_sessions}
-                onChange={e =>
-                  setProjectSettings({
-                    ...projectSettings,
-                    has_sessions: e.target.checked,
-                  })
-                }
-                className="w-3 h-3"
-              />
-              <span className="text-xs font-medium text-neutral-700">Has Sessions</span>
-            </label>
-          </div>
 
           <div>
             <label className="flex items-center gap-1">

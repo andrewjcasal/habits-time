@@ -362,6 +362,7 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
               e.preventDefault()
               const updatedMeeting = { ...meeting, title: localTitle }
               setNewMeeting(updatedMeeting)
+              closeMeetingModal()
               handleSaveMeeting(e, updatedMeeting)
             }}
             className="space-y-1"

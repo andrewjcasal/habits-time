@@ -536,13 +536,6 @@ const Projects = () => {
                   <span>Project Settings</span>
                 </button>
 
-                <button
-                  onClick={() => setShowDayView(true)}
-                  className="flex items-center gap-1 px-2 py-0.5 my-0.5 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
-                >
-                  <Calendar className="w-2.5 h-2.5" />
-                  <span>Day View</span>
-                </button>
               </div>
             )}
           </div>
@@ -579,24 +572,6 @@ const Projects = () => {
         </div>
       )}
 
-      {/* Info Banner - show when projects exist but few tasks - authenticated users only */}
-      {user && projects.length > 0 && currentTasks.length < 2 && !currentTasksLoading && (
-        <div className="px-4 py-3 bg-green-50 border-b border-green-100 mb-4">
-          <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 mt-0.5 flex-shrink-0 text-green-500" />
-            <div>
-              <h3 className="text-sm font-medium text-green-900 mb-1">
-                Add tasks to see the magic happen!
-              </h3>
-              <p className="text-sm text-green-700 leading-relaxed">
-                Fill your projects with tasks to see how they work together in the calendar. Make
-                sure to add durations to each task so they can be properly scheduled and
-                auto-shuffled as you work.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modals - only for authenticated users */}
       {user && (

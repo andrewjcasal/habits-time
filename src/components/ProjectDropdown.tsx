@@ -32,15 +32,7 @@ const ProjectDropdown = forwardRef<HTMLDivElement, ProjectDropdownProps>(
           className="px-2 py-1 flex items-center gap-1 text-sm bg-neutral-50 border-r border-neutral-200 transition-colors min-w-0 max-w-64"
         >
           {selectedProject ? (
-            <>
-              <div
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{
-                  backgroundColor: selectedProject.color || '#3B82F6',
-                }}
-              />
-              <span className="text-neutral-900 truncate">{selectedProject.name}</span>
-            </>
+            <span className="text-neutral-900 truncate">{selectedProject.name}</span>
           ) : (
             <span className="text-neutral-500">Select a project</span>
           )}
@@ -81,12 +73,6 @@ const ProjectDropdown = forwardRef<HTMLDivElement, ProjectDropdownProps>(
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        <div
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{
-                            backgroundColor: project.color || '#3B82F6',
-                          }}
-                        />
                         <div
                           className={`text-sm truncate ${
                             isSelected

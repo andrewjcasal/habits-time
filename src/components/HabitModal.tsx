@@ -66,6 +66,7 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
       .from('cassian_subhabits')
       .select('*')
       .eq('habit_id', habit.id)
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     setSubhabits(data || [])
   }

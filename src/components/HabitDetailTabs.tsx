@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, MessageSquare, Trash2, Archive, Plus, X, Target, FileText, Edit2, ArrowLeft, CheckCircle2, Circle } from 'lucide-react'
+import { Settings, MessageSquare, Trash2, Archive, Plus, X, Target, FileText, Edit2, ArrowLeft, CheckCircle2, Circle, GripVertical, Pencil } from 'lucide-react'
 import HabitContext from './HabitContext'
+import InlineEdit from './InlineEdit'
 import { useHabits } from '../hooks/useHabits'
 import { useHabitTypes } from '../hooks/useHabitTypes'
 import { supabase } from '../lib/supabase'
@@ -45,6 +46,11 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const [newSubhabitTitle, setNewSubhabitTitle] = useState('')
   const [newSubhabitMinutes, setNewSubhabitMinutes] = useState('')
   const [addingSubhabit, setAddingSubhabit] = useState(false)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [editingSubhabitId, setEditingSubhabitId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editMinutes, setEditMinutes] = useState('')
   const [aspectNotes, setAspectNotes] = useState<any[]>([])
   const [subhabitComments, setSubhabitComments] = useState<{[key: string]: string}>({})
   const [savingComments, setSavingComments] = useState<{[key: string]: boolean}>({})
@@ -63,6 +69,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
         .from('cassian_subhabits')
         .select('*')
         .eq('habit_id', habitId)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true })
 
       if (error) throw error
@@ -239,7 +246,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
 
   // Add new subhabit
   const handleAddSubhabit = async () => {
-    if (!newSubhabitTitle.trim()) return
+    if (!newSubhabitTitle.trim() || !newSubhabitMinutes) return
 
     try {
       const { data, error } = await supabase
@@ -248,6 +255,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
           habit_id: habitId,
           title: newSubhabitTitle.trim(),
           duration_minutes: newSubhabitMinutes ? parseInt(newSubhabitMinutes) : null,
+          sort_order: subhabits.length + 1,
         })
         .select('*')
         .single()
@@ -263,8 +271,43 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     }
   }
 
+  // Reorder subhabits after drag-and-drop
+  const handleReorder = async (fromIndex: number, toIndex: number) => {
+    const reordered = [...subhabits]
+    const [moved] = reordered.splice(fromIndex, 1)
+    reordered.splice(toIndex, 0, moved)
+    setSubhabits(reordered)
+
+    // Persist new sort_order to DB
+    const updates = reordered.map((sub, i) => ({ id: sub.id, sort_order: i + 1 }))
+    for (const update of updates) {
+      await supabase
+        .from('cassian_subhabits')
+        .update({ sort_order: update.sort_order })
+        .eq('id', update.id)
+    }
+  }
+
+  // Update subhabit
+  const handleUpdateSubhabit = async (subhabitId: string) => {
+    if (!editTitle.trim() || !editMinutes) return
+    try {
+      await supabase
+        .from('cassian_subhabits')
+        .update({ title: editTitle.trim(), duration_minutes: parseInt(editMinutes) })
+        .eq('id', subhabitId)
+      setSubhabits(prev => prev.map(s =>
+        s.id === subhabitId ? { ...s, title: editTitle.trim(), duration_minutes: parseInt(editMinutes) } : s
+      ))
+      setEditingSubhabitId(null)
+    } catch (err) {
+      console.error('Error updating subhabit:', err)
+    }
+  }
+
   // Delete subhabit
   const handleDeleteSubhabit = async (subhabitId: string) => {
+    if (!confirm('Delete this subhabit?')) return
     try {
       const { error } = await supabase
         .from('cassian_subhabits')
@@ -650,11 +693,12 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                   />
                   <input
                     type="number"
-                    placeholder="Minutes (optional)"
+                    placeholder="Minutes"
                     value={newSubhabitMinutes}
                     onChange={(e) => setNewSubhabitMinutes(e.target.value)}
                     className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                     min="1"
+                    required
                   />
                   <div className="flex gap-1">
                     <button
@@ -684,29 +728,79 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                     No subhabits yet. Add one to break down this habit into smaller actions.
                   </p>
                 ) : (
-                  subhabits.map(subhabit => (
+                  subhabits.map((subhabit, index) => (
                     <div
                       key={subhabit.id}
-                      className="px-2 py-1.5 border border-gray-200 rounded bg-white hover:bg-gray-50"
+                      draggable
+                      onDragStart={() => setDragIndex(index)}
+                      onDragOver={e => {
+                        e.preventDefault()
+                        setDragOverIndex(index)
+                      }}
+                      onDragEnd={() => {
+                        if (dragIndex !== null && dragOverIndex !== null && dragIndex !== dragOverIndex) {
+                          handleReorder(dragIndex, dragOverIndex)
+                        }
+                        setDragIndex(null)
+                        setDragOverIndex(null)
+                      }}
+                      className={`px-2 py-1.5 border rounded bg-white cursor-grab active:cursor-grabbing transition-colors group ${
+                        dragOverIndex === index ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-medium text-gray-900">
-                            {subhabit.title}
-                            {subhabit.duration_minutes && (
-                              <span className="ml-1 text-gray-500 font-normal">{subhabit.duration_minutes}min</span>
-                            )}
+                      {editingSubhabitId === subhabit.id ? (
+                        <InlineEdit
+                          fields={[
+                            {
+                              value: editTitle,
+                              onChange: setEditTitle,
+                              placeholder: 'Title',
+                            },
+                            {
+                              value: editMinutes,
+                              onChange: setEditMinutes,
+                              placeholder: 'min',
+                              type: 'number',
+                              min: '1',
+                              className: 'w-12 text-sm text-neutral-800 bg-transparent border-b border-primary-500 outline-none',
+                            },
+                          ]}
+                          onSave={() => handleUpdateSubhabit(subhabit.id)}
+                          onCancel={() => setEditingSubhabitId(null)}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <GripVertical className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
+                            <div className="text-xs font-medium text-gray-900">
+                              {subhabit.title}
+                              {subhabit.duration_minutes && (
+                                <span className="ml-1 text-gray-500 font-normal">{subhabit.duration_minutes}min</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              onClick={() => {
+                                setEditingSubhabitId(subhabit.id)
+                                setEditTitle(subhabit.title)
+                                setEditMinutes(String(subhabit.duration_minutes || ''))
+                              }}
+                              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Edit subhabit"
+                            >
+                              <Pencil className="w-2 h-2" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSubhabit(subhabit.id)}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Delete subhabit"
+                            >
+                              <X className="w-2 h-2" />
+                            </button>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleDeleteSubhabit(subhabit.id)}
-                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
-                          title="Delete subhabit"
-                        >
-                          <X className="w-2 h-2" />
-                        </button>
-                      </div>
-                      
+                      )}
                     </div>
                   ))
                 )}

@@ -195,17 +195,30 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Update container height and scroll to 2 hours before now
+  // Update container height and scroll to 3 hours before now
   useEffect(() => {
     if (containerRef.current) {
       setContainerHeight(containerRef.current.clientHeight)
       const now = new Date()
       const currentHour = now.getHours()
-      const targetHour = Math.max(0, currentHour - 3)
-      const hoursSince6am = Math.max(0, targetHour - 6)
-      containerRef.current.scrollTop = hoursSince6am * 64
+      // Grid: 6-23 = index 0-17, 0-4 = index 18-22
+      const isLateNight = currentHour >= 0 && currentHour < 5
+      const currentIndex = isLateNight ? (currentHour + 18) : (currentHour - 6)
+      const scrollIndex = Math.max(0, currentIndex - 3)
+      containerRef.current.scrollTop = scrollIndex * 64
     }
   }, [])
+
+  // Hours 0-4 on a column visually belong to the next calendar day
+  const adjustDateForLateNight = (time: string, columnDate: Date): Date => {
+    const hour = parseInt(time.split(':')[0])
+    if (hour >= 0 && hour < 5) {
+      const nextDay = new Date(columnDate)
+      nextDay.setDate(nextDay.getDate() + 1)
+      return nextDay
+    }
+    return columnDate
+  }
 
   const dragOccurredRef = useRef(false)
   const handleTimeSlotClick = (event: React.MouseEvent, timeSlot: string, date: Date) => {
@@ -224,7 +237,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     const [hour] = timeSlot.split(':')
     const minutes = quarter * 15
     const precisetime = `${hour}:${minutes.toString().padStart(2, '0')}`
-    openMeetingModal({ time: precisetime, date })
+    openMeetingModal({ time: precisetime, date: adjustDateForLateNight(precisetime, date) })
   }
 
   const handleAddMeeting = () => {
@@ -513,7 +526,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
         // Only open modal if we have a valid drag (not just a click)
         if (startTotalQuarters !== endTotalQuarters) {
           dragOccurredRef.current = true
-          openMeetingModal({ time: startTime, date: dragStart.date, endTime: endTime })
+          openMeetingModal({ time: startTime, date: adjustDateForLateNight(startTime, dragStart.date), endTime: endTime })
         }
       }
     }
