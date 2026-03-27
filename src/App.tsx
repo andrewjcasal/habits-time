@@ -35,21 +35,9 @@ import Transactions from './pages/Transactions'
 import Settings from './pages/Settings'
 
 // Components
-import { WelcomeModal } from './components/WelcomeModal'
-
 function App() {
   const { user, loading: isLoading } = useUserContext()
   const location = useLocation()
-  const [showWelcome, setShowWelcome] = useState(false)
-
-  useEffect(() => {
-    // Check if this is the first time the user has visited the app
-    const hasVisited = localStorage.getItem('hasVisitedReflectify')
-    if (!hasVisited && user) {
-      setShowWelcome(true)
-      localStorage.setItem('hasVisitedReflectify', 'true')
-    }
-  }, [user])
 
   if (isLoading) {
     return (
@@ -61,8 +49,6 @@ function App() {
 
   return (
     <>
-      {showWelcome && user && <WelcomeModal onClose={() => setShowWelcome(false)} />}
-
       <Routes>
         {/* Public routes */}
         <Route element={<AuthLayout />}>

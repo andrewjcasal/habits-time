@@ -64,7 +64,7 @@ const MainLayout = () => {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-14 lg:w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
         <Link to="/dashboard" className="block px-4 py-1 md:px-1 md:py-1 lg:px-4 lg:py-1">
-          <h1 className="text-lg font-semibold text-primary-700 md:text-center lg:text-left">
+          <h1 className="text-lg text-primary-700 md:text-center lg:text-left" style={{ fontFamily: "'DM Serif Display', serif" }}>
             <span className="md:hidden lg:block">Cassian</span>
           </h1>
         </Link>
@@ -129,7 +129,7 @@ const MainLayout = () => {
       {/* Mobile Header with Hamburger */}
       <header className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-neutral-200 px-1 py-1 z-30 flex items-center justify-between">
         <Link to="/dashboard" className="flex items-center pl-1">
-          <h1 className="text-base font-semibold text-primary-700">Cassian</h1>
+          <h1 className="text-base text-primary-700" style={{ fontFamily: "'DM Serif Display', serif" }}>Cassian</h1>
         </Link>
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
