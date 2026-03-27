@@ -181,10 +181,13 @@ function CalendarEventSlots({
         const duration = log.estimated_hours || 1
         const logHeight = duration * 64
 
+        const todayStr = new Date().toLocaleDateString('en-CA')
+        const isDatedTodoist = log.tasks?.source === 'todoist' && log.tasks?.due_date
+        const isUrgentTodoist = isDatedTodoist && (log.tasks.due_date <= todayStr || log.tasks.due_date === log.log_date)
         return (
           <CalendarEvent
             key={`task-daily-log-${log.id}`}
-            type="tasklog"
+            type={isUrgentTodoist ? 'tasklog-urgent' : 'tasklog'}
             style={getEventStyle(log.topPosition, logHeight, 20)}
             onClick={e => {
               e.stopPropagation()

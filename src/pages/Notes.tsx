@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { MoreVertical, Tag, X, Trash2 } from 'lucide-react'
+import { MoreVertical, X, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import AddButton from '../components/AddButton'
 import LoadingSpinner from '../components/LoadingSpinner'
+import NoteModal from '../components/NoteModal'
 
 interface Tag {
   id: string
@@ -38,18 +39,12 @@ const Notes = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [editingTitle, setEditingTitle] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [newTag, setNewTag] = useState('')
-  const [addingTag, setAddingTag] = useState(false)
   const [aspects, setAspects] = useState<Aspect[]>([])
-  const [selectedAspectId, setSelectedAspectId] = useState<string>('')
+  const [allIssues, setAllIssues] = useState<any[]>([])
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingDate, setEditingDate] = useState(false)
   const [cardDropdownId, setCardDropdownId] = useState<string | null>(null)
   const cardDropdownRef = useRef<HTMLDivElement | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const dropdownRef = useRef<HTMLDivElement | null>(null)
 
   // Fetch notes from database with tags and aspects
   const fetchNotes = async () => {
@@ -76,6 +71,15 @@ const Notes = () => {
               id,
               title
             )
+          ),
+          note_issues:cassian_note_issues (
+            id,
+            issue_id,
+            intensity,
+            issue:cassian_issues (
+              id,
+              name
+            )
           )
         `
         )
@@ -84,11 +88,12 @@ const Notes = () => {
 
       if (error) throw error
 
-      // Transform the data to flatten tags and aspects
+      // Transform the data to flatten tags, aspects, and issues
       const notesWithTagsAndAspects = (data || []).map(note => ({
         ...note,
         tags: note.note_tags?.map((nt: any) => nt.tags).filter(Boolean) || [],
         aspects: note.note_aspects?.map((na: any) => na.aspects).filter(Boolean) || [],
+        issues: note.note_issues?.map((ni: any) => ({ ...ni, issue: ni.issue })).filter((ni: any) => ni.issue) || [],
       }))
 
       setNotes(notesWithTagsAndAspects)
@@ -99,18 +104,17 @@ const Notes = () => {
     }
   }
 
-  // Fetch aspects from database
-  const fetchAspects = async () => {
+  // Fetch aspects and issues from database
+  const fetchAspectsAndIssues = async () => {
     try {
-      const { data, error } = await supabase
-        .from('cassian_aspects')
-        .select('*')
-        .order('title', { ascending: true })
-
-      if (error) throw error
-      setAspects(data || [])
+      const [aspectsRes, issuesRes] = await Promise.all([
+        supabase.from('cassian_aspects').select('*').order('title', { ascending: true }),
+        supabase.from('cassian_issues').select('*').eq('is_archived', false).order('name'),
+      ])
+      if (!aspectsRes.error) setAspects(aspectsRes.data || [])
+      if (!issuesRes.error) setAllIssues(issuesRes.data || [])
     } catch (err) {
-      console.error('Error fetching aspects:', err)
+      console.error('Error fetching aspects/issues:', err)
     }
   }
 
@@ -485,20 +489,6 @@ const Notes = () => {
     }
     setModalOpen(false)
     setSelectedNote(null)
-    setEditingTitle(false)
-    setEditingDate(false)
-    setShowDropdown(false)
-    setAddingTag(false)
-    setNewTag('')
-  }
-
-  // Handle adding new tag
-  const handleAddTag = async () => {
-    if (!selectedNote || !newTag.trim()) return
-
-    await addTag(selectedNote.id, newTag)
-    setNewTag('')
-    setAddingTag(false)
   }
 
   // Delete note
@@ -528,14 +518,9 @@ const Notes = () => {
     }
   }
 
-  // Close dropdown when clicking outside
+  // Close card dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false)
-        setAddingTag(false)
-        setNewTag('')
-      }
       if (cardDropdownRef.current && !cardDropdownRef.current.contains(event.target as Node)) {
         setCardDropdownId(null)
       }
@@ -571,7 +556,7 @@ const Notes = () => {
 
   useEffect(() => {
     fetchNotes()
-    fetchAspects()
+    fetchAspectsAndIssues()
   }, [user])
 
   // Handle noteId query parameter
@@ -688,6 +673,19 @@ const Notes = () => {
                         +{note.tags.length - 3}
                       </span>
                     )}
+                    {note.issues && note.issues.length > 0 && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-orange-500 text-white rounded shadow-sm">
+                        {note.issues.length} {note.issues.length === 1 ? 'issue' : 'issues'}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {/* Issues badge when no tags */}
+                {(!note.tags || note.tags.length === 0) && note.issues && note.issues.length > 0 && (
+                  <div className="absolute -top-2 left-0 flex flex-wrap gap-1">
+                    <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-orange-500 text-white rounded shadow-sm">
+                      {note.issues.length} {note.issues.length === 1 ? 'issue' : 'issues'}
+                    </span>
                   </div>
                 )}
 
@@ -733,278 +731,32 @@ const Notes = () => {
 
       {/* Note Modal */}
       {modalOpen && selectedNote && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={e => {
-            if (e.target === e.currentTarget) closeModal()
+        <NoteModal
+          note={selectedNote}
+          isOpen={modalOpen}
+          onClose={closeModal}
+          onUpdate={(updatedNote) => {
+            setSelectedNote(prev => prev ? { ...prev, ...updatedNote } : null)
+            setNotes(prev => prev.map(n => n.id === updatedNote.id ? { ...n, ...updatedNote } : n))
           }}
-        >
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="px-5 py-3 border-b border-neutral-200 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1 mr-3">
-                  {editingTitle ? (
-                    <input
-                      type="text"
-                      value={selectedNote.title || ''}
-                      onChange={e =>
-                        setSelectedNote(prev => (prev ? { ...prev, title: e.target.value } : null))
-                      }
-                      onBlur={() => {
-                        setEditingTitle(false)
-                        if (selectedNote) {
-                          const trimmedTitle = selectedNote.title?.trim()
-                          if (trimmedTitle) {
-                            saveNoteTitle(selectedNote.id, trimmedTitle)
-                          }
-                        }
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          setEditingTitle(false)
-                          if (selectedNote) {
-                            const trimmedTitle = selectedNote.title?.trim()
-                            if (trimmedTitle) {
-                              saveNoteTitle(selectedNote.id, trimmedTitle)
-                            }
-                          }
-                        }
-                        if (e.key === 'Escape') {
-                          setEditingTitle(false)
-                          const originalNote = notes.find(n => n.id === selectedNote.id)
-                          if (originalNote && selectedNote) {
-                            setSelectedNote(prev =>
-                              prev ? { ...prev, title: originalNote.title } : null
-                            )
-                          }
-                        }
-                      }}
-                      placeholder="Enter title..."
-                      autoFocus
-                      className="text-lg font-medium text-neutral-900 bg-transparent border-b-2 border-primary-500 outline-none w-full"
-                    />
-                  ) : (
-                    <h2
-                      className="text-lg font-medium text-neutral-900 truncate cursor-pointer hover:text-primary-600 transition-colors"
-                      onClick={() => setEditingTitle(true)}
-                      title="Click to edit title"
-                    >
-                      {getNoteTitle(selectedNote)}
-                    </h2>
-                  )}
-                  {editingDate ? (
-                    <input
-                      type="datetime-local"
-                      value={(() => {
-                        const d = new Date(selectedNote.start_time || selectedNote.created_at)
-                        const year = d.getFullYear()
-                        const month = String(d.getMonth() + 1).padStart(2, '0')
-                        const day = String(d.getDate()).padStart(2, '0')
-                        const hours = String(d.getHours()).padStart(2, '0')
-                        const mins = String(d.getMinutes()).padStart(2, '0')
-                        return `${year}-${month}-${day}T${hours}:${mins}`
-                      })()}
-                      onChange={e => {
-                        const val = e.target.value
-                        setSelectedNote(prev => prev ? { ...prev, start_time: new Date(val).toISOString() } : null)
-                      }}
-                      onBlur={() => {
-                        setEditingDate(false)
-                        if (selectedNote) {
-                          saveNoteDate(selectedNote.id, selectedNote.start_time || selectedNote.created_at)
-                        }
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === 'Escape') {
-                          setEditingDate(false)
-                          if (e.key === 'Enter' && selectedNote) {
-                            saveNoteDate(selectedNote.id, selectedNote.start_time || selectedNote.created_at)
-                          }
-                        }
-                      }}
-                      autoFocus
-                      className="text-sm text-neutral-500 bg-transparent border-b-2 border-primary-500 outline-none"
-                    />
-                  ) : (
-                    <p
-                      className="text-sm text-neutral-500 cursor-pointer hover:text-primary-600 transition-colors"
-                      onClick={() => setEditingDate(true)}
-                      title="Click to edit date"
-                    >
-                      {new Date(selectedNote.start_time || selectedNote.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {saving && <div className="text-sm text-neutral-500">Saving...</div>}
-                  <div className="relative" ref={dropdownRef}>
-                    <button
-                      onClick={() => setShowDropdown(!showDropdown)}
-                      className="p-1 text-neutral-500 hover:text-neutral-700 transition-colors rounded hover:bg-neutral-100"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-
-                    {showDropdown && (
-                      <div className="absolute right-0 top-8 bg-white border border-neutral-200 rounded-md shadow-lg z-10 min-w-36">
-                        {/* Current tags */}
-                        {selectedNote.tags && selectedNote.tags.length > 0 && (
-                          <div className="p-1.5 border-b border-neutral-100">
-                            <div className="text-xs font-medium text-neutral-600 mb-1">Tags</div>
-                            <div className="flex flex-wrap gap-0.5">
-                              {selectedNote.tags.map(tag => (
-                                <span
-                                  key={tag.id}
-                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium rounded"
-                                  style={{
-                                    backgroundColor: `${tag.color}20`,
-                                    color: tag.color,
-                                  }}
-                                >
-                                  {tag.name}
-                                  <button
-                                    onClick={() => removeTag(selectedNote.id, tag.id)}
-                                    className="hover:opacity-70"
-                                    style={{ color: tag.color }}
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Current aspects */}
-                        {selectedNote.aspects && selectedNote.aspects.length > 0 && (
-                          <div className="p-1.5 border-b border-neutral-100">
-                            <div className="text-xs font-medium text-neutral-600 mb-1">Aspects</div>
-                            <div className="flex flex-wrap gap-0.5">
-                              {selectedNote.aspects.map((aspect) => (
-                                <span
-                                  key={aspect.id}
-                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 text-green-800"
-                                >
-                                  {aspect.title}
-                                  <button
-                                    onClick={() => removeAspect(selectedNote.id, aspect.id)}
-                                    className="hover:opacity-70 text-green-600"
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Add aspect */}
-                        <div className="p-1.5 border-b border-neutral-100">
-                          <select
-                            value={selectedAspectId}
-                            onChange={(e) => {
-                              const aspectId = e.target.value
-                              if (aspectId && selectedNote) {
-                                addAspect(selectedNote.id, aspectId)
-                                setSelectedAspectId('')
-                              }
-                            }}
-                            className="w-full text-xs border border-neutral-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                          >
-                            <option value="">Add aspect...</option>
-                            {aspects
-                              .filter(aspect =>
-                                !selectedNote.aspects?.some(noteAspect => noteAspect.id === aspect.id)
-                              )
-                              .map(aspect => (
-                                <option key={aspect.id} value={aspect.id}>
-                                  {aspect.title}
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-
-                        {/* Add new tag */}
-                        {addingTag ? (
-                          <div className="flex items-center gap-1 p-1.5 border-b border-neutral-100">
-                            <input
-                              type="text"
-                              value={newTag}
-                              onChange={e => setNewTag(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                  handleAddTag()
-                                }
-                                if (e.key === 'Escape') {
-                                  setAddingTag(false)
-                                  setNewTag('')
-                                }
-                              }}
-                              placeholder="Tag name..."
-                              autoFocus
-                              className="flex-1 px-1.5 py-1 text-xs border border-neutral-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                            />
-                            <button
-                              onClick={handleAddTag}
-                              className="px-1.5 py-1 text-xs bg-primary-500 text-white rounded hover:bg-primary-600"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setAddingTag(true)}
-                            className="flex items-center gap-1.5 w-full px-1.5 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 transition-colors border-b border-neutral-100"
-                          >
-                            <Tag className="w-2 h-2" />
-                            Add tag
-                          </button>
-                        )}
-
-                        {/* Delete note */}
-                        <button
-                          onClick={() => deleteNote(selectedNote.id)}
-                          className="flex items-center gap-1.5 w-full px-1.5 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 className="w-2 h-2" />
-                          Delete note
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={closeModal}
-                    className="p-1 text-neutral-500 hover:text-neutral-700 transition-colors rounded hover:bg-neutral-100"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Note Editor */}
-            <div className="flex-1 p-5 overflow-auto min-h-0">
-              <textarea
-                value={selectedNote.content}
-                onChange={e => handleContentChange(e.target.value)}
-                placeholder="Start writing your note..."
-                className="w-full h-full min-h-[40vh] resize-none border-none outline-none text-neutral-900 placeholder-neutral-400 text-base leading-relaxed block"
-                style={{
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  wordWrap: 'break-word',
-                  whiteSpace: 'pre-wrap',
-                }}
-              />
-            </div>
-          </div>
-        </div>
+          onDelete={deleteNote}
+          showExtended
+          saving={saving}
+          onSaveTitle={saveNoteTitle}
+          onSaveDate={saveNoteDate}
+          onSaveContent={saveNote}
+          onAddTag={addTag}
+          onRemoveTag={removeTag}
+          onAddAspect={addAspect}
+          onRemoveAspect={removeAspect}
+          aspects={aspects}
+          initialNoteIssues={selectedNote?.issues || []}
+          initialAllIssues={allIssues}
+          onIssuesChange={(noteId, issues) => {
+            setNotes(prev => prev.map(n => n.id === noteId ? { ...n, issues } : n))
+            setSelectedNote(prev => prev?.id === noteId ? { ...prev, issues } : prev)
+          }}
+        />
       )}
     </div>
   )

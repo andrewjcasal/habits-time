@@ -71,8 +71,8 @@ export const handleHabitSkip = async (
   }
 }
 
-export const handleCompleteTask = async (selectedTask: any) => {
-  if (!selectedTask) return
+export const handleCompleteTask = async (selectedTask: any): Promise<string | null> => {
+  if (!selectedTask) return null
   try {
     const originalTaskId = selectedTask.id.includes('-chunk-')
       ? selectedTask.id.split('-chunk-')[0]
@@ -84,9 +84,10 @@ export const handleCompleteTask = async (selectedTask: any) => {
       .eq('id', originalTaskId)
 
     if (error) throw error
-    window.location.reload()
+    return originalTaskId
   } catch (error) {
     console.error('Error completing task:', error)
+    return null
   }
 }
 

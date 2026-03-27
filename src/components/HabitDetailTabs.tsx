@@ -43,7 +43,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const [subhabits, setSubhabits] = useState<any[]>([])
   const [aspects, setAspects] = useState<any[]>([])
   const [newSubhabitTitle, setNewSubhabitTitle] = useState('')
-  const [newSubhabitAspectId, setNewSubhabitAspectId] = useState('')
+  const [newSubhabitMinutes, setNewSubhabitMinutes] = useState('')
   const [addingSubhabit, setAddingSubhabit] = useState(false)
   const [aspectNotes, setAspectNotes] = useState<any[]>([])
   const [subhabitComments, setSubhabitComments] = useState<{[key: string]: string}>({})
@@ -61,13 +61,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     try {
       const { data, error } = await supabase
         .from('cassian_subhabits')
-        .select(`
-          *,
-          aspects:cassian_aspects (
-            id,
-            title
-          )
-        `)
+        .select('*')
         .eq('habit_id', habitId)
         .order('created_at', { ascending: true })
 
@@ -253,22 +247,16 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
         .insert({
           habit_id: habitId,
           title: newSubhabitTitle.trim(),
-          aspect_id: newSubhabitAspectId || null
+          duration_minutes: newSubhabitMinutes ? parseInt(newSubhabitMinutes) : null,
         })
-        .select(`
-          *,
-          aspects:cassian_aspects (
-            id,
-            title
-          )
-        `)
+        .select('*')
         .single()
 
       if (error) throw error
 
       setSubhabits(prev => [...prev, data])
       setNewSubhabitTitle('')
-      setNewSubhabitAspectId('')
+      setNewSubhabitMinutes('')
       setAddingSubhabit(false)
     } catch (err) {
       console.error('Error adding subhabit:', err)
@@ -660,18 +648,14 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                     className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                     autoFocus
                   />
-                  <select
-                    value={newSubhabitAspectId}
-                    onChange={(e) => setNewSubhabitAspectId(e.target.value)}
+                  <input
+                    type="number"
+                    placeholder="Minutes (optional)"
+                    value={newSubhabitMinutes}
+                    onChange={(e) => setNewSubhabitMinutes(e.target.value)}
                     className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="">Select aspect (optional)...</option>
-                    {aspects.map(aspect => (
-                      <option key={aspect.id} value={aspect.id}>
-                        {aspect.title}
-                      </option>
-                    ))}
-                  </select>
+                    min="1"
+                  />
                   <div className="flex gap-1">
                     <button
                       onClick={handleAddSubhabit}
@@ -683,7 +667,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                       onClick={() => {
                         setAddingSubhabit(false)
                         setNewSubhabitTitle('')
-                        setNewSubhabitAspectId('')
+                        setNewSubhabitMinutes('')
                       }}
                       className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
                     >
@@ -703,19 +687,16 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                   subhabits.map(subhabit => (
                     <div
                       key={subhabit.id}
-                      className="p-2 border border-gray-200 rounded bg-white hover:bg-gray-50"
+                      className="px-2 py-1.5 border border-gray-200 rounded bg-white hover:bg-gray-50"
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between">
                         <div>
                           <div className="text-xs font-medium text-gray-900">
                             {subhabit.title}
+                            {subhabit.duration_minutes && (
+                              <span className="ml-1 text-gray-500 font-normal">{subhabit.duration_minutes}min</span>
+                            )}
                           </div>
-                          {subhabit.aspects && (
-                            <div className="text-xs text-green-700 mt-0.5">
-                              <Target className="w-2 h-2 inline mr-1" />
-                              {subhabit.aspects.title}
-                            </div>
-                          )}
                         </div>
                         <button
                           onClick={() => handleDeleteSubhabit(subhabit.id)}
@@ -726,22 +707,6 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                         </button>
                       </div>
                       
-                      {/* Today's comments field */}
-                      <div className="w-full">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Today's comments:
-                        </label>
-                        <textarea
-                          value={subhabitComments[subhabit.id] || ''}
-                          onChange={(e) => handleCommentChange(subhabit.id, e.target.value)}
-                          placeholder="Add your thoughts about this subhabit today..."
-                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent resize-none"
-                          rows={2}
-                        />
-                        {savingComments[subhabit.id] && (
-                          <div className="text-xs text-gray-500 mt-1">Saving...</div>
-                        )}
-                      </div>
                     </div>
                   ))
                 )}

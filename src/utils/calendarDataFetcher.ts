@@ -21,7 +21,7 @@ export const fetchAllCalendarData = async (userId: string) => {
       withTimeout(supabase.from('cassian_sessions').select('*, projects:cassian_projects(*)').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_projects').select('*').eq('user_id', userId).neq('status', 'archived')),
       withTimeout(supabase.from('cassian_meetings').select('*').eq('user_id', userId)),
-      withTimeout(supabase.from('cassian_tasks_daily_logs').select('*, tasks:cassian_tasks!inner(*, projects:cassian_projects(*))').eq('user_id', userId)),
+      withTimeout(supabase.from('cassian_tasks_daily_logs').select('*, tasks:cassian_tasks(*, projects:cassian_projects(*))').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_tasks').select('*, projects:cassian_projects!inner(*)').eq('user_id', userId).neq('projects.status', 'archived')),
       withTimeout(supabase.from('cassian_user_settings').select('*').eq('user_id', userId).single()),
       withTimeout(supabase.from('cassian_calendar_notes').select('*, habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey(id, content, created_at)').order('pinned_date', { ascending: true })),
@@ -40,6 +40,17 @@ export const fetchAllCalendarData = async (userId: string) => {
     const calendarNotes = calendarNotesResult.status === 'fulfilled' ? (calendarNotesResult.value.data || []) : []
     const habitNotes = habitNotesResult.status === 'fulfilled' ? (habitNotesResult.value.data || []) : []
     const categoryBuffers = categoryBuffersResult.status === 'fulfilled' ? (categoryBuffersResult.value.data || []) : []
+
+    console.log('📦 Calendar data fetched:', {
+      habits: habits.length,
+      sessions: sessions.length,
+      projects: projects.length,
+      meetings: meetings.length,
+      tasksDailyLogs: tasksDailyLogs.length,
+      todoistLogs: tasksDailyLogs.filter((l: any) => l.tasks?.source === 'todoist').length,
+      tasks: tasks.length,
+      settings: !!settings,
+    })
 
     // Log any failures
     const failures = [

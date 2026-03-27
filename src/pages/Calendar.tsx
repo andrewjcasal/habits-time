@@ -660,6 +660,8 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   // Render all calendar events for a time slot
   const renderCalendarEvents = useCallback(
     (timeSlot: string, date: Date) => {
+      if (isDataLoading) return null
+
       const dateStr = format(date, 'yyyy-MM-dd')
       const today = format(new Date(), 'yyyy-MM-dd')
       const isToday = dateStr === today
@@ -706,6 +708,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
       getTasksDailyLogsForTimeSlot,
       getBuffersForCalendarTimeSlot,
       getCategoryBuffersForTimeSlot,
+      isDataLoading,
       tasksScheduled,
       handleHabitClick,
       handleSessionClick,
@@ -956,7 +959,10 @@ const Calendar = () => {
           return await deleteMeetingHandler(meeting)
         }
       }}
-      onCompleteTask={async (task: any) => { await handleCompleteTask(task) }}
+      onCompleteTask={async (task: any) => {
+        const completedId = await handleCompleteTask(task)
+        if (completedId && removeTaskHandler) removeTaskHandler(completedId)
+      }}
       onDeleteTask={async (task: any) => {
         const deletedId = await handleDeleteTask(task)
         if (deletedId && removeTaskHandler) removeTaskHandler(deletedId)

@@ -1,7 +1,7 @@
 import React from 'react'
 
 interface CalendarEventProps {
-  type: 'habit' | 'session' | 'task' | 'placeholder' | 'meeting' | 'tasklog' | 'buffer' | 'reduced-buffer' | 'category-buffer' | 'todoist'
+  type: 'habit' | 'session' | 'task' | 'placeholder' | 'meeting' | 'tasklog' | 'tasklog-urgent' | 'buffer' | 'reduced-buffer' | 'category-buffer' | 'todoist'
   style: React.CSSProperties
   onClick?: (e: React.MouseEvent) => void
   onResizeStart?: (e: React.MouseEvent) => void
@@ -54,6 +54,7 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
     placeholder: 'bg-green-100 text-green-800 cursor-pointer hover:bg-green-200',
     meeting: 'bg-red-100 text-red-800',
     tasklog: 'bg-yellow-100 text-yellow-800 cursor-pointer hover:opacity-100',
+    'tasklog-urgent': 'bg-amber-200 text-amber-900 cursor-pointer hover:opacity-100',
     buffer: 'bg-indigo-100 text-indigo-800',
     'reduced-buffer': 'bg-orange-100 text-orange-800 opacity-80',
     'category-buffer': 'bg-gray-100 text-gray-800',

@@ -52,6 +52,7 @@ const MainLayout = () => {
     { path: '/projects', label: 'Projects', icon: FolderOpen },
     { path: '/habits', label: 'Habits', icon: Heart },
     { path: '/notes', label: 'Notes', icon: FileText },
+    { path: '/issues', label: 'Issues', icon: Zap },
   ]
 
   const settingsItem = { path: '/settings', label: 'Settings', icon: Settings }

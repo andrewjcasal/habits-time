@@ -101,7 +101,15 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         if (cancelled) return
 
-        // Step 2: Update UI immediately with base data (shows habits, sessions, meetings)
+        // Phase 1: Compute synchronous data and render grid immediately
+        const today = new Date()
+        const todayStr = format(today, 'yyyy-MM-dd')
+        const filteredTasksDailyLogs = fetchedTasksDailyLogs.filter(log => log.log_date !== todayStr)
+        const dayColumnsList = getDayColumns()
+        const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
+        const generatedBuffers = generateBuffersForDays(dayColumnsList, fetchedMeetings)
+
+        if (cancelled) return
         setHabits(fetchedHabits)
         setSessions(fetchedSessions)
         setProjects(fetchedProjects)
@@ -110,88 +118,56 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         setSettings(fetchedSettings)
         setCalendarNotes(fetchedCalendarNotes)
         setHabitNotes(fetchedHabitNotes)
-        setIsDataLoading(false) // Show partial data immediately
+        setConflictMaps(newConflictMaps)
+        setIsDataLoading(false)
 
-        // Create work hours range function using fetched settings
+        // Phase 2: Task scheduling + buffers in parallel (background)
         const getWorkHoursRangeFromSettings = () => {
-          if (!fetchedSettings) {
-            console.warn('⚠️ No settings found, using fallback work hours (10-22)')
-            return { start: 10, end: 22 }
-          }
-          
+          if (!fetchedSettings) return { start: 10, end: 22 }
           const start = parseInt(fetchedSettings.work_hours_start.split(':')[0], 10)
           const end = parseInt(fetchedSettings.work_hours_end.split(':')[0], 10)
-          
-          
           return { start, end }
         }
 
-        // Step 3: Fetch and filter tasks (exclude tasks from projects with sessions)
-        const tasksPromise = fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions)
-        // Step 4: Process conflict maps while tasks are loading
-        const today = new Date()
-        const todayStr = format(today, 'yyyy-MM-dd')
-        const filteredTasksDailyLogs = fetchedTasksDailyLogs.filter(log => log.log_date !== todayStr)
-        const dayColumnsList = getDayColumns()
-        const newConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
-        setConflictMaps(newConflictMaps)
-        
-        // Step 4.5: Generate daily buffers (extracted from conflict maps)
-        const generatedBuffers = generateBuffersForDays(dayColumnsList, fetchedMeetings)
-        setBuffers(generatedBuffers)
+        const [filteredTasks, calculatedBufferBlocks] = await Promise.all([
+          fetchTasksForProjects(user.id, fetchedProjects, fetchedSessions),
+          calculateCategoryBufferBlocks(user.id, baseDate, newConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings, fetchedCategoryBuffers),
+        ])
 
-
-        // Step 5: Wait for filtered tasks and schedule them
-        const filteredTasks = await tasksPromise
+        if (cancelled) return
         setAllTasks(filteredTasks)
+        setBuffers(generatedBuffers)
+        setCategoryBufferBlocks(calculatedBufferBlocks)
 
-        // Step 6: Check if we need to regenerate tasks
+        // Task scheduling
         const newDataHash = createDataHash(fetchedHabits, fetchedSessions, fetchedMeetings, filteredTasks, fetchedTasksDailyLogs)
         const needsRegeneration = !tasksScheduled || dataHash !== newDataHash
 
         if (needsRegeneration) {
-          
           setDataHash(newDataHash)
-
           try {
-            // Schedule tasks - use filtered data consistent with conflict computation
-            const scheduledTasksResult = await scheduleAllTasks(
+            const scheduledResult = await scheduleAllTasks(
               filteredTasks,
               newConflictMaps,
               dayColumnsList,
               getWorkHoursRangeFromSettings,
               scheduleTaskInAvailableSlots,
               saveTaskChunks,
-              null, // clearTaskLogsFromTimeForward removed
+              null,
               user.id,
               filteredTasksDailyLogs,
               fetchedSettings?.weekend_days || ['saturday', 'sunday'],
               fetchedSettings,
-              fetchedTasks, // allTasks
-              new Map() // scheduledTasksCache - empty during initial scheduling
+              fetchedTasks,
+              new Map()
             )
-            setScheduledTasksCache(scheduledTasksResult)
-            setTasksScheduled(true)
-
+            if (cancelled) return
+            setScheduledTasksCache(scheduledResult)
           } catch (error) {
             console.error('❌ Task scheduling failed:', error)
-            // Set tasksScheduled to true even if scheduling fails to prevent infinite loading
-            // This ensures the UI shows whatever tasks are available
-            setTasksScheduled(true)
           }
-        } else {
-          // Ensure tasksScheduled is true when using cached data
-          setTasksScheduled(true)
         }
-
-        // Step 7: Calculate category buffer blocks after task scheduling
-        // Need to recompute conflicts including scheduled tasks
-        const finalConflictMaps = computeConflictMaps(fetchedHabits, fetchedSessions, fetchedMeetings, dayColumnsList, filteredTasksDailyLogs)
-        const calculatedBufferBlocks = await calculateCategoryBufferBlocks(user.id, baseDate, finalConflictMaps, getWorkHoursRange, fetchedHabits, fetchedSettings, fetchedCategoryBuffers)
-        setCategoryBufferBlocks(calculatedBufferBlocks)
-
-        // Step 8: Todoist tasks — just read existing daily logs from DB (no API call)
-        // Full sync (API + reschedule) happens via syncTodoist() button
+        setTasksScheduled(true)
 
       } catch (error) {
         console.error('Error in calendar data loading:', error)
@@ -278,9 +254,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const getCurrentTimeLinePosition = (date: Date) => {
     const currentHour = currentTime.getHours()
     const currentMinute = currentTime.getMinutes()
-    const { end } = getWorkHoursRange()
 
-    if (currentHour < 6 || currentHour >= end) return null
+    // Show line for hours 6am-4am (the full grid range)
+    const adjustedHour = currentHour < 5 ? currentHour + 24 : currentHour
+    if (adjustedHour < 6 || adjustedHour > 28) return null
 
     const isToday = format(date, 'yyyy-MM-dd') === format(currentTime, 'yyyy-MM-dd')
     if (!isToday) return null
@@ -589,9 +566,11 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   const tasksDailyLogsIndex = useMemo(() => {
     const index = new Map<string, any[]>()
+    let todoistCount = 0
     tasksDailyLogs.forEach(log => {
       const startTime = log.actual_start_time || log.scheduled_start_time
       if (!startTime) return
+      if (log.tasks?.source === 'todoist') todoistCount++
       const hour = parseInt(startTime.split(':')[0])
       if (hour === 5) return
       const minutes = parseInt(startTime.split(':')[1])
@@ -600,6 +579,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       arr.push({ ...log, topPosition: (minutes / 60) * 100 })
       index.set(key, arr)
     })
+    console.log('📋 TasksDailyLogs index:', tasksDailyLogs.length, 'total,', todoistCount, 'todoist, slots:', index.size)
     return index
   }, [tasksDailyLogs])
 
@@ -780,34 +760,17 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           .map((t: any) => t.id)
       )
 
-      const isOverdueOrToday = (t: any) => t.due_date && t.due_date <= todayStr
       const isUrgent = (t: any) => urgentDbIds.has(t.id)
       const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
-
-      const overdueOrToday = todoistDbTasks.filter(
-        (t: any) => isOverdueOrToday(t) && !isUrgent(t)
-      )
-      const urgent = todoistDbTasks.filter(
-        (t: any) => isUrgent(t) && !isOverdueOrToday(t)
-      )
-      const overdueAndUrgent = todoistDbTasks.filter(
-        (t: any) => isOverdueOrToday(t) && isUrgent(t)
-      )
-      const rest = todoistDbTasks.filter(
-        (t: any) => !isUrgent(t) && !isOverdueOrToday(t)
-      )
-
-      // Sort each bucket by priority (high > medium > low)
       const byPriority = (a: any, b: any) => (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2)
-      overdueOrToday.sort(byPriority)
-      urgent.sort(byPriority)
-      rest.sort(byPriority)
 
-      const prioritizedTasks = [...overdueAndUrgent, ...overdueOrToday, ...urgent, ...rest]
-
-      // 7. Schedule in priority order
+      // 7. Schedule in priority order with date pinning
       const futureDayColumns = dayColumns.filter((col: any) => col.dateStr >= todayStr)
-      const todoistConflictMaps = computeConflictMaps(habits, sessions, meetings, futureDayColumns, tasksDailyLogs)
+      // Filter out deleted todoist daily logs from conflict maps (we just wiped them)
+      const nonTodoistDailyLogs = tasksDailyLogs.filter(
+        (log: any) => !todoistDbIds.includes(log.task_id)
+      )
+      const todoistConflictMaps = computeConflictMaps(habits, sessions, meetings, futureDayColumns, nonTodoistDailyLogs)
       const weekendDayNames = settings?.weekend_days || ['saturday', 'sunday']
 
       const getTodoistHoursForDate = (date?: Date) => {
@@ -818,11 +781,60 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         return TODOIST_WEEKDAY_HOURS
       }
 
-      const todoistScheduleResult = await scheduleAllTasks(
-        prioritizedTasks, todoistConflictMaps, futureDayColumns, getTodoistHoursForDate,
-        scheduleTaskInAvailableSlots, saveTaskChunks, null,
-        user.id, tasksDailyLogs, [], null, prioritizedTasks, new Map()
-      )
+      // Schedule per-day with correct priority ordering within each day:
+      // 1. Overdue/today tasks
+      // 2. Tasks whose due_date matches this day
+      // 3. @urgent tasks
+      // 4. Remaining by priority (high > med > low)
+      const overdueOrToday = todoistDbTasks
+        .filter((t: any) => t.due_date && t.due_date <= todayStr && !isUrgent(t))
+        .sort(byPriority)
+      const urgentTasks = todoistDbTasks
+        .filter((t: any) => isUrgent(t) && !(t.due_date && t.due_date <= todayStr))
+        .sort(byPriority)
+      const restTasks = todoistDbTasks
+        .filter((t: any) => !isUrgent(t) && !(t.due_date && t.due_date <= todayStr) && !t.due_date)
+        .sort(byPriority)
+
+      // Track which tasks have been scheduled (across all days)
+      const scheduledTaskIds = new Set<string>()
+      let combinedResult = new Map<string, any[]>()
+
+      for (const dayCol of futureDayColumns) {
+        // Dated tasks pinned to this specific day
+        const datedForThisDay = todoistDbTasks
+          .filter((t: any) => t.due_date && t.due_date > todayStr && t.due_date === dayCol.dateStr)
+          .sort(byPriority)
+
+        // Build per-day priority list, skipping already-scheduled tasks
+        const dayTasks = [
+          ...overdueOrToday.filter(t => !scheduledTaskIds.has(t.id)),
+          ...datedForThisDay.filter(t => !scheduledTaskIds.has(t.id)),
+          ...urgentTasks.filter(t => !scheduledTaskIds.has(t.id)),
+          ...restTasks.filter(t => !scheduledTaskIds.has(t.id)),
+        ]
+        if (dayTasks.length === 0) continue
+
+        const dayResult = await scheduleAllTasks(
+          dayTasks, todoistConflictMaps, [dayCol], getTodoistHoursForDate,
+          scheduleTaskInAvailableSlots, saveTaskChunks, null,
+          user.id, nonTodoistDailyLogs, [], null, dayTasks, new Map()
+        )
+
+        dayResult.forEach((tasks, dateKey) => {
+          tasks.forEach((t: any) => {
+            const taskId = t.id?.split('-chunk-')[0]
+            if (taskId) scheduledTaskIds.add(taskId)
+          })
+          const existing = combinedResult.get(dateKey) || []
+          combinedResult.set(dateKey, [...existing, ...tasks])
+        })
+      }
+
+      const todoistScheduleResult = combinedResult
+      let totalScheduled = 0
+      todoistScheduleResult.forEach((tasks) => { totalScheduled += tasks.length })
+      console.log('🔄 Todoist sync scheduled:', totalScheduled, 'chunks across', todoistScheduleResult.size, 'days')
 
       // 8. Update UI state
       setScheduledTasksCache(prev => {

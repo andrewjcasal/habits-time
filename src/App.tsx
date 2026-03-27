@@ -21,6 +21,7 @@ import Habits from './pages/Habits'
 import TodoistTriage from './pages/TodoistTriage'
 import Wins from './pages/Wins'
 import Notes from './pages/Notes'
+import Issues from './pages/Issues'
 import Community from './pages/Community'
 import PersonDetail from './pages/PersonDetail'
 import Projects from './pages/Projects'
@@ -94,6 +95,7 @@ function App() {
             <Route path="todoist" element={<TodoistTriage />} />
             <Route path="wins" element={<Wins />} />
             <Route path="notes" element={<Notes />} />
+            <Route path="issues" element={<Issues />} />
             <Route path="community" element={<Community />} />
             <Route path="community/:personId" element={<PersonDetail />} />
             <Route path="settings" element={<Settings />} />

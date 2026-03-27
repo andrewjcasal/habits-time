@@ -11,6 +11,15 @@ export interface TodoistApiTask {
   parent_id: string | null
 }
 
+function parseDurationFromTitle(title: string): { cleanTitle: string; hours: number } {
+  const match = title.match(/\[(\d+)\]/)
+  if (match) {
+    const minutes = parseInt(match[1], 10)
+    return { cleanTitle: title.replace(match[0], '').trim(), hours: minutes / 60 }
+  }
+  return { cleanTitle: title, hours: 0.5 }
+}
+
 function mapTodoistPriority(priority: number): string {
   switch (priority) {
     case 4:
@@ -53,17 +62,20 @@ export async function syncTodoistTasks(
   // Insert new tasks (with .select() to get the inserted rows back)
   let insertedTasks: any[] = []
   if (newTasks.length > 0) {
-    const rows = newTasks.map((t) => ({
-      todoist_task_id: t.id,
-      source: 'todoist',
-      title: t.content,
-      description: t.description || null,
-      priority: mapTodoistPriority(t.priority),
-      due_date: t.due?.date || null,
-      estimated_hours: 0.5,
-      project_id: null,
-      user_id: userId,
-    }))
+    const rows = newTasks.map((t) => {
+      const { cleanTitle, hours } = parseDurationFromTitle(t.content)
+      return {
+        todoist_task_id: t.id,
+        source: 'todoist',
+        title: cleanTitle,
+        description: t.description || null,
+        priority: mapTodoistPriority(t.priority),
+        due_date: t.due?.date || null,
+        estimated_hours: hours,
+        project_id: null,
+        user_id: userId,
+      }
+    })
 
     const { data: inserted, error: insertError } = await supabase
       .from('cassian_tasks')
@@ -83,12 +95,12 @@ export async function syncTodoistTasks(
     const apiTask = apiTaskMap.get(dbTask.todoist_task_id)
     if (!apiTask) continue
     const newDueDate = apiTask.due?.date || null
-    const newTitle = apiTask.content
+    const { cleanTitle: newTitle, hours: newHours } = parseDurationFromTitle(apiTask.content)
     const newPriority = mapTodoistPriority(apiTask.priority)
-    if (dbTask.due_date !== newDueDate || dbTask.title !== newTitle || dbTask.priority !== newPriority) {
+    if (dbTask.due_date !== newDueDate || dbTask.title !== newTitle || dbTask.priority !== newPriority || dbTask.estimated_hours !== newHours) {
       await supabase
         .from('cassian_tasks')
-        .update({ due_date: newDueDate, title: newTitle, priority: newPriority })
+        .update({ due_date: newDueDate, title: newTitle, priority: newPriority, estimated_hours: newHours })
         .eq('id', dbTask.id)
     }
   }

@@ -223,7 +223,7 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
           description: '',
           start_time: startTime,
           end_time: endTime,
-          date: timeSlot.date.toISOString().split('T')[0],
+          date: timeSlot.date.toLocaleDateString('en-CA'),
           location: '',
           meeting_type: 'general',
           priority: 'medium',
