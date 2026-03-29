@@ -6,6 +6,7 @@ import NoteModal from '../components/NoteModal'
 import { useCalendarData } from '../hooks/useCalendarData'
 import { supabase } from '../lib/supabase'
 import { Meeting } from '../types'
+import { deltaYToMinutes, computeMovedTimes } from '../utils/calendarDragUtils'
 import TaskScheduleModal from '../components/TaskScheduleModal'
 import {
   handleHabitTimeChange,
@@ -53,6 +54,12 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   const [resizeNewEndTime, setResizeNewEndTime] = useState<Date | null>(null)
   const resizeStartYRef = useRef<number>(0)
   const resizeStartEndTimeRef = useRef<Date | null>(null)
+
+  // Task log drag state
+  const [draggingTaskLog, setDraggingTaskLog] = useState<any>(null)
+  const [taskLogDragY, setTaskLogDragY] = useState<number>(0)
+  const taskLogDragStartYRef = useRef<number>(0)
+  const taskLogOriginalStartRef = useRef<string>('')
 
   // Drag-to-create meeting state
   const [isDragging, setIsDragging] = useState(false)
@@ -122,6 +129,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     removeCalendarNote,
     removeTaskFromCalendar,
     removeTaskLogFromUI,
+    moveTaskLog,
     skipHabitForDate,
     syncTodoist,
   } = useCalendarData(windowWidth, baseDate)
@@ -611,7 +619,7 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
 
     const handleMouseMove = (e: MouseEvent) => {
       const deltaY = e.clientY - resizeStartYRef.current
-      const deltaMinutes = Math.round(deltaY / 64 * 60 / 15) * 15 // snap to 15-min
+      const deltaMinutes = deltaYToMinutes(deltaY)
       const newEnd = new Date(resizeStartEndTimeRef.current!.getTime() + deltaMinutes * 60000)
       const meetingStart = new Date(resizingMeeting.start_time)
       // Minimum 15 minutes
@@ -670,6 +678,77 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     }
   }, [resizingMeeting, resizeNewEndTime, tasksDailyLogs, updateMeeting])
 
+  // Task log drag-to-move
+  const handleTaskLogDragStart = useCallback((log: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setDraggingTaskLog(log)
+    taskLogDragStartYRef.current = e.clientY
+    taskLogOriginalStartRef.current = log.scheduled_start_time
+    setTaskLogDragY(0)
+  }, [])
+
+  useEffect(() => {
+    if (!draggingTaskLog) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = e.clientY - taskLogDragStartYRef.current
+      setTaskLogDragY(deltaY)
+    }
+
+    const handleMouseUp = async () => {
+      if (!draggingTaskLog) return
+
+      const result = computeMovedTimes(
+        taskLogOriginalStartRef.current,
+        draggingTaskLog.estimated_hours || 0.5,
+        taskLogDragY
+      )
+
+      if (!result) {
+        setDraggingTaskLog(null)
+        setTaskLogDragY(0)
+        return
+      }
+
+      // Check if the new end time is before now (moved into the past = complete)
+      const now = new Date()
+      const [endH, endM] = result.newEndTime.split(':').map(Number)
+      const endDate = new Date(draggingTaskLog.log_date + 'T00:00:00')
+      endDate.setHours(endH, endM, 0, 0)
+      const isBeforeNow = endDate < now
+
+      if (isBeforeNow && draggingTaskLog.tasks?.source === 'todoist' && draggingTaskLog.tasks?.todoist_task_id) {
+        // Complete in Todoist
+        await supabase.functions.invoke('todoist', {
+          body: { action: 'complete', taskId: draggingTaskLog.tasks.todoist_task_id }
+        })
+        // Mark complete in DB
+        await supabase.from('cassian_tasks').update({ is_complete: true, status: 'completed' }).eq('id', draggingTaskLog.task_id)
+      } else if (isBeforeNow) {
+        // Non-todoist task: mark complete
+        await supabase.from('cassian_tasks').update({ is_complete: true, status: 'completed' }).eq('id', draggingTaskLog.task_id)
+      }
+
+      // Always move to the new position
+      await supabase
+        .from('cassian_tasks_daily_logs')
+        .update({ scheduled_start_time: result.newStartTime, scheduled_end_time: result.newEndTime })
+        .eq('id', draggingTaskLog.id)
+      moveTaskLog(draggingTaskLog.id, result.newStartTime, result.newEndTime)
+
+      setDraggingTaskLog(null)
+      setTaskLogDragY(0)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingTaskLog, taskLogDragY])
+
   // Render all calendar events for a time slot
   const renderCalendarEvents = useCallback(
     (timeSlot: string, date: Date) => {
@@ -710,6 +789,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
           handleTaskClick={handleTaskClick}
           handleEditMeeting={handleEditMeeting}
           onMeetingResizeStart={handleMeetingResizeStart}
+          onTaskLogDragStart={handleTaskLogDragStart}
+          draggingTaskLogId={draggingTaskLog?.id}
+          taskLogDragY={taskLogDragY}
         />
       )
     },
@@ -727,6 +809,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
       handleSessionClick,
       handleTaskClick,
       handleEditMeeting,
+      handleTaskLogDragStart,
+      draggingTaskLog,
+      taskLogDragY,
     ]
   )
 

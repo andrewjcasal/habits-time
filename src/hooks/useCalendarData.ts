@@ -14,6 +14,16 @@ import { startOfWeek } from 'date-fns'
 import { calculateCategoryBufferBlocks } from '../utils/categoryBufferCalculation'
 import { syncTodoistTasks } from '../utils/todoistSync'
 
+// Hours 0-4 on the grid belong to the previous day's column
+function getColumnDate(dateStr: string, hour: number): string {
+  if (hour >= 0 && hour < 5) {
+    const d = new Date(dateStr + 'T12:00:00')
+    d.setDate(d.getDate() - 1)
+    return format(d, 'yyyy-MM-dd')
+  }
+  return dateStr
+}
+
 // Todoist tasks are scheduled in personal hours, separate from work tasks
 const TODOIST_WEEKDAY_HOURS = { start: 19, end: 23 }
 const TODOIST_WEEKEND_HOURS = { start: 10, end: 22 }
@@ -407,7 +417,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     scheduledTasksCache.forEach((chunks, dateKey) => {
       chunks.forEach(chunk => {
         const hour = chunk.startTime ? Math.floor(chunk.startTime) : chunk.startHour
-        if (hour < 6) return
+        if (hour === 5) return
         const key = `${dateKey}-${hour}`
         const arr = index.get(key) || []
         arr.push(chunk)
@@ -422,8 +432,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     meetings.forEach(meeting => {
       const meetingStart = new Date(meeting.start_time)
       const hour = meetingStart.getHours()
-      if (hour < 6) return
-      const key = `${format(meetingStart, 'yyyy-MM-dd')}-${hour}`
+      if (hour === 5) return // 5am gap — not on grid
+      const key = `${getColumnDate(format(meetingStart, 'yyyy-MM-dd'), hour)}-${hour}`
       const arr = index.get(key) || []
       arr.push(meeting)
       index.set(key, arr)
@@ -560,9 +570,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       if (!dateStr) return
       const startTime = session.actual_start_time || defaultStartTime
       const hour = parseInt(startTime.split(':')[0])
-      if (hour < 6) return
+      if (hour === 5) return
       const minutes = parseInt(startTime.split(':')[1])
-      const key = `${dateStr}-${hour}`
+      const key = `${getColumnDate(dateStr, hour)}-${hour}`
       const arr = index.get(key) || []
       arr.push({ ...session, topPosition: (minutes / 60) * 100 })
       index.set(key, arr)
@@ -585,7 +595,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       const hour = parseInt(startTime.split(':')[0])
       if (hour === 5) return
       const minutes = parseInt(startTime.split(':')[1])
-      const key = `${log.log_date}-${hour}`
+      const key = `${getColumnDate(log.log_date, hour)}-${hour}`
       const arr = index.get(key) || []
       arr.push({ ...log, topPosition: (minutes / 60) * 100 })
       index.set(key, arr)
@@ -605,7 +615,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     generatedBuffers.forEach((buffer, dateStr) => {
       if (!buffer || !buffer.isActive) return
       const hour = parseInt(buffer.startTime.split(':')[0])
-      if (hour < 6) return
+      if (hour === 5) return
       const minutes = parseInt(buffer.startTime.split(':')[1])
       const key = `${dateStr}-${hour}`
       index.set(key, [{ ...buffer, topPosition: (minutes / 60) * 100 }])
@@ -900,6 +910,11 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     },
     removeTaskLogFromUI: (logId: string) => {
       setTasksDailyLogs(prev => prev.filter(log => log.id !== logId))
+    },
+    moveTaskLog: (logId: string, newStartTime: string, newEndTime: string) => {
+      setTasksDailyLogs(prev => prev.map(log =>
+        log.id === logId ? { ...log, scheduled_start_time: newStartTime, scheduled_end_time: newEndTime } : log
+      ))
     },
     removeTaskFromCalendar: (taskId: string) => {
       setTasksDailyLogs(prev => prev.filter(log => log.task_id !== taskId))

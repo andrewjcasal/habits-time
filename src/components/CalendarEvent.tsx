@@ -5,6 +5,7 @@ interface CalendarEventProps {
   style: React.CSSProperties
   onClick?: (e: React.MouseEvent) => void
   onResizeStart?: (e: React.MouseEvent) => void
+  onDragStart?: (e: React.MouseEvent) => void
   className?: string
   title?: string
   eventTitle: string
@@ -19,6 +20,7 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
   style,
   onClick,
   onResizeStart,
+  onDragStart,
   className = '',
   title,
   eventTitle,
@@ -63,9 +65,10 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
 
   return (
     <div
-      className={`${baseClass} ${typeClasses[type]} ${className}`}
+      className={`${baseClass} ${typeClasses[type]} ${onDragStart ? 'cursor-grab active:cursor-grabbing' : ''} ${className}`}
       style={{ ...style, pointerEvents: 'auto' }}
       onClick={onClick}
+      onMouseDown={onDragStart}
       title={title}
       data-calendar-event="true"
     >

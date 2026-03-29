@@ -43,6 +43,9 @@ interface CalendarEventSlotsProps {
   handleTaskClick: (task: any) => void
   handleEditMeeting: (meeting: any) => void
   onMeetingResizeStart?: (meeting: any, e: React.MouseEvent) => void
+  onTaskLogDragStart?: (log: any, e: React.MouseEvent) => void
+  draggingTaskLogId?: string | null
+  taskLogDragY?: number
 }
 
 function CalendarEventSlots({
@@ -62,6 +65,9 @@ function CalendarEventSlots({
   handleTaskClick,
   handleEditMeeting,
   onMeetingResizeStart,
+  onTaskLogDragStart,
+  draggingTaskLogId,
+  taskLogDragY = 0,
 }: CalendarEventSlotsProps) {
   return (
     <>
@@ -184,15 +190,21 @@ function CalendarEventSlots({
         const todayStr = new Date().toLocaleDateString('en-CA')
         const isDatedTodoist = log.tasks?.source === 'todoist' && log.tasks?.due_date
         const isUrgentTodoist = isDatedTodoist && (log.tasks.due_date <= todayStr || log.tasks.due_date === log.log_date)
+        const isDragging = draggingTaskLogId === log.id
+        const dragStyle = isDragging
+          ? { ...getEventStyle(log.topPosition, logHeight, 20), transform: `translateY(${taskLogDragY}px)`, opacity: 0.8, zIndex: 50 }
+          : getEventStyle(log.topPosition, logHeight, 20)
         return (
           <CalendarEvent
             key={`task-daily-log-${log.id}`}
             type={isUrgentTodoist ? 'tasklog-urgent' : 'tasklog'}
-            style={getEventStyle(log.topPosition, logHeight, 20)}
+            style={dragStyle}
             onClick={e => {
+              if (isDragging) return
               e.stopPropagation()
               handleTaskClick(log.tasks)
             }}
+            onDragStart={onTaskLogDragStart ? (e: React.MouseEvent) => onTaskLogDragStart(log, e) : undefined}
             eventTitle={log.tasks?.title || 'Task Log'}
             subtitle={log.tasks?.projects?.name}
             duration={`${duration}h`}
