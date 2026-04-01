@@ -142,6 +142,7 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
     skipHabitForDate,
     addHabitBlock,
     updateHabitLogDuration,
+    moveHabitLog,
     linkMeetingHabit,
     syncTodoist,
   } = useCalendarData(windowWidth, baseDate)
@@ -887,8 +888,21 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
         removeTaskLogFromUI(log.id)
       }
 
-      // Update the habit's time
-      await handleHabitTimeChangeWithReset(draggingHabit.id, dateStr, newTimeStr)
+      // Update the habit's time — find existing log and update by ID to avoid duplicates
+      const existingLog = draggingHabit.habits_daily_logs?.find(
+        (log: any) => log.log_date === dateStr && !log.is_skipped
+      )
+      if (existingLog?.id) {
+        await supabase
+          .from('cassian_habits_daily_logs')
+          .update({ scheduled_start_time: `${newTimeStr}:00` })
+          .eq('id', existingLog.id)
+      } else {
+        await handleHabitTimeChangeWithReset(draggingHabit.id, dateStr, newTimeStr)
+      }
+
+      // Update local state
+      moveHabitLog(draggingHabit.id, dateStr, `${newTimeStr}:00`)
 
       setDraggingHabit(null)
       setHabitDragY(0)

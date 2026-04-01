@@ -953,6 +953,15 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         return { ...m, meeting_habits: [...existing, { habit_id: habitId }] }
       }))
     },
+    moveHabitLog: (habitId: string, date: string, newStartTime: string) => {
+      setHabits(prev => prev.map(h => {
+        if (h.id !== habitId) return h
+        const logs = (h.habits_daily_logs || []).map((log: any) =>
+          log.log_date === date && !log.is_skipped ? { ...log, scheduled_start_time: newStartTime } : log
+        )
+        return { ...h, habits_daily_logs: logs }
+      }))
+    },
     updateHabitLogDuration: (habitId: string, date: string, duration: number) => {
       setHabits(prev => prev.map(h => {
         if (h.id !== habitId) return h
