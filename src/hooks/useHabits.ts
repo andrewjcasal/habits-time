@@ -102,7 +102,7 @@ export function useHabits(selectedDate?: string) {
       }
 
       const { error } = await supabase.from('cassian_habits_daily_logs').upsert(logData, {
-        onConflict: 'habit_id,user_id,log_date',
+        onConflict: 'habit_id,user_id,log_date,scheduled_start_time',
       })
 
       if (error) throw error

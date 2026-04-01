@@ -33,8 +33,13 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
   // Check if duration is 30+ minutes - convert various formats to minutes
   const getDurationInMinutes = (dur: string | number): number => {
     if (typeof dur === 'number') return dur
+    // Parse "1h 30m", "2h", "45m" formats
+    const hMatch = dur.match(/(\d+)h/)
+    const mMatch = dur.match(/(\d+)m/)
+    if (hMatch || mMatch) {
+      return (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0)
+    }
     if (dur.endsWith('min')) return parseInt(dur)
-    if (dur.endsWith('h')) return parseFloat(dur) * 60
     return 0
   }
   
@@ -68,7 +73,10 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
       className={`${baseClass} ${typeClasses[type]} ${onDragStart ? 'cursor-grab active:cursor-grabbing' : ''} ${className}`}
       style={{ ...style, pointerEvents: 'auto' }}
       onClick={onClick}
-      onMouseDown={onDragStart}
+      onMouseDown={e => {
+        e.stopPropagation()
+        if (onDragStart) onDragStart(e)
+      }}
       title={title}
       data-calendar-event="true"
     >
@@ -95,7 +103,8 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
       )}
       {onResizeStart && (
         <div
-          className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize hover:bg-black/10 transition-colors"
+          className="absolute bottom-0 left-0 right-0 cursor-s-resize hover:bg-black/10 transition-colors"
+          style={{ height: '5px' }}
           onMouseDown={e => {
             e.stopPropagation()
             e.preventDefault()

@@ -598,28 +598,41 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                  Habit Type
-                </label>
-                <select
-                  value={currentHabit?.habit_type_id || ''}
-                  onChange={e => updateHabitType(habitId, e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select a habit type...</option>
-                  {habitTypes.map(type => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
-                </select>
-                {currentHabitType && (
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    {currentHabitType.description}
-                  </p>
-                )}
-              </div>
+
+              {/* Weekly Days */}
+              {currentHabit?.habits_types?.scheduling_rule !== 'non_calendar' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Days (leave empty for daily)</label>
+                  <div className="flex flex-wrap gap-1">
+                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => {
+                      const isActive = (currentHabit?.weekly_days || []).includes(day)
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={async () => {
+                            const current = currentHabit?.weekly_days || []
+                            const updated = isActive
+                              ? current.filter((d: string) => d !== day)
+                              : [...current, day]
+                            await supabase
+                              .from('cassian_habits')
+                              .update({ weekly_days: updated.length > 0 ? updated : null })
+                              .eq('id', habitId)
+                          }}
+                          className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                            isActive
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {day.slice(0, 3)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Save Button */}
               {hasUnsavedChanges && (

@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
-import { Clock, Calendar, Play, Pause, SkipForward, Check } from 'lucide-react'
+import { Clock, Play, Pause, SkipForward, Check } from 'lucide-react'
 import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
-import { supabase } from '../lib/supabase'
 import ModalWrapper from './ModalWrapper'
-import SidebarActionButton from './SidebarActionButton'
 import { useModal } from '../contexts/ModalContext'
 
 interface HabitModalProps {
@@ -24,7 +22,6 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
     selectedHabit: habit,
     selectedHabitDate: selectedDate,
     closeHabitModal,
-    addMeetingFromHabit
   } = useModal()
   const [newTime, setNewTime] = useState('')
   const [newDuration, setNewDuration] = useState<number>(0)
@@ -49,7 +46,7 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
 
       setNewTime(effectiveStartTime || '')
       setNewDuration(effectiveDuration)
-      fetchSubhabits()
+      loadSubhabits()
     }
   }, [habit, selectedDate])
 
@@ -60,32 +57,23 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
     }
   }, [])
 
-  const fetchSubhabits = async () => {
+  const loadSubhabits = () => {
     if (!habit) return
 
-    // Check if habit has todoist import configured
-    if (habit.todoist_filter_labels?.length > 0) {
-      const { data: todoistTasks } = await supabase
-        .from('cassian_habit_todoist_tasks')
-        .select('*')
-        .eq('habit_id', habit.id)
-        .order('sort_order', { ascending: true })
-      // Map to same shape as subhabits for the timer
-      setSubhabits((todoistTasks || []).map(t => ({
+    // Use todoist imported tasks if configured, otherwise manual subhabits
+    if (habit.todoist_filter_labels?.length > 0 && habit.habit_todoist_tasks?.length > 0) {
+      const sorted = [...habit.habit_todoist_tasks].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+      setSubhabits(sorted.map((t: any) => ({
         id: t.id,
         title: t.title,
         duration_minutes: t.duration_minutes,
       })))
-      return
+    } else if (habit.subhabits?.length > 0) {
+      const sorted = [...habit.subhabits].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      setSubhabits(sorted)
+    } else {
+      setSubhabits([])
     }
-
-    const { data } = await supabase
-      .from('cassian_subhabits')
-      .select('*')
-      .eq('habit_id', habit.id)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true })
-    setSubhabits(data || [])
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -206,12 +194,6 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
 
   if (!showHabitModal || !habit || !selectedDate) return null
 
-  const rightSidebarActions = (
-    <SidebarActionButton onClick={addMeetingFromHabit} title="Add Meeting">
-      <Calendar className="w-3 h-3" />
-    </SidebarActionButton>
-  )
-
   // Routine timer view
   if (routineActive) {
     const currentSub = subhabits[currentSubhabitIndex]
@@ -306,7 +288,7 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
       isOpen={showHabitModal}
       onClose={closeHabitModal}
       title="Edit Habit"
-      rightSidebarActions={rightSidebarActions}
+
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-1">

@@ -163,7 +163,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               getWorkHoursRangeFromSettings,
               scheduleTaskInAvailableSlots,
               saveTaskChunks,
-              null,
               user.id,
               filteredTasksDailyLogs,
               fetchedSettings?.weekend_days || ['saturday', 'sunday'],
@@ -383,7 +382,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               getWorkHoursRange,
               scheduleTaskInAvailableSlots,
               saveTaskChunks,
-              null, // clearTaskLogsFromTimeForward removed
               user.id,
               filteredTasksDailyLogs,
               settings?.weekend_days || ['saturday', 'sunday'],
@@ -431,12 +429,42 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const index = new Map<string, any[]>()
     meetings.forEach(meeting => {
       const meetingStart = new Date(meeting.start_time)
-      const hour = meetingStart.getHours()
-      if (hour === 5) return // 5am gap — not on grid
-      const key = `${getColumnDate(format(meetingStart, 'yyyy-MM-dd'), hour)}-${hour}`
-      const arr = index.get(key) || []
-      arr.push(meeting)
-      index.set(key, arr)
+      const meetingEnd = new Date(meeting.end_time)
+      const startHour = meetingStart.getHours()
+      const startMin = meetingStart.getMinutes()
+      const startDateStr = format(meetingStart, 'yyyy-MM-dd')
+
+      // Calculate total duration in hours
+      const durationMs = meetingEnd.getTime() - meetingStart.getTime()
+      const durationHours = durationMs / (1000 * 60 * 60)
+
+      // Determine which hours this meeting spans
+      const startTotalMin = startHour * 60 + startMin
+      const endTotalMin = startTotalMin + durationHours * 60
+
+      // Index at the start hour (primary entry)
+      if (startHour !== 5) {
+        const key = `${getColumnDate(startDateStr, startHour)}-${startHour}`
+        const arr = index.get(key) || []
+        arr.push(meeting)
+        index.set(key, arr)
+      }
+
+      // Check if meeting crosses the 5am gap (late-night → morning = column split)
+      // Late night hours 0-4 are on prev day's column, hours 6+ are on the actual date's column
+      if (startHour >= 0 && startHour < 5 && endTotalMin > 360) {
+        // Meeting starts in late-night (prev day column) and extends past 6am (current day column)
+        // Add a clipped entry at hour 6 on the current day's column
+        const clippedMeeting = {
+          ...meeting,
+          _clippedStart: '06:00:00',
+          _originalStart: meeting.start_time,
+        }
+        const morningKey = `${startDateStr}-6`
+        const morningArr = index.get(morningKey) || []
+        morningArr.push(clippedMeeting)
+        index.set(morningKey, morningArr)
+      }
     })
     return index
   }, [meetings])
@@ -477,13 +505,29 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       for (const col of dayColumns) {
         const dateKey = col.dateStr
         if (habit.created_at) {
-          const creationDate = new Date(habit.created_at).toISOString().split('T')[0]
+          const creationDate = new Date(habit.created_at).toLocaleDateString('en-CA')
           if (dateKey < creationDate) continue
         }
 
-        const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateKey)
-        if (dailyLog?.is_skipped) continue
+        // Weekly habits: only show on configured days
+        if (habit.weekly_days && habit.weekly_days.length > 0) {
+          const dayName = col.date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+          if (!habit.weekly_days.includes(dayName)) continue
+        }
 
+        // Get all daily logs for this date (supports multiple blocks per day)
+        const dailyLogs = (habit.habits_daily_logs || []).filter((log: any) => log.log_date === dateKey)
+
+        // If only skipped logs exist and no unskipped blocks, skip the habit for this day
+        const unskippedLogs = dailyLogs.filter((log: any) => !log.is_skipped)
+        const hasSkippedLog = dailyLogs.some((log: any) => log.is_skipped)
+
+        if (hasSkippedLog && unskippedLogs.length === 0) continue
+
+        // If there are specific blocks, render each one
+        const logsToRender = unskippedLogs.length > 0 ? unskippedLogs : [null]
+
+        for (const dailyLog of logsToRender) {
         const effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
         const effectiveDuration = dailyLog?.duration || habit.duration || 0
         if (!effectiveStartTime) continue
@@ -550,6 +594,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const arr = index.get(key) || []
         arr.push({ ...habit, topPosition, isRescheduled })
         index.set(key, arr)
+        } // end for dailyLog of logsToRender
       }
     }
     return index
@@ -587,11 +632,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   const tasksDailyLogsIndex = useMemo(() => {
     const index = new Map<string, any[]>()
-    let todoistCount = 0
     tasksDailyLogs.forEach(log => {
       const startTime = log.actual_start_time || log.scheduled_start_time
       if (!startTime) return
-      if (log.tasks?.source === 'todoist') todoistCount++
       const hour = parseInt(startTime.split(':')[0])
       if (hour === 5) return
       const minutes = parseInt(startTime.split(':')[1])
@@ -600,7 +643,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       arr.push({ ...log, topPosition: (minutes / 60) * 100 })
       index.set(key, arr)
     })
-    console.log('📋 TasksDailyLogs index:', tasksDailyLogs.length, 'total,', todoistCount, 'todoist, slots:', index.size)
     return index
   }, [tasksDailyLogs])
 
@@ -842,7 +884,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         const dayResult = await scheduleAllTasks(
           dayTasks, todoistConflictMaps, [dayCol], getTodoistHoursForDate,
-          scheduleTaskInAvailableSlots, saveTaskChunks, null,
+          scheduleTaskInAvailableSlots, saveTaskChunks,
           user.id, nonTodoistDailyLogs, [], null, dayTasks, new Map()
         )
 
@@ -857,10 +899,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       }
 
       const todoistScheduleResult = combinedResult
-      let totalScheduled = 0
-      todoistScheduleResult.forEach((tasks) => { totalScheduled += tasks.length })
-      console.log('🔄 Todoist sync scheduled:', totalScheduled, 'chunks across', todoistScheduleResult.size, 'days')
-
       // 8. Update UI state
       setScheduledTasksCache(prev => {
         const merged = new Map(prev)
@@ -905,6 +943,38 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           habits_daily_logs: hasLog
             ? existingLogs.map((log: any) => log.log_date === date ? { ...log, is_skipped: true } : log)
             : [...existingLogs, { habit_id: habitId, log_date: date, is_skipped: true }]
+        }
+      }))
+    },
+    linkMeetingHabit: (meetingId: string, habitId: string) => {
+      setMeetings(prev => prev.map(m => {
+        if (m.id !== meetingId) return m
+        const existing = m.meeting_habits || []
+        return { ...m, meeting_habits: [...existing, { habit_id: habitId }] }
+      }))
+    },
+    updateHabitLogDuration: (habitId: string, date: string, duration: number) => {
+      setHabits(prev => prev.map(h => {
+        if (h.id !== habitId) return h
+        const logs = (h.habits_daily_logs || []).map((log: any) =>
+          log.log_date === date && !log.is_skipped ? { ...log, duration } : log
+        )
+        return { ...h, habits_daily_logs: logs }
+      }))
+    },
+    addHabitBlock: (habitId: string, date: string, startTime: string, duration: number) => {
+      setHabits(prev => prev.map(h => {
+        if (h.id !== habitId) return h
+        // Remove skipped logs for this date, add new block
+        const existingLogs = (h.habits_daily_logs || []).filter(
+          (log: any) => !(log.log_date === date && log.is_skipped)
+        )
+        return {
+          ...h,
+          habits_daily_logs: [
+            ...existingLogs,
+            { habit_id: habitId, log_date: date, scheduled_start_time: startTime, duration, is_skipped: false, is_completed: false }
+          ]
         }
       }))
     },

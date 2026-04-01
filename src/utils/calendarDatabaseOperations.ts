@@ -29,7 +29,7 @@ export const handleHabitTimeChange = async (
     const { error } = await supabase.from('cassian_habits_daily_logs').upsert(
       updateData,
       {
-        onConflict: 'habit_id,user_id,log_date',
+        onConflict: 'habit_id,user_id,log_date,scheduled_start_time',
       }
     )
 
@@ -60,7 +60,7 @@ export const handleHabitSkip = async (
         scheduled_start_time: null, // Clear any scheduled time
       },
       {
-        onConflict: 'habit_id,user_id,log_date',
+        onConflict: 'habit_id,user_id,log_date,scheduled_start_time',
       }
     )
 

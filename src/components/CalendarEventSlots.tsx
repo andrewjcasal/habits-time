@@ -1,14 +1,14 @@
 import React from 'react'
-import { Clock } from 'lucide-react'
+import { Clock, Check } from 'lucide-react'
 import CalendarEvent from './CalendarEvent'
 
-// Helper function to format duration without rounding quarter hours
-const formatDuration = (duration: number): string => {
-  if (duration % 1 === 0) return duration.toString()
-  if (duration === 0.25) return '0.25'
-  if (duration === 0.5) return '0.5'
-  if (duration === 0.75) return '0.75'
-  return duration.toString()
+// Unified duration format: takes minutes, outputs "Xh Ym" or "Ym"
+const formatDuration = (minutes: number): string => {
+  const h = Math.floor(minutes / 60)
+  const m = Math.round(minutes % 60)
+  if (h > 0 && m > 0) return `${h}h ${m}m`
+  if (h > 0) return `${h}h`
+  return `${m}m`
 }
 
 // Common styles for all calendar events
@@ -46,6 +46,11 @@ interface CalendarEventSlotsProps {
   onTaskLogDragStart?: (log: any, e: React.MouseEvent) => void
   draggingTaskLogId?: string | null
   taskLogDragY?: number
+  onHabitDragStart?: (habit: any, date: Date, e: React.MouseEvent) => void
+  onHabitResizeStart?: (habit: any, date: Date, e: React.MouseEvent) => void
+  draggingHabitId?: string | null
+  draggingHabitDateStr?: string | null
+  habitDragY?: number
 }
 
 function CalendarEventSlots({
@@ -68,6 +73,11 @@ function CalendarEventSlots({
   onTaskLogDragStart,
   draggingTaskLogId,
   taskLogDragY = 0,
+  onHabitDragStart,
+  onHabitResizeStart,
+  draggingHabitId,
+  draggingHabitDateStr,
+  habitDragY = 0,
 }: CalendarEventSlotsProps) {
   return (
     <>
@@ -79,24 +89,29 @@ function CalendarEventSlots({
         const habitHeight = effectiveDuration ? (effectiveDuration / 60) * 64 : 64
         const isRescheduled = habit.isRescheduled || false
 
-        // Calculate position with vertical offset
-        const baseTopPosition = habit.topPosition || 0
-        const verticalOffset = index * baseItemHeight
-        const adjustedTopPosition = baseTopPosition + (verticalOffset / 64) * 100
+        const adjustedTopPosition = habit.topPosition || 0
+
+        const isDraggingThis = draggingHabitId === habit.id && draggingHabitDateStr === dateStr
+        const habitStyle = isDraggingThis
+          ? { ...getEventStyle(adjustedTopPosition, habitHeight), transform: `translateY(${habitDragY}px)`, opacity: 0.8, zIndex: 50 }
+          : getEventStyle(adjustedTopPosition, habitHeight)
 
         return (
           <CalendarEvent
             key={`habit-${habit.id}`}
             type="habit"
-            style={getEventStyle(adjustedTopPosition, habitHeight)}
+            style={habitStyle}
             onClick={e => {
+              if (isDraggingThis) return
               e.stopPropagation()
               e.preventDefault()
               handleHabitClick(habit, date)
             }}
+            onDragStart={onHabitDragStart ? (e: React.MouseEvent) => onHabitDragStart(habit, date, e) : undefined}
+            onResizeStart={onHabitResizeStart ? (e: React.MouseEvent) => onHabitResizeStart(habit, date, e) : undefined}
             eventTitle={habit.name}
             duration={
-              effectiveDuration > 0 ? `${formatDuration(effectiveDuration / 60)}h` : undefined
+              effectiveDuration > 0 ? formatDuration(effectiveDuration) : undefined
             }
             icon={isRescheduled ? <Clock className="w-1.5 h-1.5" /> : undefined}
           />
@@ -122,7 +137,7 @@ function CalendarEventSlots({
               handleSessionClick(session)
             }}
             eventTitle={session.projects?.name || 'Project Session'}
-            duration={`${session.scheduled_hours}h`}
+            duration={formatDuration(session.scheduled_hours * 60)}
           />
         )
       })}
@@ -151,32 +166,58 @@ function CalendarEventSlots({
               handleTaskClick(task)
             }}
             eventTitle={`${task.title}${isPlaceholder ? ' \u{1F4B0}' : ''}`}
-            duration={`${task.estimated_hours}h`}
+            duration={formatDuration((task.estimated_hours || 1) * 60)}
           />
         )
       })}
 
       {/* Meetings */}
       {meetingsInSlot.map(meeting => {
-        const meetingStart = new Date(meeting.start_time)
         const meetingEnd = new Date(meeting.end_time)
-        const minutesIntoHour = meetingStart.getMinutes()
-        const topPositionInSlot = (minutesIntoHour / 60) * 100
-        const meetingDuration = (meetingEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
+        const isClipped = !!meeting._clippedStart
+        let meetingStart: Date
+        let meetingDuration: number
+        let topPositionInSlot: number
+
+        if (isClipped) {
+          // Clipped entry: starts at 6am, ends at original end
+          meetingStart = new Date(meeting.start_time)
+          meetingStart.setHours(6, 0, 0, 0)
+          topPositionInSlot = 0
+          meetingDuration = (meetingEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
+        } else {
+          meetingStart = new Date(meeting.start_time)
+          const startHour = meetingStart.getHours()
+          // If late-night meeting extends past 5am, clip at 5am
+          if (startHour >= 0 && startHour < 5) {
+            const fiveAm = new Date(meetingStart)
+            fiveAm.setHours(5, 0, 0, 0)
+            const clippedEnd = meetingEnd > fiveAm ? fiveAm : meetingEnd
+            meetingDuration = (clippedEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
+          } else {
+            meetingDuration = (meetingEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
+          }
+          topPositionInSlot = (meetingStart.getMinutes() / 60) * 100
+        }
+
         const meetingHeight = (meetingDuration / 60) * 64
 
         return (
           <CalendarEvent
-            key={`meeting-${meeting.id}`}
+            key={`meeting-${meeting.id}${isClipped ? '-clipped' : ''}`}
             type="meeting"
-            style={getEventStyle(topPositionInSlot, meetingHeight, 15)}
+            style={{
+              ...getEventStyle(topPositionInSlot, meetingHeight, 15),
+              ...(meeting.meeting_habits?.length > 0 ? { backgroundColor: '#dcfce7', color: '#166534' } : {}),
+            }}
             onClick={e => {
               e.stopPropagation()
               handleEditMeeting(meeting)
             }}
             onResizeStart={onMeetingResizeStart ? (e) => onMeetingResizeStart(meeting, e) : undefined}
             eventTitle={meeting.title}
-            duration={`${Math.round(meetingDuration)}min`}
+            icon={meeting.meeting_habits?.length > 0 ? <Check className="w-2 h-2" /> : undefined}
+            duration={formatDuration(Math.round(meetingDuration))}
           />
         )
       })}
@@ -207,7 +248,7 @@ function CalendarEventSlots({
             onDragStart={onTaskLogDragStart ? (e: React.MouseEvent) => onTaskLogDragStart(log, e) : undefined}
             eventTitle={log.tasks?.title || 'Task Log'}
             subtitle={log.tasks?.projects?.name}
-            duration={`${duration}h`}
+            duration={formatDuration(duration * 60)}
           />
         )
       })}
@@ -221,11 +262,11 @@ function CalendarEventSlots({
             key={`buffer-${buffer.id}`}
             type={buffer.isReduced ? 'reduced-buffer' : 'buffer'}
             style={getEventStyle(buffer.topPosition || 0, bufferHeight, 8)}
-            title={`${buffer.title} - ${formatDuration(buffer.duration / 60)} hours${
+            title={`${buffer.title} - ${formatDuration(buffer.duration)}${
               buffer.isReduced ? ' (reduced due to same day)' : ''
             }`}
             eventTitle={buffer.title}
-            duration={`${formatDuration(buffer.duration / 60)}h`}
+            duration={formatDuration(buffer.duration)}
           />
         )
       })}
@@ -244,7 +285,7 @@ function CalendarEventSlots({
             } Buffer - ${categoryBuffer.remaining_hours.toFixed(1)} hours remaining this week`}
             eventTitle={categoryBuffer.category_name}
             subtitle="Buffer Time"
-            duration={`${formatDuration(categoryBuffer.duration)}h`}
+            duration={formatDuration(categoryBuffer.duration * 60)}
           />
         )
       })}

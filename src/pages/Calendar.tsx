@@ -7,6 +7,7 @@ import { useCalendarData } from '../hooks/useCalendarData'
 import { supabase } from '../lib/supabase'
 import { Meeting } from '../types'
 import { deltaYToMinutes, computeMovedTimes } from '../utils/calendarDragUtils'
+import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
 import TaskScheduleModal from '../components/TaskScheduleModal'
 import {
   handleHabitTimeChange,
@@ -21,16 +22,10 @@ import CalendarTopBar from '../components/CalendarTopBar'
 import CalendarGrid, { getQuarterFromMousePosition, quarterToTimeString } from '../components/CalendarGrid'
 
 interface CalendarContentProps {
-  onSetSaveHandler: (handler: (e: React.FormEvent, updatedMeeting: any, editingMeeting?: Meeting) => Promise<void>) => void
-  onSetDeleteHandler: (handler: (meeting: Meeting) => Promise<void>) => void
-  onSetHabitTimeChangeHandler: (handler: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>) => void
-  onSetHabitSkipHandler: (handler: (habitId: string, date: string) => Promise<void>) => void
-  onSetRemoveTaskHandler: (handler: (taskId: string) => void) => void
-  onSetRemoveTaskLogHandler: (handler: (logId: string) => void) => void
-  onSetUpdateMeetingEndTimeHandler: (handler: (meetingId: string, newEndTime: string) => Promise<void>) => void
+  handlersRef: React.MutableRefObject<Record<string, Function>>
 }
 
-const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeChangeHandler, onSetHabitSkipHandler, onSetRemoveTaskHandler, onSetRemoveTaskLogHandler, onSetUpdateMeetingEndTimeHandler }: CalendarContentProps) => {
+const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
 
   const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals, openResizeConflictDialog } = useModal()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -60,6 +55,20 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   const [taskLogDragY, setTaskLogDragY] = useState<number>(0)
   const taskLogDragStartYRef = useRef<number>(0)
   const taskLogOriginalStartRef = useRef<string>('')
+
+  // Habit resize state
+  const [resizingHabit, setResizingHabit] = useState<any>(null)
+  const [resizingHabitDate, setResizingHabitDate] = useState<Date | null>(null)
+  const [resizeHabitNewDuration, setResizeHabitNewDuration] = useState<number>(0)
+  const habitResizeStartYRef = useRef<number>(0)
+  const habitResizeOriginalDurationRef = useRef<number>(0)
+
+  // Habit drag state
+  const [draggingHabit, setDraggingHabit] = useState<any>(null)
+  const [draggingHabitDate, setDraggingHabitDate] = useState<Date | null>(null)
+  const [habitDragY, setHabitDragY] = useState<number>(0)
+  const habitDragStartYRef = useRef<number>(0)
+  const habitOriginalStartRef = useRef<string>('')
 
   // Drag-to-create meeting state
   const [isDragging, setIsDragging] = useState(false)
@@ -131,6 +140,9 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     removeTaskLogFromUI,
     moveTaskLog,
     skipHabitForDate,
+    addHabitBlock,
+    updateHabitLogDuration,
+    linkMeetingHabit,
     syncTodoist,
   } = useCalendarData(windowWidth, baseDate)
 
@@ -273,12 +285,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     try {
       let startTime: Date, endTime: Date
 
-      console.log('Meeting update data:', {
-        start_time: updatedMeeting.start_time,
-        end_time: updatedMeeting.end_time,
-        date: updatedMeeting.date
-      })
-      
       // Handle both ISO string format and time string format (or mixed formats)
       if (updatedMeeting.start_time.includes('T') || updatedMeeting.end_time.includes('T')) {
         // ISO string format from MeetingModal (or mixed format for cross-midnight meetings)
@@ -443,14 +449,12 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     hourIndex: number,
     columnIndex: number
   ) => {
-    // Check if the mousedown originated from a calendar event
+    // Don't start drag if another drag/resize is active or clicking on a calendar event
+    if (resizingMeeting || draggingTaskLog || draggingHabit) return
     const target = event.target as HTMLElement
-    if (target.closest('[data-calendar-event]')) {
-      return // Don't start drag if clicking on a calendar event
-    }
+    if (target.closest('[data-calendar-event]')) return
     
     const quarter = getQuarterFromMousePosition(event, event.currentTarget as HTMLElement)
-    console.log('Mouse down:', { hourIndex, quarter, timeSlot })
     setIsDragging(true)
     setDragStart({ time: timeSlot, date, hourIndex, columnIndex, quarter })
     setDragEnd({ time: timeSlot, date, hourIndex, columnIndex, quarter })
@@ -465,7 +469,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   ) => {
     if (isDragging && dragStart && columnIndex === dragStart.columnIndex) {
       const quarter = getQuarterFromMousePosition(event, event.currentTarget as HTMLElement)
-      console.log('Mouse enter:', { timeSlot, hourIndex, quarter })
       setDragEnd({ time: timeSlot, date, hourIndex, columnIndex, quarter })
     }
   }
@@ -479,7 +482,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
   ) => {
     if (isDragging && dragStart && columnIndex === dragStart.columnIndex) {
       const quarter = getQuarterFromMousePosition(event, event.currentTarget as HTMLElement)
-      console.log('Mouse move:', { timeSlot, hourIndex, quarter })
       setDragEnd({ time: timeSlot, date, hourIndex, columnIndex, quarter })
     }
   }
@@ -492,15 +494,23 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     columnIndex?: number
   ) => {
     if (event) mouseHandledRef.current = true
-    console.log('Mouse up:', { hasEvent: !!event, isDragging, dragStart, dragEnd, timeSlot, hourIndex })
+
     
+    // Don't process drag-to-create if another event drag just finished
+    if (eventDragActiveRef.current) {
+      eventDragActiveRef.current = false
+      setIsDragging(false)
+      setDragStart(null)
+      setDragEnd(null)
+      return
+    }
+
     if (isDragging && dragStart) {
       // Force update dragEnd to the mouse up position if we have it
       let finalDragEnd = dragEnd
       if (event && timeSlot && date && hourIndex !== undefined && columnIndex !== undefined) {
         const quarter = getQuarterFromMousePosition(event, event.currentTarget as HTMLElement)
         finalDragEnd = { time: timeSlot, date, hourIndex, columnIndex, quarter }
-        console.log('Forcing dragEnd to mouse up position:', finalDragEnd)
       }
 
       if (finalDragEnd) {
@@ -519,17 +529,6 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
 
         const startTime = quarterToTimeString(startHourIndex, startQuarter, hourSlots)
         const endTime = quarterToTimeString(endHourIndex, endQuarter, hourSlots)
-
-        console.log('Drag debug (forced end position):', { 
-          dragStart: dragStart.hourIndex + ':' + dragStart.quarter, 
-          dragEnd: finalDragEnd.hourIndex + ':' + finalDragEnd.quarter,
-          startTotalQuarters, 
-          endTotalQuarters, 
-          minQuarters,
-          maxQuarters,
-          startTime, 
-          endTime 
-        })
 
         // Only open modal if we have a valid drag (not just a click)
         if (startTotalQuarters !== endTotalQuarters) {
@@ -604,10 +603,12 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
 
   // Meeting resize handlers
   const meetingResizedRef = useRef(false)
+  const eventDragActiveRef = useRef(false)
   const handleMeetingResizeStart = useCallback((meeting: any, e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
     meetingResizedRef.current = true
+    eventDragActiveRef.current = true
     setResizingMeeting(meeting)
     resizeStartYRef.current = e.clientY
     resizeStartEndTimeRef.current = new Date(meeting.end_time)
@@ -678,10 +679,74 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     }
   }, [resizingMeeting, resizeNewEndTime, tasksDailyLogs, updateMeeting])
 
+  // Habit resize
+  const handleHabitResizeStart = useCallback((habit: any, date: Date, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    eventDragActiveRef.current = true
+    const dateStr = format(date, 'yyyy-MM-dd')
+    const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateStr && !log.is_skipped)
+    const duration = dailyLog?.duration || habit.duration || 60
+    setResizingHabit(habit)
+    setResizingHabitDate(date)
+    habitResizeStartYRef.current = e.clientY
+    habitResizeOriginalDurationRef.current = duration
+    setResizeHabitNewDuration(duration)
+  }, [])
+
+  useEffect(() => {
+    if (!resizingHabit || !resizingHabitDate) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaMinutes = deltaYToMinutes(e.clientY - habitResizeStartYRef.current)
+      const newDuration = Math.max(15, habitResizeOriginalDurationRef.current + deltaMinutes)
+      setResizeHabitNewDuration(newDuration)
+    }
+
+    const handleMouseUp = async () => {
+      const dateStr = format(resizingHabitDate, 'yyyy-MM-dd')
+      const originalDuration = habitResizeOriginalDurationRef.current
+
+      if (resizeHabitNewDuration !== originalDuration) {
+        // Find the daily log to update
+        const dailyLog = resizingHabit.habits_daily_logs?.find(
+          (log: any) => log.log_date === dateStr && !log.is_skipped
+        )
+
+        if (dailyLog?.id) {
+          await supabase
+            .from('cassian_habits_daily_logs')
+            .update({ duration: resizeHabitNewDuration })
+            .eq('id', dailyLog.id)
+        } else {
+          // No existing log — update via time change
+          await handleHabitTimeChangeWithReset(
+            resizingHabit.id, dateStr,
+            getEffectiveHabitStartTime(resizingHabit, dateStr) || resizingHabit.current_start_time,
+            resizeHabitNewDuration
+          )
+        }
+
+        updateHabitLogDuration(resizingHabit.id, dateStr, resizeHabitNewDuration)
+      }
+
+      setResizingHabit(null)
+      setResizingHabitDate(null)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [resizingHabit, resizingHabitDate, resizeHabitNewDuration])
+
   // Task log drag-to-move
   const handleTaskLogDragStart = useCallback((log: any, e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
+    eventDragActiveRef.current = true
     setDraggingTaskLog(log)
     taskLogDragStartYRef.current = e.clientY
     taskLogOriginalStartRef.current = log.scheduled_start_time
@@ -749,6 +814,94 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
     }
   }, [draggingTaskLog, taskLogDragY])
 
+  // Habit drag-to-move
+  const handleHabitDragStart = useCallback((habit: any, date: Date, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    eventDragActiveRef.current = true
+    const dateStr = format(date, 'yyyy-MM-dd')
+    const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateStr)
+    const startTime = getEffectiveHabitStartTime(habit, dateStr, dailyLog)
+    setDraggingHabit(habit)
+    setDraggingHabitDate(date)
+    habitDragStartYRef.current = e.clientY
+    habitOriginalStartRef.current = startTime || '06:00'
+    setHabitDragY(0)
+  }, [])
+
+  useEffect(() => {
+    if (!draggingHabit || !draggingHabitDate) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = e.clientY - habitDragStartYRef.current
+      setHabitDragY(deltaY)
+    }
+
+    const handleMouseUp = async () => {
+      if (!draggingHabit || !draggingHabitDate) return
+
+      const dateStr = format(draggingHabitDate, 'yyyy-MM-dd')
+      const durationHours = (draggingHabit.duration || 60) / 60
+      const result = computeMovedTimes(habitOriginalStartRef.current, durationHours, habitDragY)
+
+      if (!result) {
+        setDraggingHabit(null)
+        setHabitDragY(0)
+        return
+      }
+
+      const newStartH = parseInt(result.newStartTime.split(':')[0])
+      const newStartM = parseInt(result.newStartTime.split(':')[1])
+      const newTimeStr = `${newStartH.toString().padStart(2, '0')}:${newStartM.toString().padStart(2, '0')}`
+      const newEndH = parseInt(result.newEndTime.split(':')[0]) + parseInt(result.newEndTime.split(':')[1]) / 60
+      const newStartHours = newStartH + newStartM / 60
+
+      // Skip overlapping habits
+      const overlappingHabits = habits.filter((h: any) => {
+        if (h.id === draggingHabit.id) return false
+        const hLog = h.habits_daily_logs?.find((log: any) => log.log_date === dateStr)
+        if (hLog?.is_skipped) return false
+        const hStart = hLog?.start_time || h.start_time || '06:00'
+        const hStartH = parseInt(hStart.split(':')[0]) + parseInt(hStart.split(':')[1]) / 60
+        const hDuration = (hLog?.duration || h.duration || 60) / 60
+        const hEndH = hStartH + hDuration
+        return hStartH < newEndH && hEndH > newStartHours
+      })
+
+      for (const h of overlappingHabits) {
+        await handleHabitSkipWithReset(h.id, dateStr)
+      }
+
+      // Delete overlapping task daily logs
+      const overlappingLogs = tasksDailyLogs.filter((log: any) => {
+        if (log.log_date !== dateStr) return false
+        const logTime = log.actual_start_time || log.scheduled_start_time
+        if (!logTime) return false
+        const logStartH = parseInt(logTime.split(':')[0]) + parseInt(logTime.split(':')[1]) / 60
+        const logEndH = logStartH + (log.estimated_hours || 0.5)
+        return logStartH < newEndH && logEndH > newStartHours
+      })
+
+      for (const log of overlappingLogs) {
+        await supabase.from('cassian_tasks_daily_logs').delete().eq('id', log.id)
+        removeTaskLogFromUI(log.id)
+      }
+
+      // Update the habit's time
+      await handleHabitTimeChangeWithReset(draggingHabit.id, dateStr, newTimeStr)
+
+      setDraggingHabit(null)
+      setHabitDragY(0)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingHabit, draggingHabitDate, habitDragY, habits, tasksDailyLogs])
+
   // Render all calendar events for a time slot
   const renderCalendarEvents = useCallback(
     (timeSlot: string, date: Date) => {
@@ -792,6 +945,11 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
           onTaskLogDragStart={handleTaskLogDragStart}
           draggingTaskLogId={draggingTaskLog?.id}
           taskLogDragY={taskLogDragY}
+          onHabitDragStart={handleHabitDragStart}
+          onHabitResizeStart={handleHabitResizeStart}
+          draggingHabitId={draggingHabit?.id}
+          draggingHabitDateStr={draggingHabitDate ? format(draggingHabitDate, 'yyyy-MM-dd') : null}
+          habitDragY={habitDragY}
         />
       )
     },
@@ -812,6 +970,10 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
       handleTaskLogDragStart,
       draggingTaskLog,
       taskLogDragY,
+      handleHabitDragStart,
+      handleHabitResizeStart,
+      draggingHabit,
+      habitDragY,
     ]
   )
 
@@ -869,16 +1031,20 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
 
   // Set the handlers for the modal provider
   useEffect(() => {
-    onSetSaveHandler(handleSaveMeeting)
-    onSetDeleteHandler(handleDeleteMeeting)
-    onSetHabitTimeChangeHandler(handleHabitTimeChangeWithReset)
-    onSetHabitSkipHandler(handleHabitSkipWithReset)
-    onSetRemoveTaskHandler(removeTaskFromCalendar)
-    onSetRemoveTaskLogHandler(removeTaskLogFromUI)
-    onSetUpdateMeetingEndTimeHandler(async (meetingId: string, newEndTime: string) => {
-      await updateMeeting(meetingId, { end_time: newEndTime })
-    })
-  }, [handleSaveMeeting, handleDeleteMeeting, onSetSaveHandler, onSetDeleteHandler])
+    handlersRef.current = {
+      saveMeeting: handleSaveMeeting,
+      deleteMeeting: handleDeleteMeeting,
+      habitTimeChange: handleHabitTimeChangeWithReset,
+      habitSkip: handleHabitSkipWithReset,
+      removeTask: removeTaskFromCalendar,
+      removeTaskLog: removeTaskLogFromUI,
+      updateMeetingEndTime: async (meetingId: string, newEndTime: string) => {
+        await updateMeeting(meetingId, { end_time: newEndTime })
+      },
+      addHabitBlock,
+      linkMeetingHabit,
+    }
+  }, [handleSaveMeeting, handleDeleteMeeting])
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
@@ -1012,6 +1178,23 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
         dragEnd={dragEnd}
         isInDragSelection={isInDragSelection}
         getCurrentTimeLinePosition={getCurrentTimeLinePosition}
+        habitDragPreview={draggingHabit && draggingHabitDate ? (() => {
+          const dateStr = format(draggingHabitDate, 'yyyy-MM-dd')
+          const colIdx = dayColumns.findIndex(c => c.dateStr === dateStr)
+          if (colIdx === -1) return null
+          const durationMin = draggingHabit.duration || 60
+          const heightPx = (durationMin / 60) * 64
+          // Compute new start from original + drag delta
+          const [origH, origM] = habitOriginalStartRef.current.split(':').map(Number)
+          const deltaMin = deltaYToMinutes(habitDragY)
+          const totalMin = origH * 60 + origM + deltaMin
+          const newH = Math.max(0, Math.floor(totalMin / 60))
+          // Grid starts at 6am, hours 0-4 are at index 18-22
+          const hourIndex = newH < 5 ? newH + 18 : newH - 6
+          const minuteFrac = (totalMin % 60) / 60
+          const topPx = (hourIndex + minuteFrac) * 64
+          return { columnIndex: colIdx, topPx, heightPx }
+        })() : null}
       />
 
       <TaskScheduleModal
@@ -1037,63 +1220,49 @@ const CalendarContent = ({ onSetSaveHandler, onSetDeleteHandler, onSetHabitTimeC
 }
 
 const Calendar = () => {
-  let saveMeetingHandler: (e: React.FormEvent, updatedMeeting: any, editingMeeting?: Meeting) => Promise<void>
-  let deleteMeetingHandler: (meeting: Meeting) => Promise<void>
-  let habitTimeChangeHandler: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
-  let habitSkipHandler: (habitId: string, date: string) => Promise<void>
-  let removeTaskHandler: (taskId: string) => void
-  let removeTaskLogHandler: (logId: string) => void
-  let updateMeetingEndTimeHandler: (meetingId: string, newEndTime: string) => Promise<void>
+  const handlersRef = useRef<Record<string, Function>>({})
 
   return (
     <ModalProvider
-      onSaveMeeting={async (e: React.FormEvent, updatedMeeting: any, editingMeeting?: Meeting) => {
-        if (saveMeetingHandler) {
-          return await saveMeetingHandler(e, updatedMeeting, editingMeeting)
-        }
+      onSaveMeeting={async (e, updatedMeeting, editingMeeting) => {
+        await handlersRef.current.saveMeeting?.(e, updatedMeeting, editingMeeting)
       }}
-      onDeleteMeeting={async (meeting: Meeting) => {
-        if (deleteMeetingHandler) {
-          return await deleteMeetingHandler(meeting)
-        }
+      onDeleteMeeting={async (meeting) => {
+        await handlersRef.current.deleteMeeting?.(meeting)
       }}
-      onCompleteTask={async (task: any) => {
+      onCompleteTask={async (task) => {
         const completedId = await handleCompleteTask(task)
-        if (completedId && removeTaskHandler) removeTaskHandler(completedId)
+        if (completedId) handlersRef.current.removeTask?.(completedId)
       }}
-      onDeleteTask={async (task: any) => {
+      onDeleteTask={async (task) => {
         const deletedId = await handleDeleteTask(task)
-        if (deletedId && removeTaskHandler) removeTaskHandler(deletedId)
+        if (deletedId) handlersRef.current.removeTask?.(deletedId)
       }}
-      onHabitTimeChange={async (habitId: string, date: string, newTime: string, newDuration?: number) => {
-        if (habitTimeChangeHandler) await habitTimeChangeHandler(habitId, date, newTime, newDuration)
+      onHabitTimeChange={async (habitId, date, newTime, newDuration) => {
+        await handlersRef.current.habitTimeChange?.(habitId, date, newTime, newDuration)
       }}
-      onHabitSkip={async (habitId: string, date: string) => {
-        if (habitSkipHandler) await habitSkipHandler(habitId, date)
+      onHabitSkip={async (habitId, date) => {
+        await handlersRef.current.habitSkip?.(habitId, date)
       }}
-      onUpdateSession={async (sessionId: string, updates: any) => {
-        console.log('Update session:', sessionId, updates)
-      }}
+      onUpdateSession={async () => {}}
       onTaskLogCreated={() => { window.location.reload() }}
-      onUpdateMeetingEndTime={async (meetingId: string, newEndTime: string) => {
-        if (updateMeetingEndTimeHandler) await updateMeetingEndTimeHandler(meetingId, newEndTime)
+      onUpdateMeetingEndTime={async (meetingId, newEndTime) => {
+        await handlersRef.current.updateMeetingEndTime?.(meetingId, newEndTime)
       }}
-      onDeleteTaskLog={async (logId: string) => {
+      onDeleteTaskLog={async (logId) => {
         await supabase.from('cassian_tasks_daily_logs').delete().eq('id', logId)
       }}
-      onRemoveTaskLogFromUI={(logId: string) => {
-        if (removeTaskLogHandler) removeTaskLogHandler(logId)
+      onRemoveTaskLogFromUI={(logId) => {
+        handlersRef.current.removeTaskLog?.(logId)
+      }}
+      onAddHabitBlock={(habitId, date, startTime, duration) => {
+        handlersRef.current.addHabitBlock?.(habitId, date, startTime, duration)
+      }}
+      onMeetingHabitLinked={(meetingId, habitId) => {
+        handlersRef.current.linkMeetingHabit?.(meetingId, habitId)
       }}
     >
-      <CalendarContent
-        onSetSaveHandler={(handler) => { saveMeetingHandler = handler }}
-        onSetDeleteHandler={(handler) => { deleteMeetingHandler = handler }}
-        onSetHabitTimeChangeHandler={(handler) => { habitTimeChangeHandler = handler }}
-        onSetHabitSkipHandler={(handler) => { habitSkipHandler = handler }}
-        onSetRemoveTaskHandler={(handler) => { removeTaskHandler = handler }}
-        onSetRemoveTaskLogHandler={(handler) => { removeTaskLogHandler = handler }}
-        onSetUpdateMeetingEndTimeHandler={(handler) => { updateMeetingEndTimeHandler = handler }}
-      />
+      <CalendarContent handlersRef={handlersRef} />
     </ModalProvider>
   )
 }

@@ -73,92 +73,6 @@ export function useTaskDailyLogs() {
     }
   }
 
-  const clearTaskLogsForDate = async (userId: string, date: Date) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const { error: deleteError } = await supabase
-        .from('cassian_tasks_daily_logs')
-        .delete()
-        .eq('user_id', userId)
-        .eq('log_date', format(date, 'yyyy-MM-dd'))
-
-      if (deleteError) {
-        console.error('Error clearing task daily logs:', deleteError)
-        setError(deleteError.message)
-        return false
-      }
-
-      return true
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to clear task logs'
-      setError(errorMessage)
-      console.error('Error clearing task logs:', err)
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const clearTaskLogsFromTimeForward = async (userId: string, date: Date, fromTime: string) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const { error: deleteError } = await supabase
-        .from('cassian_tasks_daily_logs')
-        .delete()
-        .eq('user_id', userId)
-        .eq('log_date', format(date, 'yyyy-MM-dd'))
-        .gte('scheduled_start_time', `${fromTime}:00`)
-
-      if (deleteError) {
-        console.error('Error clearing task daily logs from time forward:', deleteError)
-        setError(deleteError.message)
-        return false
-      }
-
-      return true
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to clear task logs from time forward'
-      setError(errorMessage)
-      console.error('Error clearing task logs from time forward:', err)
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const clearTaskLogsForDateRange = async (userId: string, startDate: Date, endDate: Date) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const { error: deleteError } = await supabase
-        .from('cassian_tasks_daily_logs')
-        .delete()
-        .eq('user_id', userId)
-        .gte('log_date', format(startDate, 'yyyy-MM-dd'))
-        .lte('log_date', format(endDate, 'yyyy-MM-dd'))
-
-      if (deleteError) {
-        console.error('Error clearing task daily logs:', deleteError)
-        setError(deleteError.message)
-        return false
-      }
-
-      return true
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to clear task logs'
-      setError(errorMessage)
-      console.error('Error clearing task logs:', err)
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const getTaskLogsForDateRange = async (userId: string, startDate: Date, endDate: Date) => {
     try {
       setLoading(true)
@@ -194,9 +108,6 @@ export function useTaskDailyLogs() {
     loading,
     error,
     saveTaskChunks,
-    clearTaskLogsForDate,
-    clearTaskLogsFromTimeForward,
-    clearTaskLogsForDateRange,
     getTaskLogsForDateRange
   }
 }

@@ -194,7 +194,6 @@ const scheduleTasksWithoutBillableLogic = async (
   getWorkHoursRange: () => { start: number; end: number },
   scheduleTaskInAvailableSlots: any,
   saveTaskChunks: any,
-  clearTaskLogsFromTimeForward: any,
   userId: string,
   tasksDailyLogsData: any[],
   weekendDays: string[]
@@ -292,7 +291,6 @@ export const scheduleAllTasks = async (
   getWorkHoursRange: () => { start: number; end: number },
   scheduleTaskInAvailableSlots: any,
   saveTaskChunks: any,
-  clearTaskLogsFromTimeForward: any,
   userId: string,
   tasksDailyLogsData: any[] = [],
   weekendDays: string[] = [],
@@ -346,7 +344,7 @@ export const scheduleAllTasks = async (
     if (tasksToSchedule.length === 0) return new Map()
     
     // Continue with normal scheduling without placeholder tasks
-    return scheduleTasksWithoutBillableLogic(tasksToSchedule, conflictMaps, dayColumns, getWorkHoursRange, scheduleTaskInAvailableSlots, saveTaskChunks, clearTaskLogsFromTimeForward, userId, tasksDailyLogsData, weekendDays)
+    return scheduleTasksWithoutBillableLogic(tasksToSchedule, conflictMaps, dayColumns, getWorkHoursRange, scheduleTaskInAvailableSlots, saveTaskChunks, userId, tasksDailyLogsData, weekendDays)
   }
   
   // Calculate completed hours for each task from task daily logs

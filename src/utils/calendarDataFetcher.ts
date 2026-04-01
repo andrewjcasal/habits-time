@@ -17,10 +17,10 @@ export const fetchAllCalendarData = async (userId: string) => {
   try {
     // Fetch all data sources in parallel with timeout protection
     const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, tasksResult, settingsResult, calendarNotesResult, habitNotesResult, categoryBuffersResult] = await Promise.allSettled([
-      withTimeout(supabase.from('cassian_habits').select('*, habits_daily_logs:cassian_habits_daily_logs(*), habits_types:cassian_habits_types(*)').eq('user_id', userId).eq('is_visible', true).or('is_archived.eq.false,is_archived.is.null')),
+      withTimeout(supabase.from('cassian_habits').select('*, habits_daily_logs:cassian_habits_daily_logs(*), habits_types:cassian_habits_types(*), subhabits:cassian_subhabits(*), habit_todoist_tasks:cassian_habit_todoist_tasks(*)').eq('user_id', userId).eq('is_visible', true).or('is_archived.eq.false,is_archived.is.null')),
       withTimeout(supabase.from('cassian_sessions').select('*, projects:cassian_projects(*)').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_projects').select('*').eq('user_id', userId).neq('status', 'archived')),
-      withTimeout(supabase.from('cassian_meetings').select('*').eq('user_id', userId)),
+      withTimeout(supabase.from('cassian_meetings').select('*, meeting_habits:cassian_meeting_habits(habit_id)').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_tasks_daily_logs').select('*, tasks:cassian_tasks(*, projects:cassian_projects(*))').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_tasks').select('*, projects:cassian_projects!inner(*)').eq('user_id', userId).neq('projects.status', 'archived')),
       withTimeout(supabase.from('cassian_user_settings').select('*').eq('user_id', userId).single()),
@@ -40,23 +40,6 @@ export const fetchAllCalendarData = async (userId: string) => {
     const calendarNotes = calendarNotesResult.status === 'fulfilled' ? (calendarNotesResult.value.data || []) : []
     const habitNotes = habitNotesResult.status === 'fulfilled' ? (habitNotesResult.value.data || []) : []
     const categoryBuffers = categoryBuffersResult.status === 'fulfilled' ? (categoryBuffersResult.value.data || []) : []
-
-    // Debug: check if tasks join is populated
-    const logsWithoutTasks = tasksDailyLogs.filter((l: any) => !l.tasks)
-    if (logsWithoutTasks.length > 0) {
-      console.warn('⚠️ Daily logs missing tasks join:', logsWithoutTasks.length, 'of', tasksDailyLogs.length)
-    }
-
-    console.log('📦 Calendar data fetched:', {
-      habits: habits.length,
-      sessions: sessions.length,
-      projects: projects.length,
-      meetings: meetings.length,
-      tasksDailyLogs: tasksDailyLogs.length,
-      todoistLogs: tasksDailyLogs.filter((l: any) => l.tasks?.source === 'todoist').length,
-      tasks: tasks.length,
-      settings: !!settings,
-    })
 
     // Log any failures
     const failures = [

@@ -7,6 +7,7 @@ interface ModalWrapperProps {
   title: string
   children: ReactNode
   rightSidebarActions?: ReactNode
+  headerActions?: ReactNode
   maxWidth?: 'sm' | 'md' | 'lg'
 }
 
@@ -16,6 +17,7 @@ const ModalWrapper = ({
   title,
   children,
   rightSidebarActions,
+  headerActions,
   maxWidth = 'md'
 }: ModalWrapperProps) => {
   if (!isOpen) return null
@@ -36,9 +38,12 @@ const ModalWrapper = ({
               <h2 className="text-sm font-semibold text-neutral-900">
                 {title}
               </h2>
-              <button onClick={onClose} className="text-neutral-500 hover:text-neutral-700">
-                <X className="w-3 h-3" />
-              </button>
+              <div className="flex items-center gap-1">
+                {headerActions}
+                <button onClick={onClose} className="text-neutral-500 hover:text-neutral-700">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
             </div>
             {children}
           </div>

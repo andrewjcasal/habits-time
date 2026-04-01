@@ -23,7 +23,7 @@ export const generateDailyBuffer = (date: Date, meetings: any[] = []): BufferTim
     return null
   }
   
-  let startHour = 19 // 7 PM
+  let startHour = 17.5 // 5:30 PM
   let duration = 60 // 1 hour
   let isReduced = false
   
@@ -43,7 +43,7 @@ export const generateDailyBuffer = (date: Date, meetings: any[] = []): BufferTim
   }
   
   // Check for meeting conflicts and adjust buffer position
-  const bufferStart = startHour * 60 // 7 PM in minutes
+  const bufferStart = startHour * 60 // 5:30 PM in minutes
   const bufferEnd = bufferStart + duration
   
   const conflictingMeeting = meetings.find(meeting => {
@@ -94,11 +94,14 @@ export const generateDailyBuffer = (date: Date, meetings: any[] = []): BufferTim
     return buffer
   }
   
+  const startMinutes = Math.round(startHour * 60)
+  const sH = Math.floor(startMinutes / 60)
+  const sM = startMinutes % 60
   const buffer: BufferTime = {
     id: `buffer-${dateStr}`,
     title: 'Buffer Time',
-    startTime: `${startHour.toString().padStart(2, '0')}:00`,
-    endTime: `${(startHour + Math.floor(duration / 60)).toString().padStart(2, '0')}:${(duration % 60).toString().padStart(2, '0')}`,
+    startTime: `${sH.toString().padStart(2, '0')}:${sM.toString().padStart(2, '0')}`,
+    endTime: `${Math.floor((startMinutes + duration) / 60).toString().padStart(2, '0')}:${((startMinutes + duration) % 60).toString().padStart(2, '0')}`,
     duration,
     date,
     dateStr,

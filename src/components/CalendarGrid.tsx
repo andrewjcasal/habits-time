@@ -72,6 +72,11 @@ interface CalendarGridProps {
   dragEnd: { hourIndex: number; columnIndex: number; quarter: number } | null
   isInDragSelection: (hourIndex: number, columnIndex: number) => boolean
   getCurrentTimeLinePosition: (date: Date) => number | null
+  habitDragPreview?: {
+    columnIndex: number
+    topPx: number
+    heightPx: number
+  } | null
 }
 
 export default function CalendarGrid({
@@ -93,6 +98,7 @@ export default function CalendarGrid({
   dragEnd,
   isInDragSelection,
   getCurrentTimeLinePosition,
+  habitDragPreview,
 }: CalendarGridProps) {
   return (
     <div
@@ -248,6 +254,35 @@ export default function CalendarGrid({
               />
             )
           })()}
+        </div>
+      )}
+
+      {/* Habit Drag Preview Shadow */}
+      {habitDragPreview && (
+        <div className="absolute inset-0 pointer-events-none z-15">
+          <div
+            className="absolute"
+            style={{
+              left: '80px',
+              right: '0',
+              display: 'grid',
+              gridTemplateColumns: gridCols.replace('80px ', ''),
+            }}
+          >
+            {dayColumns.map((_, i) => (
+              <div key={i} className="relative">
+                {i === habitDragPreview.columnIndex && (
+                  <div
+                    className="absolute left-0 right-0 bg-blue-200/40 border border-blue-300/50 rounded"
+                    style={{
+                      top: `${habitDragPreview.topPx}px`,
+                      height: `${habitDragPreview.heightPx}px`,
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

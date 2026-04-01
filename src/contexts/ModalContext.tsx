@@ -73,7 +73,6 @@ interface ModalActions {
   confirmResizeConflict: (deleteTasks: boolean) => Promise<void>
 
   // Cross-modal actions
-  addMeetingFromHabit: () => void
   addMeetingFromTask: () => void
 }
 
@@ -123,9 +122,11 @@ interface ModalProviderProps {
   onUpdateMeetingEndTime: (meetingId: string, newEndTime: string) => Promise<void>
   onDeleteTaskLog: (logId: string) => Promise<void>
   onRemoveTaskLogFromUI: (logId: string) => void
+  onAddHabitBlock?: (habitId: string, date: string, startTime: string, duration: number) => void
+  onMeetingHabitLinked?: (meetingId: string, habitId: string) => void
 }
 
-export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onCompleteTask, onDeleteTask, onHabitTimeChange, onHabitSkip, onUpdateSession, onTaskLogCreated, onUpdateMeetingEndTime, onDeleteTaskLog, onRemoveTaskLogFromUI }: ModalProviderProps) => {
+export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onCompleteTask, onDeleteTask, onHabitTimeChange, onHabitSkip, onUpdateSession, onTaskLogCreated, onUpdateMeetingEndTime, onDeleteTaskLog, onRemoveTaskLogFromUI, onAddHabitBlock, onMeetingHabitLinked }: ModalProviderProps) => {
   const { user } = useUserContext()
   const [modalState, setModalState] = useState<ModalState>(initialModalState)
   const [userSettings, setUserSettings] = useState<any>(null)
@@ -354,17 +355,6 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
   }
 
   // Cross-modal actions
-  const addMeetingFromHabit = () => {
-    if (modalState.selectedHabit && modalState.selectedHabitDate) {
-      // Close habit modal and open meeting modal with habit context
-      const habitTime = modalState.selectedHabit.current_start_time || '09:00'
-      const timeSlot = { time: habitTime, date: modalState.selectedHabitDate }
-      
-      closeHabitModal()
-      openMeetingModal(timeSlot)
-    }
-  }
-
   const addMeetingFromTask = () => {
     if (modalState.selectedTask) {
       // Extract time from task and open meeting modal
@@ -405,15 +395,14 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
     openResizeConflictDialog,
     closeResizeConflictDialog,
     confirmResizeConflict,
-    addMeetingFromHabit,
     addMeetingFromTask,
   }
 
   return (
     <ModalContext.Provider value={value}>
       <MeetingModal
-        onTaskLogCreated={onTaskLogCreated}
-        onBackToTask={modalState.selectedTask ? () => { closeTaskModal(); } : undefined}
+        onAddHabitBlock={onAddHabitBlock}
+        onMeetingHabitLinked={onMeetingHabitLinked}
       />
       <CalendarTaskModal
         isOpen={modalState.showTaskModal}

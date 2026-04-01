@@ -18,7 +18,6 @@ interface InlineEditProps {
 
 export default function InlineEdit({ fields, onSave, onCancel }: InlineEditProps) {
   const firstRef = useRef<HTMLInputElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     firstRef.current?.focus()
@@ -30,7 +29,7 @@ export default function InlineEdit({ fields, onSave, onCancel }: InlineEditProps
   }
 
   return (
-    <div className="flex items-center gap-1" ref={containerRef}>
+    <div className="flex items-center gap-1">
       {fields.map((field, i) => (
         <input
           key={i}

@@ -1,11 +1,9 @@
 import { format, subWeeks } from 'date-fns'
-import { ChevronDown, FileText, Calendar, ArrowLeft } from 'lucide-react'
+import { ChevronDown, Pencil } from 'lucide-react'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Meeting } from '../types'
 import { supabase } from '../lib/supabase'
-import TaskDailyLogModal from './TaskDailyLogModal'
 import ModalWrapper from './ModalWrapper'
-import SidebarActionButton from './SidebarActionButton'
 import { useModal } from '../contexts/ModalContext'
 import { useUserContext } from '../contexts/UserContext'
 
@@ -16,11 +14,11 @@ interface Category {
 }
 
 interface MeetingModalProps {
-  onTaskLogCreated?: () => void
-  onBackToTask?: () => void
+  onAddHabitBlock?: (habitId: string, date: string, startTime: string, duration: number) => void
+  onMeetingHabitLinked?: (meetingId: string, habitId: string) => void
 }
 
-const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => {
+const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked }: MeetingModalProps) => {
   const {
     showMeetingModal,
     newMeeting: meeting,
@@ -42,39 +40,38 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
   const [loadingTitles, setLoadingTitles] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriesFetched, setCategoriesFetched] = useState(false)
-  const [showTaskLogModal, setShowTaskLogModal] = useState(false)
   const [localTitle, setLocalTitle] = useState(meeting.title)
-  const [showTaskLogForm, setShowTaskLogForm] = useState(false)
-  const [tasks, setTasks] = useState<{id: string, title: string, estimated_hours: number}[]>([])
-  const [taskLogForm, setTaskLogForm] = useState({
-    task_id: '',
-    hours: 1,
-    notes: ''
-  })
+  const [viewMode, setViewMode] = useState<'readonly' | 'edit' | 'create-habit' | 'link-habit'>('readonly')
+  const [newHabitName, setNewHabitName] = useState('')
+  const [newHabitDuration, setNewHabitDuration] = useState(30)
+  const [newHabitStartTime, setNewHabitStartTime] = useState('09:00')
+  const [creatingHabit, setCreatingHabit] = useState(false)
+  const [allHabits, setAllHabits] = useState<any[]>([])
+  const [selectedHabitId, setSelectedHabitId] = useState('')
+  const [linkingHabit, setLinkingHabit] = useState(false)
+  const [skippedHabits, setSkippedHabits] = useState<any[]>([])
 
   // Sync local title with meeting prop when modal opens
   useEffect(() => {
     if (showMeetingModal) {
       setLocalTitle(meeting.title)
-      setShowTaskLogForm(false)
+      // New meetings go straight to edit, existing meetings show readonly
+      setViewMode(editingMeeting ? 'readonly' : 'edit')
       setShowLocationField(false)
       setShowDescriptionField(false)
       setShowFullForm(false)
     }
   }, [showMeetingModal, meeting.title])
 
-  // Fetch tasks when task log form is shown
-  useEffect(() => {
-    if (showTaskLogForm) {
-      fetchTasks()
-    }
-  }, [showTaskLogForm])
-
   // Fetch previous meeting titles when modal opens (only for new meetings, memoized)
   useEffect(() => {
     if (showMeetingModal && !editingMeeting && previousTitles.length === 0) {
       setLoadingTitles(true)
       fetchPreviousTitles().finally(() => setLoadingTitles(false))
+    }
+    // Fetch skipped habits for the selected date
+    if (showMeetingModal && !editingMeeting && selectedTimeSlot && user) {
+      fetchSkippedHabits()
     }
   }, [showMeetingModal, editingMeeting, previousTitles.length])
 
@@ -104,75 +101,6 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       setCategoriesFetched(true)
     } catch (error) {
       console.error('Error fetching categories:', error)
-    }
-  }
-
-  const fetchTasks = async () => {
-    try {
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('cassian_tasks')
-        .select('id, title, estimated_hours')
-        .eq('user_id', user.id)
-        .eq('status', 'todo')
-        .order('title')
-
-      if (error) {
-        console.error('Error fetching tasks:', error)
-        return
-      }
-
-      setTasks(data || [])
-    } catch (error) {
-      console.error('Error fetching tasks:', error)
-    }
-  }
-
-  const handleCreateTaskLog = async () => {
-    if (!taskLogForm.task_id || !selectedTimeSlot || !user) return
-
-    try {
-
-      // Calculate end time
-      const [startHour, startMinute] = selectedTimeSlot.time.split(':').map(Number)
-      const startTimeInMinutes = startHour * 60 + startMinute
-      const endTimeInMinutes = startTimeInMinutes + (taskLogForm.hours * 60)
-      const endHour = Math.floor(endTimeInMinutes / 60)
-      const endMinute = endTimeInMinutes % 60
-      const scheduled_end_time = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`
-
-      const { error } = await supabase
-        .from('cassian_tasks_daily_logs')
-        .insert({
-          task_id: taskLogForm.task_id,
-          user_id: user.id,
-          log_date: format(selectedTimeSlot.date, 'yyyy-MM-dd'),
-          scheduled_start_time: `${selectedTimeSlot.time}:00`,
-          scheduled_end_time,
-          estimated_hours: taskLogForm.hours,
-          notes: taskLogForm.notes.trim() || null
-        })
-
-      if (error) {
-        console.error('Error creating task log:', error)
-        return
-      }
-
-      // Reset form
-      setTaskLogForm({
-        task_id: '',
-        hours: 1,
-        notes: ''
-      })
-
-      // Close the task log form and notify parent if needed
-      setShowTaskLogForm(false)
-      if (onTaskLogCreated) {
-        onTaskLogCreated()
-      }
-    } catch (error) {
-      console.error('Error creating task log:', error)
     }
   }
 
@@ -284,40 +212,137 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
       .slice(0, 10)
   }, [previousTitles, localTitle])
 
+  const fetchSkippedHabits = async () => {
+    if (!user || !selectedTimeSlot) return
+    const dateStr = format(selectedTimeSlot.date, 'yyyy-MM-dd')
+    const { data: habits } = await supabase
+      .from('cassian_habits')
+      .select('id, name, duration, habits_daily_logs:cassian_habits_daily_logs(is_skipped, log_date)')
+      .eq('user_id', user.id)
+      .eq('is_visible', true)
+      .or('is_archived.eq.false,is_archived.is.null')
+    const skipped = (habits || []).filter(h =>
+      h.habits_daily_logs?.some((log: any) => log.log_date === dateStr && log.is_skipped)
+    )
+    setSkippedHabits(skipped)
+  }
+
+  const handleAddHabitBlock = async (habit: any) => {
+    if (!user || !selectedTimeSlot) return
+    const dateStr = format(selectedTimeSlot.date, 'yyyy-MM-dd')
+    const startTime = `${selectedTimeSlot.time}:00`
+    const durationMin = habit.duration || 15
+
+    // Delete skipped log for this habit+date (if any)
+    await supabase
+      .from('cassian_habits_daily_logs')
+      .delete()
+      .eq('habit_id', habit.id)
+      .eq('user_id', user.id)
+      .eq('log_date', dateStr)
+      .eq('is_skipped', true)
+
+    // Insert the new block
+    await supabase.from('cassian_habits_daily_logs').upsert({
+      habit_id: habit.id,
+      user_id: user.id,
+      log_date: dateStr,
+      scheduled_start_time: startTime,
+      duration: durationMin,
+      is_skipped: false,
+      is_completed: false,
+    }, {
+      onConflict: 'habit_id,user_id,log_date,scheduled_start_time',
+    })
+
+    onAddHabitBlock?.(habit.id, dateStr, startTime, durationMin)
+    closeMeetingModal()
+  }
+
+  const fetchHabitsForLinking = async () => {
+    if (!user) return
+    const { data } = await supabase
+      .from('cassian_habits')
+      .select('id, name')
+      .eq('user_id', user.id)
+      .eq('is_visible', true)
+      .or('is_archived.eq.false,is_archived.is.null')
+      .order('name')
+    setAllHabits(data || [])
+  }
+
+  const handleLinkHabit = async () => {
+    if (!selectedHabitId || !editingMeeting || !user) return
+    setLinkingHabit(true)
+    try {
+      await supabase.from('cassian_meeting_habits').insert({
+        meeting_id: editingMeeting.id,
+        habit_id: selectedHabitId,
+        user_id: user.id,
+      })
+      onMeetingHabitLinked?.(editingMeeting.id, selectedHabitId)
+      closeMeetingModal()
+    } catch (err) {
+      console.error('Error linking habit:', err)
+    } finally {
+      setLinkingHabit(false)
+    }
+  }
+
+  const handleCreateHabitFromMeeting = async () => {
+    if (!newHabitName.trim() || !user || !editingMeeting) return
+    setCreatingHabit(true)
+    try {
+      // Find "fixed" habit type
+      const { data: fixedType } = await supabase
+        .from('cassian_habits_types')
+        .select('id')
+        .eq('scheduling_rule', 'fixed_time')
+        .single()
+
+      if (!fixedType) return
+
+      // Create the habit
+      const { data: habit, error: habitError } = await supabase
+        .from('cassian_habits')
+        .insert({
+          name: newHabitName.trim(),
+          duration: newHabitDuration,
+          habit_type_id: fixedType.id,
+          default_start_time: newHabitStartTime,
+          current_start_time: newHabitStartTime,
+          user_id: user.id,
+          is_visible: true,
+        })
+        .select()
+        .single()
+
+      if (habitError || !habit) throw habitError
+
+      // Link habit to meeting
+      await supabase.from('cassian_meeting_habits').insert({
+        meeting_id: editingMeeting.id,
+        habit_id: habit.id,
+        user_id: user.id,
+      })
+
+      onMeetingHabitLinked?.(editingMeeting.id, habit.id)
+      closeMeetingModal()
+    } catch (err) {
+      console.error('Error creating habit from meeting:', err)
+    } finally {
+      setCreatingHabit(false)
+    }
+  }
+
   // Return null AFTER all hooks have been called to maintain hook order
   if (!showMeetingModal) return null
 
   const getTitle = () => {
-    if (showTaskLogForm) return 'Add Task Log'
-    return editingMeeting ? 'Edit Meeting' : 'Add Meeting'
+    if (viewMode === 'create-habit') return 'Create Habit'
+    if (viewMode === 'edit') return editingMeeting ? 'Edit Meeting' : 'Add Meeting'
+    return meeting.title || 'Meeting'
   }
-
-  const rightSidebarActions =
-    selectedTimeSlot && !editingMeeting ? (
-      <>
-        {onBackToTask && (
-          <SidebarActionButton onClick={onBackToTask} title="Back to Task">
-            <ArrowLeft className="w-3 h-3" />
-          </SidebarActionButton>
-        )}
-        {!onBackToTask && (
-          <>
-            {!showTaskLogForm ? (
-              <SidebarActionButton onClick={() => setShowTaskLogForm(true)} title="Add Task Log">
-                <FileText className="w-3 h-3" />
-              </SidebarActionButton>
-            ) : (
-              <SidebarActionButton
-                onClick={() => setShowTaskLogForm(false)}
-                title="Back to Meeting"
-              >
-                <Calendar className="w-3 h-3" />
-              </SidebarActionButton>
-            )}
-          </>
-        )}
-      </>
-    ) : undefined
 
   return (
     <>
@@ -325,11 +350,154 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
         isOpen={showMeetingModal}
         onClose={closeMeetingModal}
         title={getTitle()}
-        rightSidebarActions={rightSidebarActions}
         maxWidth={selectedTimeSlot ? 'lg' : 'md'}
+        headerActions={viewMode === 'readonly' && editingMeeting ? (
+          <button
+            onClick={() => setViewMode('edit')}
+            className="p-1 text-neutral-400 hover:text-neutral-600 rounded hover:bg-neutral-100 transition-colors"
+            title="Edit meeting"
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+        ) : undefined}
       >
-        {!showTaskLogForm ? (
-          !editingMeeting && !showFullForm && (previousTitles.length > 0 || loadingTitles) ? (
+        {/* Readonly view for existing meetings */}
+        {viewMode === 'readonly' && editingMeeting ? (
+          <div className="space-y-2">
+            <div className="text-xs text-neutral-500">
+              {format(new Date(editingMeeting.start_time), 'EEEE, MMM d, yyyy')}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-neutral-700">
+              <span>{format(new Date(editingMeeting.start_time), 'h:mm a')}</span>
+              <span className="text-neutral-400">—</span>
+              <span>{format(new Date(editingMeeting.end_time), 'h:mm a')}</span>
+              <span className="text-neutral-400">
+                ({Math.round((new Date(editingMeeting.end_time).getTime() - new Date(editingMeeting.start_time).getTime()) / 60000)} min)
+              </span>
+            </div>
+            {editingMeeting.location && (
+              <p className="text-xs text-neutral-500">{editingMeeting.location}</p>
+            )}
+            {editingMeeting.description && (
+              <p className="text-xs text-neutral-500">{editingMeeting.description}</p>
+            )}
+            <div className="pt-2 border-t border-neutral-100">
+              <button
+                onClick={() => {
+                  setNewHabitName(editingMeeting.title)
+                  const ms = new Date(editingMeeting.start_time)
+                  setNewHabitStartTime(`${ms.getHours().toString().padStart(2, '0')}:${ms.getMinutes().toString().padStart(2, '0')}`)
+                  const dur = Math.round((new Date(editingMeeting.end_time).getTime() - ms.getTime()) / 60000)
+                  setNewHabitDuration(dur > 0 ? dur : 30)
+                  setViewMode('create-habit')
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors w-full justify-center"
+              >
+                Create habit from meeting
+              </button>
+              <button
+                onClick={() => {
+                  fetchHabitsForLinking()
+                  setSelectedHabitId('')
+                  setViewMode('link-habit')
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-neutral-700 bg-neutral-200 rounded-lg hover:bg-neutral-300 transition-colors w-full justify-center"
+              >
+                Associate to existing habit
+              </button>
+            </div>
+          </div>
+
+        ) : viewMode === 'link-habit' && editingMeeting ? (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-neutral-600 mb-1">Select a habit</label>
+              <select
+                value={selectedHabitId}
+                onChange={e => setSelectedHabitId(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+              >
+                <option value="">Choose habit...</option>
+                {allHabits.map(h => (
+                  <option key={h.id} value={h.id}>{h.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('readonly')}
+                className="px-3 py-1.5 text-xs text-neutral-600 hover:text-neutral-800"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleLinkHabit}
+                disabled={linkingHabit || !selectedHabitId}
+                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {linkingHabit ? 'Linking...' : 'Link Habit'}
+              </button>
+            </div>
+          </div>
+
+        ) : viewMode === 'create-habit' && editingMeeting ? (
+          <div className="space-y-3">
+            <p className="text-xs text-neutral-500">
+              This habit will start today and repeat going forward.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-neutral-600 mb-1">Name</label>
+              <input
+                type="text"
+                value={newHabitName}
+                onChange={e => setNewHabitName(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-neutral-600 mb-1">Start time</label>
+                <input
+                  type="time"
+                  value={newHabitStartTime}
+                  onChange={e => setNewHabitStartTime(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-neutral-600 mb-1">Duration (min)</label>
+                <input
+                  type="number"
+                  value={newHabitDuration}
+                  onChange={e => setNewHabitDuration(parseInt(e.target.value) || 0)}
+                  className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  min="1"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('readonly')}
+                className="px-3 py-1.5 text-xs text-neutral-600 hover:text-neutral-800"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateHabitFromMeeting}
+                disabled={creatingHabit || !newHabitName.trim()}
+                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {creatingHabit ? 'Creating...' : 'Create Habit'}
+              </button>
+            </div>
+          </div>
+
+        ) : !editingMeeting && !showFullForm && (previousTitles.length > 0 || loadingTitles) ? (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-1.5">
                 {previousTitles.slice(0, 12).map((titleData, index) => (
@@ -355,6 +523,23 @@ const MeetingModal = ({ onTaskLogCreated, onBackToTask }: MeetingModalProps) => 
               >
                 + Different meeting
               </button>
+              {skippedHabits.length > 0 && (
+                <div className="pt-2 border-t border-neutral-100">
+                  <p className="text-xs text-neutral-400 mb-1.5">Skipped habits</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {skippedHabits.map(habit => (
+                      <button
+                        key={habit.id}
+                        type="button"
+                        onClick={() => handleAddHabitBlock(habit)}
+                        className="px-3 py-1.5 rounded-full text-xs border bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                      >
+                        {habit.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
           <form
@@ -643,86 +828,8 @@ onChange={e => {
             </div>
           </form>
           )
-        ) : (
-          <div className="space-y-1">
-            <p className="text-xs text-neutral-600 mb-2">
-              Create a task log for{' '}
-              {selectedTimeSlot ? format(selectedTimeSlot.date, 'MMM d, yyyy') : 'today'}
-            </p>
-            <div>
-              <select
-                value={taskLogForm.task_id}
-                onChange={e => setTaskLogForm({ ...taskLogForm, task_id: e.target.value })}
-                className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
-                required
-              >
-                <option value="">Select a task...</option>
-                {tasks.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.title} ({task.estimated_hours}h)
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-1">
-              <input
-                type="time"
-                defaultValue={selectedTimeSlot?.time || ''}
-                className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
-                required
-              />
-              <input
-                type="number"
-                min="0.25"
-                max="8"
-                step="0.25"
-                value={taskLogForm.hours}
-                onChange={e => setTaskLogForm({ ...taskLogForm, hours: parseFloat(e.target.value) || 1 })}
-                placeholder="Hours"
-                className="w-16 px-1 py-1 border border-neutral-300 rounded-md text-xs"
-                required
-              />
-            </div>
-            <textarea
-              placeholder="Notes (optional)"
-              value={taskLogForm.notes}
-              onChange={e => setTaskLogForm({ ...taskLogForm, notes: e.target.value })}
-              className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs resize-none"
-              rows={2}
-            />
-            <div className="flex gap-1 justify-end pt-1">
-              <button
-                type="button"
-                onClick={() => setShowTaskLogForm(false)}
-                className="px-2 py-1 text-neutral-600 text-xs hover:text-neutral-800"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateTaskLog}
-                disabled={!taskLogForm.task_id}
-                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                Create Task Log
-              </button>
-            </div>
-          </div>
-        )}
+        }
       </ModalWrapper>
-
-      <TaskDailyLogModal
-        isOpen={showTaskLogModal}
-        onClose={() => setShowTaskLogModal(false)}
-        selectedDate={selectedTimeSlot?.date || new Date(meeting.date)}
-        selectedTimeSlot={selectedTimeSlot}
-        onTaskLogCreated={() => {
-          setShowTaskLogModal(false)
-          if (onTaskLogCreated) {
-            onTaskLogCreated()
-          }
-        }}
-      />
     </>
   )
 }
