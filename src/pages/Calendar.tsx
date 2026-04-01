@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Plus, Info, FileText, RefreshCw } from 'lucide-react'
+import { Plus, Info, FileText, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
+import CalendarSettingsPanel from '../components/CalendarSettingsPanel'
 import NoteModal from '../components/NoteModal'
 import { useCalendarData } from '../hooks/useCalendarData'
 import { supabase } from '../lib/supabase'
@@ -40,7 +41,45 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
   // Note view modal state
   const [viewingNote, setViewingNote] = useState<any>(null)
   const [isSyncingTodoist, setIsSyncingTodoist] = useState(false)
+  const [showCalendarSettings, setShowCalendarSettings] = useState(false)
 
+
+  // Handle Google Calendar OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('google_callback') === 'true' && params.get('code')) {
+      const code = params.get('code')!
+      const handleCallback = async () => {
+        await supabase.functions.invoke('google-calendar', {
+          body: {
+            action: 'callback',
+            code,
+            redirectUri: window.location.origin + '/calendar?google_callback=true',
+          },
+        })
+        // Clean URL and sync
+        window.history.replaceState({}, '', '/calendar')
+        await syncGoogleCalendar()
+      }
+      handleCallback()
+    }
+  }, [])
+
+  // Sync Google Calendar events
+  const syncGoogleCalendar = async () => {
+    const { data } = await supabase.functions.invoke('google-calendar', {
+      body: { action: 'list_calendars' },
+    })
+    const calendars = data?.calendars || []
+    const enabledCalendars = calendars.filter((c: any) => c.is_enabled)
+    for (const cal of enabledCalendars) {
+      await supabase.functions.invoke('google-calendar', {
+        body: { action: 'sync_events', userCalendarId: cal.id },
+      })
+    }
+    // Refresh calendar data by reloading
+    window.location.reload()
+  }
 
   // Calendar notes come from useCalendarData (merged into single fetch)
 
@@ -154,7 +193,7 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
       ? '80px 1fr 1fr 1fr 1fr 1fr 1fr 1fr'
       : windowWidth > 600
       ? '80px 1fr 1fr 1fr 1fr 1fr 1fr 1fr'
-      : '80px minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr)'
+      : '60px 1fr'
 
   // Navigation functions
   const navigateBackWeek = () => {
@@ -1114,6 +1153,9 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
         navigateToToday={navigateToToday}
         navigateForwardDay={navigateForwardDay}
         navigateForwardWeek={navigateForwardWeek}
+        showCalendarSettings={showCalendarSettings}
+        setShowCalendarSettings={setShowCalendarSettings}
+        onSyncGoogleCalendar={syncGoogleCalendar}
       />
 
       {/* Headers */}
@@ -1127,11 +1169,11 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
             title="Add meeting"
             onClick={handleAddMeeting}
           >
-            <Plus className="w-3 h-3 text-neutral-600" />
+            <Plus className="w-4 h-4 sm:w-3 sm:h-3 text-neutral-600" />
           </button>
           {settings?.todoist_api_key && (
             <button
-              className="p-0.5 hover:bg-neutral-200 rounded transition-colors"
+              className="hidden sm:block p-0.5 hover:bg-neutral-200 rounded transition-colors"
               title="Sync Todoist"
               disabled={isSyncingTodoist}
               onClick={async () => {

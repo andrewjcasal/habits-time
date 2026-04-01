@@ -8,7 +8,9 @@ import {
   Info,
   ListTodo,
   Sun,
+  Settings,
 } from 'lucide-react'
+import CalendarSettingsPanel from './CalendarSettingsPanel'
 
 interface CalendarTopBarProps {
   settings: any
@@ -29,6 +31,9 @@ interface CalendarTopBarProps {
   navigateToToday: () => void
   navigateForwardDay: () => void
   navigateForwardWeek: () => void
+  showCalendarSettings: boolean
+  setShowCalendarSettings: (show: boolean) => void
+  onSyncGoogleCalendar: () => void
 }
 
 export default function CalendarTopBar({
@@ -50,6 +55,9 @@ export default function CalendarTopBar({
   navigateToToday,
   navigateForwardDay,
   navigateForwardWeek,
+  showCalendarSettings,
+  setShowCalendarSettings,
+  onSyncGoogleCalendar,
 }: CalendarTopBarProps) {
   const showBar = settings ? (settings.metadata?.showWorkHoursBar ?? true) : false
 
@@ -62,7 +70,7 @@ export default function CalendarTopBar({
       <div className="flex items-center">
         <button
           onClick={navigateBackWeek}
-          className=" hover:bg-neutral-200 rounded transition-colors"
+          className="hidden sm:block hover:bg-neutral-200 rounded transition-colors"
           title="Go back 5 days"
         >
           <ChevronsLeft className="w-2 h-2 text-neutral-600" />
@@ -72,25 +80,25 @@ export default function CalendarTopBar({
           className="hover:bg-neutral-200 rounded transition-colors"
           title="Go back 1 day"
         >
-          <ChevronLeft className="w-2 h-2 text-neutral-600" />
+          <ChevronLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
         </button>
         <button
           onClick={navigateToToday}
           className="hover:bg-neutral-200 rounded transition-colors mx-1"
           title="Go to today"
         >
-          <Sun className="w-2 h-2 text-yellow-600" />
+          <Sun className="w-4 h-4 sm:w-2 sm:h-2 text-yellow-600" />
         </button>
         <button
           onClick={navigateForwardDay}
           className="hover:bg-neutral-200 rounded transition-colors"
           title="Go forward 1 day"
         >
-          <ChevronRight className="w-2 h-2 text-neutral-600" />
+          <ChevronRight className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
         </button>
         <button
           onClick={navigateForwardWeek}
-          className="hover:bg-neutral-200 rounded transition-colors"
+          className="hidden sm:block hover:bg-neutral-200 rounded transition-colors"
           title="Go forward 5 days"
         >
           <ChevronsRight className="w-2 h-2 text-neutral-600" />
@@ -325,6 +333,22 @@ export default function CalendarTopBar({
           )}
         </div>
       </div>}
+
+      {/* Calendar Settings Gear */}
+      <div className="relative ml-2">
+        <button
+          onClick={() => setShowCalendarSettings(!showCalendarSettings)}
+          className="p-0.5 hover:bg-neutral-200 rounded transition-colors"
+          title="Calendar settings"
+        >
+          <Settings className="w-2.5 h-2.5 text-neutral-500" />
+        </button>
+        <CalendarSettingsPanel
+          isOpen={showCalendarSettings}
+          onClose={() => setShowCalendarSettings(false)}
+          onSync={onSyncGoogleCalendar}
+        />
+      </div>
       </div>
     </div>
   )

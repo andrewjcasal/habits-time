@@ -213,22 +213,27 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const today = new Date()
     const todayStr = format(today, 'yyyy-MM-dd')
     const tomorrowStr = format(addDays(today, 1), 'yyyy-MM-dd')
-    
-    const columnCount = windowWidth > 600 ? 7 : 3
-    
+    const yesterdayStr = format(addDays(today, -1), 'yyyy-MM-dd')
+
+    const columnCount = windowWidth > 600 ? 7 : 1
+
     return Array.from({ length: columnCount }, (_, i) => {
       const date = addDays(baseDate, i)
       const dateStr = format(date, 'yyyy-MM-dd')
-      
+
       let label: string
       if (dateStr === todayStr) {
         label = 'Today'
       } else if (dateStr === tomorrowStr) {
         label = 'Tomorrow'
+      } else if (dateStr === yesterdayStr) {
+        label = 'Yesterday'
       } else {
-        label = format(date, 'EEE, MMM d')
+        label = columnCount === 1
+          ? `${format(date, 'EEEEE')} ${date.getMonth() + 1}/${date.getDate()}`
+          : format(date, 'EEE, MMM d')
       }
-      
+
       return { date, label, dateStr }
     })
   }, [baseDate, windowWidth])
@@ -956,10 +961,21 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     moveHabitLog: (habitId: string, date: string, newStartTime: string) => {
       setHabits(prev => prev.map(h => {
         if (h.id !== habitId) return h
-        const logs = (h.habits_daily_logs || []).map((log: any) =>
-          log.log_date === date && !log.is_skipped ? { ...log, scheduled_start_time: newStartTime } : log
-        )
-        return { ...h, habits_daily_logs: logs }
+        const logs = h.habits_daily_logs || []
+        const hasLog = logs.some((log: any) => log.log_date === date && !log.is_skipped)
+        if (hasLog) {
+          return {
+            ...h,
+            habits_daily_logs: logs.map((log: any) =>
+              log.log_date === date && !log.is_skipped ? { ...log, scheduled_start_time: newStartTime } : log
+            )
+          }
+        }
+        // No existing log — add one
+        return {
+          ...h,
+          habits_daily_logs: [...logs, { habit_id: habitId, log_date: date, scheduled_start_time: newStartTime, is_skipped: false, duration: h.duration }]
+        }
       }))
     },
     updateHabitLogDuration: (habitId: string, date: string, duration: number) => {

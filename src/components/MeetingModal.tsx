@@ -405,6 +405,21 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked }: MeetingModalPro
               >
                 Associate to existing habit
               </button>
+              {editingMeeting.google_event_id && (
+                <button
+                  onClick={async () => {
+                    await supabase
+                      .from('cassian_meetings')
+                      .update({ is_ignored: true })
+                      .eq('id', editingMeeting.id)
+                    closeMeetingModal()
+                    window.location.reload()
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors w-full justify-center mt-1"
+                >
+                  Ignore this event
+                </button>
+              )}
             </div>
           </div>
 

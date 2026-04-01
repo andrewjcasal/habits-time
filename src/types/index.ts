@@ -360,6 +360,9 @@ export interface Meeting {
   priority: 'low' | 'medium' | 'high'
   status: 'scheduled' | 'completed' | 'cancelled'
   category_id?: string
+  google_event_id?: string
+  user_calendar_id?: string
+  is_ignored?: boolean
   created_at: string
   updated_at: string
 }

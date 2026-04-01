@@ -34,6 +34,12 @@
 - Focus on shorter, actionable posts rather than long personal stories
 - Reflection tone should be coaching/momentum-building, not therapeutic
 
+## UI Design
+
+- Use the `frontend-design` skill for all new components, pages, and significant layout updates
+- Design direction: warm editorial minimalism — DM Serif Display for headings, DM Sans for body
+- Color palette: warm ivory backgrounds (#FDFBF7), amber accents, neutral-900 for primary actions
+
 ## Modal & Dialog Architecture
 
 - All modals and dialogs are managed by `ModalContext` (`src/contexts/ModalContext.tsx`)

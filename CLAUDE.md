@@ -49,6 +49,12 @@
 - Only one modal can be open at a time — `getClosedModalState()` closes all others before opening a new one
 - Calendar-specific UI state (tooltips, drag state, note modals) can stay local to Calendar.tsx
 
+## UI Design
+
+- Use the `frontend-design` skill for all new components, pages, and significant layout updates
+- Design direction: warm editorial minimalism — DM Serif Display for headings, DM Sans for body
+- Color palette: warm ivory backgrounds (#FDFBF7), amber accents, neutral-900 for primary actions
+
 ## Code Style
 
 - Do not use anonymous functions (IIFEs) inside JSX — extract logic into `useMemo`, named functions, or variables before the return statement
