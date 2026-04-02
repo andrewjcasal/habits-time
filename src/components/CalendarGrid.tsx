@@ -112,10 +112,10 @@ export default function CalendarGrid({
             className="grid border-b border-neutral-300"
             style={{
               gridTemplateColumns: gridCols,
-              height: undefined, // controlled by h-[76px] sm:h-16 classes
+              height: 64,
             }}
           >
-            <div className="border-r border-neutral-300 py-0 px-1 h-[76px] sm:h-16 bg-neutral-50 flex items-start">
+            <div className="border-r border-neutral-300 py-0 px-1 h-16 bg-neutral-50 flex items-start">
               <div className="font-mono text-neutral-600 text-xs">{hour.display}</div>
             </div>
             {dayColumns.map((column, columnIndex) => {
@@ -124,7 +124,7 @@ export default function CalendarGrid({
               return (
                 <div
                   key={columnIndex}
-                  className={`border-r border-neutral-300 last:border-r-0 p-1 sm:p-0.5 h-[76px] sm:h-16 text-sm sm:text-xs relative cursor-pointer select-none`}
+                  className={`border-r border-neutral-300 last:border-r-0 p-1 sm:p-0.5 h-16 text-sm sm:text-xs relative cursor-pointer select-none`}
                   onClick={e =>
                     !isDragging && handleTimeSlotClick(e, hour.time, column.date)
                   }
