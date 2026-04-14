@@ -1147,7 +1147,7 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
   }, [handleSaveMeeting, handleDeleteMeeting, modalTimeSlot])
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-white overflow-hidden md:static md:h-screen">
+    <div className="flex flex-col bg-white md:h-screen md:overflow-hidden">
       {/* CSS for drag animation */}
       <style>
         {`
@@ -1161,6 +1161,8 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
           }
         `}
       </style>
+      {/* Sticky header on mobile, normal flow on desktop */}
+      <div className="sticky top-0 z-20 bg-white md:static">
       {/* Calendar Setup Banner - shown when calendar is sparse */}
       {!isDataLoading && meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
         <div className="-mx-2 mb-2 px-4 py-2 bg-amber-50 border-b border-amber-100 sm:mx-0 sm:mb-0 sm:px-4 sm:py-3 sm:bg-amber-50 sm:border sm:border-amber-100 sm:rounded-lg sm:mx-0 sm:mt-0">
@@ -1248,6 +1250,7 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
           </div>
         ))}
       </div>
+      </div>{/* end sticky header */}
 
       {/* Calendar Grid */}
       <CalendarGrid
