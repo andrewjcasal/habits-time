@@ -7,6 +7,7 @@ import {
   ChevronsRight,
   Info,
   ListTodo,
+  Plus,
   Sun,
   Settings,
   Menu,
@@ -36,6 +37,8 @@ interface CalendarTopBarProps {
   setShowCalendarSettings: (show: boolean) => void
   onSyncGoogleCalendar: () => void
   onToggleMobileMenu?: () => void
+  onAddMeeting?: () => void
+  mobileDayLabel?: string
 }
 
 export default function CalendarTopBar({
@@ -61,6 +64,8 @@ export default function CalendarTopBar({
   setShowCalendarSettings,
   onSyncGoogleCalendar,
   onToggleMobileMenu,
+  onAddMeeting,
+  mobileDayLabel,
 }: CalendarTopBarProps) {
   const showBar = settings ? (settings.metadata?.showWorkHoursBar ?? true) : false
 
@@ -71,6 +76,15 @@ export default function CalendarTopBar({
     <div className="flex items-center justify-between sm:px-2">
       {/* Left side: Navigation Controls */}
       <div className="flex items-center">
+        {onAddMeeting && (
+          <button
+            onClick={onAddMeeting}
+            className="md:hidden hover:bg-neutral-200 rounded transition-colors mr-1"
+            title="Add meeting"
+          >
+            <Plus className="w-4 h-4 text-neutral-600" />
+          </button>
+        )}
         <button
           onClick={navigateBackWeek}
           className="hidden sm:block hover:bg-neutral-200 rounded transition-colors"
@@ -85,12 +99,21 @@ export default function CalendarTopBar({
         >
           <ChevronLeft className="w-4 h-4 sm:w-2 sm:h-2 text-neutral-600" />
         </button>
+        {mobileDayLabel && (
+          <button
+            onClick={navigateToToday}
+            className="md:hidden hover:bg-neutral-200 rounded transition-colors mx-1 text-sm font-medium text-neutral-700"
+            title="Go to today"
+          >
+            {mobileDayLabel}
+          </button>
+        )}
         <button
           onClick={navigateToToday}
-          className="hover:bg-neutral-200 rounded transition-colors mx-1"
+          className="hidden md:block hover:bg-neutral-200 rounded transition-colors mx-1"
           title="Go to today"
         >
-          <Sun className="w-4 h-4 sm:w-2 sm:h-2 text-yellow-600" />
+          <Sun className="w-2 h-2 text-yellow-600" />
         </button>
         <button
           onClick={navigateForwardDay}
@@ -341,7 +364,7 @@ export default function CalendarTopBar({
       <div className="relative ml-2 flex items-center gap-1">
         <button
           onClick={() => setShowCalendarSettings(!showCalendarSettings)}
-          className="p-0.5 hover:bg-neutral-200 rounded transition-colors"
+          className="hidden md:block p-0.5 hover:bg-neutral-200 rounded transition-colors"
           title="Calendar settings"
         >
           <Settings className="w-2.5 h-2.5 text-neutral-500" />

@@ -1206,20 +1206,22 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
         setShowCalendarSettings={setShowCalendarSettings}
         onSyncGoogleCalendar={syncGoogleCalendar}
         onToggleMobileMenu={() => setMobileMenuOpen(true)}
+        onAddMeeting={handleAddMeeting}
+        mobileDayLabel={dayColumns[0]?.label}
       />
 
-      {/* Headers */}
+      {/* Headers - hidden on mobile since date + add moved to top bar */}
       <div
-        className="grid border-b border-neutral-200 min-w-0"
+        className="hidden md:grid border-b border-neutral-200 min-w-0"
         style={{ gridTemplateColumns: gridCols }}
       >
-        <div className="bg-neutral-100 border-r border-neutral-200 flex items-center justify-center py-1 sm:py-0.5 gap-1">
+        <div className="bg-neutral-100 border-r border-neutral-200 flex items-center justify-center py-0.5 gap-1">
           <button
             className="p-0.5 hover:bg-neutral-200 rounded transition-colors"
             title="Add meeting"
             onClick={handleAddMeeting}
           >
-            <Plus className="w-4 h-4 sm:w-3 sm:h-3 text-neutral-600" />
+            <Plus className="w-3 h-3 text-neutral-600" />
           </button>
           {settings?.todoist_api_key && (
             <button
