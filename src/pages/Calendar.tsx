@@ -1147,7 +1147,7 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
   }, [handleSaveMeeting, handleDeleteMeeting, modalTimeSlot])
 
   return (
-    <div className="flex flex-col h-screen bg-white overflow-hidden">
+    <div className="flex flex-col h-dvh bg-white overflow-hidden">
       {/* CSS for drag animation */}
       <style>
         {`
