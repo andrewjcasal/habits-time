@@ -9,6 +9,7 @@ import {
   ListTodo,
   Sun,
   Settings,
+  Menu,
 } from 'lucide-react'
 import CalendarSettingsPanel from './CalendarSettingsPanel'
 
@@ -34,6 +35,7 @@ interface CalendarTopBarProps {
   showCalendarSettings: boolean
   setShowCalendarSettings: (show: boolean) => void
   onSyncGoogleCalendar: () => void
+  onToggleMobileMenu?: () => void
 }
 
 export default function CalendarTopBar({
@@ -58,6 +60,7 @@ export default function CalendarTopBar({
   showCalendarSettings,
   setShowCalendarSettings,
   onSyncGoogleCalendar,
+  onToggleMobileMenu,
 }: CalendarTopBarProps) {
   const showBar = settings ? (settings.metadata?.showWorkHoursBar ?? true) : false
 
@@ -334,8 +337,8 @@ export default function CalendarTopBar({
         </div>
       </div>}
 
-      {/* Calendar Settings Gear */}
-      <div className="relative ml-2">
+      {/* Calendar Settings Gear + Mobile Hamburger */}
+      <div className="relative ml-2 flex items-center gap-1">
         <button
           onClick={() => setShowCalendarSettings(!showCalendarSettings)}
           className="p-0.5 hover:bg-neutral-200 rounded transition-colors"
@@ -343,6 +346,15 @@ export default function CalendarTopBar({
         >
           <Settings className="w-2.5 h-2.5 text-neutral-500" />
         </button>
+        {onToggleMobileMenu && (
+          <button
+            onClick={onToggleMobileMenu}
+            className="md:hidden p-0.5 hover:bg-neutral-200 rounded transition-colors"
+            title="Menu"
+          >
+            <Menu className="w-2.5 h-2.5 text-neutral-500" />
+          </button>
+        )}
         <CalendarSettingsPanel
           isOpen={showCalendarSettings}
           onClose={() => setShowCalendarSettings(false)}

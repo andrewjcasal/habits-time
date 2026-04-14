@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useOutletContext } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plus, Info, FileText, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
 import CalendarSettingsPanel from '../components/CalendarSettingsPanel'
@@ -29,6 +29,7 @@ interface CalendarContentProps {
 const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
 
   const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals, openResizeConflictDialog } = useModal()
+  const { setMobileMenuOpen } = useOutletContext<{ setMobileMenuOpen: (open: boolean) => void }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [containerHeight, setContainerHeight] = useState(600)
@@ -1156,6 +1157,7 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
         showCalendarSettings={showCalendarSettings}
         setShowCalendarSettings={setShowCalendarSettings}
         onSyncGoogleCalendar={syncGoogleCalendar}
+        onToggleMobileMenu={() => setMobileMenuOpen(true)}
       />
 
       {/* Headers */}

@@ -57,6 +57,7 @@ const MainLayout = () => {
 
   const settingsItem = { path: '/settings', label: 'Settings', icon: Settings }
 
+  const isCalendarPage = location.pathname === '/calendar'
   const isActive = (path: string) => location.pathname === path
 
   return (
@@ -126,18 +127,20 @@ const MainLayout = () => {
         </div>
       </aside>
 
-      {/* Mobile Header with Hamburger */}
-      <header className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-neutral-200 px-1 py-1 z-30 flex items-center justify-between">
-        <Link to="/dashboard" className="flex items-center pl-1">
-          <h1 className="text-base text-primary-700" style={{ fontFamily: "'DM Serif Display', serif" }}>Cassian</h1>
-        </Link>
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-1 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
-        >
-          {mobileMenuOpen ? <X className="h-3 w-3" /> : <Menu className="h-3 w-3" />}
-        </button>
-      </header>
+      {/* Mobile Header with Hamburger — hidden on calendar page (calendar has its own) */}
+      {!isCalendarPage && (
+        <header className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-neutral-200 px-1 py-1 z-30 flex items-center justify-between">
+          <Link to="/dashboard" className="flex items-center pl-1">
+            <h1 className="text-base text-primary-700" style={{ fontFamily: "'DM Serif Display', serif" }}>Cassian</h1>
+          </Link>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-1 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          >
+            {mobileMenuOpen ? <X className="h-3 w-3" /> : <Menu className="h-3 w-3" />}
+          </button>
+        </header>
+      )}
 
       {/* Mobile Menu Overlay */}
       <AnimatePresence>
@@ -235,8 +238,8 @@ const MainLayout = () => {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-14 lg:ml-56 pt-16 md:pt-0 w-full md:w-auto">
-        <Outlet />
+      <main className={`flex-1 md:ml-14 lg:ml-56 md:pt-0 w-full md:w-auto ${isCalendarPage ? 'pt-0' : 'pt-16'}`}>
+        <Outlet context={{ setMobileMenuOpen }} />
       </main>
 
       {/* Feedback Button */}
