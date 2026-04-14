@@ -1,4 +1,4 @@
-import { format, subWeeks } from 'date-fns'
+import { format } from 'date-fns'
 import { ChevronDown, Pencil } from 'lucide-react'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Meeting } from '../types'
@@ -16,9 +16,10 @@ interface Category {
 interface MeetingModalProps {
   onAddHabitBlock?: (habitId: string, date: string, startTime: string, duration: number) => void
   onMeetingHabitLinked?: (meetingId: string, habitId: string) => void
+  onAddNote?: () => void
 }
 
-const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked }: MeetingModalProps) => {
+const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote }: MeetingModalProps) => {
   const {
     showMeetingModal,
     newMeeting: meeting,
@@ -108,68 +109,21 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked }: MeetingModalPro
     try {
       if (!user) return
 
-      const twoWeeksAgo = subWeeks(new Date(), 2)
-
-      const { data: meetings, error } = await supabase
-        .from('cassian_meetings')
-        .select('title, start_time')
-        .eq('user_id', user.id)
-        .not('title', 'is', null)
-        .not('title', 'eq', '')
-        .order('start_time', { ascending: false })
-        .limit(20)
+      const { data, error } = await supabase
+        .rpc('get_recent_meeting_titles', { p_user_id: user.id, p_limit: 20 })
 
       if (error) {
         console.error('Error fetching previous meeting titles:', error)
         return
       }
 
-      // Group by title and calculate usage stats
-      const titleStats = new Map<string, { count: number; lastUsed: Date; recentCount: number }>()
-
-      meetings?.forEach(meeting => {
-        const title = meeting.title.trim()
-        const startTime = new Date(meeting.start_time)
-        const isRecent = startTime >= twoWeeksAgo
-
-        if (titleStats.has(title)) {
-          const stats = titleStats.get(title)!
-          stats.count++
-          if (startTime > stats.lastUsed) {
-            stats.lastUsed = startTime
-          }
-          if (isRecent) {
-            stats.recentCount++
-          }
-        } else {
-          titleStats.set(title, {
-            count: 1,
-            lastUsed: startTime,
-            recentCount: isRecent ? 1 : 0,
-          })
-        }
-      })
-
-      // Convert to array and sort: recent usage first, then by total usage, then alphabetically
-      const sortedTitles = Array.from(titleStats.entries())
-        .map(([title, stats]) => ({
-          title,
-          count: stats.count,
-          lastUsed: stats.lastUsed,
-          recentCount: stats.recentCount,
+      setPreviousTitles(
+        (data || []).map((row: any) => ({
+          title: row.title,
+          count: row.count,
+          lastUsed: new Date(row.last_used),
         }))
-        .sort((a, b) => {
-          // First, prioritize titles used in the last 2 weeks
-          if (a.recentCount > 0 && b.recentCount === 0) return -1
-          if (b.recentCount > 0 && a.recentCount === 0) return 1
-
-          // Within each group, sort by recent usage count, then total count, then alphabetically
-          if (a.recentCount !== b.recentCount) return b.recentCount - a.recentCount
-          if (a.count !== b.count) return b.count - a.count
-          return a.title.localeCompare(b.title)
-        })
-
-      setPreviousTitles(sortedTitles)
+      )
     } catch (error) {
       console.error('Error fetching previous meeting titles:', error)
     }
@@ -531,13 +485,27 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked }: MeetingModalPro
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => setShowFullForm(true)}
-                className="text-xs text-primary-600 hover:text-primary-800"
-              >
-                + Different meeting
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowFullForm(true)}
+                  className="text-xs text-primary-600 hover:text-primary-800"
+                >
+                  + Different meeting
+                </button>
+                {onAddNote && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMeetingModal()
+                      onAddNote()
+                    }}
+                    className="text-xs text-primary-600 hover:text-primary-800"
+                  >
+                    + Add note
+                  </button>
+                )}
+              </div>
               {skippedHabits.length > 0 && (
                 <div className="pt-2 border-t border-neutral-100">
                   <p className="text-xs text-neutral-400 mb-1.5">Skipped habits</p>

@@ -28,7 +28,7 @@ interface CalendarContentProps {
 
 const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
 
-  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals, openResizeConflictDialog } = useModal()
+  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals, openResizeConflictDialog, selectedTimeSlot: modalTimeSlot } = useModal()
   const { setMobileMenuOpen } = useOutletContext<{ setMobileMenuOpen: (open: boolean) => void }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
@@ -1097,8 +1097,23 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
       },
       addHabitBlock,
       linkMeetingHabit,
+      addNote: () => {
+        if (modalTimeSlot) {
+          const [hour, minute] = modalTimeSlot.time.split(':').map(Number)
+          const noteDate = new Date(modalTimeSlot.date)
+          noteDate.setHours(hour, minute, 0, 0)
+          setViewingNote({
+            id: null,
+            title: '',
+            content: '',
+            start_time: noteDate.toISOString(),
+            created_at: noteDate.toISOString(),
+            _isNew: true,
+          })
+        }
+      },
     }
-  }, [handleSaveMeeting, handleDeleteMeeting])
+  }, [handleSaveMeeting, handleDeleteMeeting, modalTimeSlot])
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
@@ -1318,6 +1333,9 @@ const Calendar = () => {
       }}
       onMeetingHabitLinked={(meetingId, habitId) => {
         handlersRef.current.linkMeetingHabit?.(meetingId, habitId)
+      }}
+      onAddNote={() => {
+        handlersRef.current.addNote?.()
       }}
     >
       <CalendarContent handlersRef={handlersRef} />
