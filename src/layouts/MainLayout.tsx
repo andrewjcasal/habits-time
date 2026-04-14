@@ -61,7 +61,7 @@ const MainLayout = () => {
   const isActive = (path: string) => location.pathname === path
 
   return (
-    <div className="flex min-h-screen bg-neutral-50">
+    <div className={`flex bg-neutral-50 ${isCalendarPage ? 'h-dvh overflow-hidden' : 'min-h-screen'}`}>
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-14 lg:w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
         <Link to="/dashboard" className="block px-4 py-1 md:px-1 md:py-1 lg:px-4 lg:py-1">
@@ -238,7 +238,7 @@ const MainLayout = () => {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className={`flex-1 md:ml-14 lg:ml-56 md:pt-0 w-full md:w-auto ${isCalendarPage ? 'pt-0' : 'pt-16'}`}>
+      <main className={`flex-1 md:ml-14 lg:ml-56 md:pt-0 w-full md:w-auto ${isCalendarPage ? 'pt-0 h-dvh overflow-hidden' : 'pt-16'}`}>
         <Outlet context={{ setMobileMenuOpen }} />
       </main>
 
