@@ -18,17 +18,22 @@ import {
 } from '../utils/calendarDatabaseOperations'
 import { calculateWorkHours } from '../utils/workHoursCalculation'
 import { ModalProvider, useModal } from '../contexts/ModalContext'
+import { useUserContext } from '../contexts/UserContext'
 import CalendarEventSlots from '../components/CalendarEventSlots'
 import CalendarTopBar from '../components/CalendarTopBar'
 import CalendarGrid, { getQuarterFromMousePosition, quarterToTimeString } from '../components/CalendarGrid'
 
 interface CalendarContentProps {
   handlersRef: React.MutableRefObject<Record<string, Function>>
+  onMeetingTitlesLoaded: (titles: { title: string; count: number; lastUsed: Date }[]) => void
+  onMeetingCategoriesLoaded: (categories: { id: string; name: string; color: string }[]) => void
+  onHabitsLoaded: (habits: any[]) => void
 }
 
-const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
+const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategoriesLoaded, onHabitsLoaded }: CalendarContentProps) => {
 
   const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals, openResizeConflictDialog, selectedTimeSlot: modalTimeSlot } = useModal()
+  const { user } = useUserContext()
   const { setMobileMenuOpen } = useOutletContext<{ setMobileMenuOpen: (open: boolean) => void }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
@@ -43,6 +48,8 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
   const [viewingNote, setViewingNote] = useState<any>(null)
   const [isSyncingTodoist, setIsSyncingTodoist] = useState(false)
   const [showCalendarSettings, setShowCalendarSettings] = useState(false)
+
+  const [meetingDataLoaded, setMeetingDataLoaded] = useState(false)
 
 
   // Handle Google Calendar OAuth callback
@@ -81,6 +88,30 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
     // Refresh calendar data by reloading
     window.location.reload()
   }
+
+  // Pre-fetch meeting modal data on calendar mount
+  useEffect(() => {
+    if (!user || meetingDataLoaded) return
+    const fetchMeetingData = async () => {
+      const [titlesRes, categoriesRes] = await Promise.all([
+        supabase.rpc('get_recent_meeting_titles', { p_user_id: user.id, p_limit: 20 }),
+        supabase.from('cassian_meeting_categories').select('id, name, color').eq('user_id', user.id).order('name'),
+      ])
+      if (titlesRes.data) {
+        onMeetingTitlesLoaded(titlesRes.data.map((row: any) => ({ title: row.title, count: row.count, lastUsed: new Date(row.last_used) })))
+      }
+      if (categoriesRes.data) {
+        onMeetingCategoriesLoaded(categoriesRes.data)
+      }
+      setMeetingDataLoaded(true)
+    }
+    fetchMeetingData()
+  }, [user])
+
+  // Propagate habits data to parent for meeting modal
+  useEffect(() => {
+    onHabitsLoaded(habits)
+  }, [habits])
 
   // Calendar notes come from useCalendarData (merged into single fetch)
 
@@ -1294,6 +1325,9 @@ const CalendarContent = ({ handlersRef }: CalendarContentProps) => {
 
 const Calendar = () => {
   const handlersRef = useRef<Record<string, Function>>({})
+  const [meetingTitles, setMeetingTitles] = useState<{ title: string; count: number; lastUsed: Date }[]>([])
+  const [meetingCategories, setMeetingCategories] = useState<{ id: string; name: string; color: string }[]>([])
+  const [calendarHabits, setCalendarHabits] = useState<any[]>([])
 
   return (
     <ModalProvider
@@ -1337,8 +1371,11 @@ const Calendar = () => {
       onAddNote={() => {
         handlersRef.current.addNote?.()
       }}
+      meetingTitles={meetingTitles}
+      meetingCategories={meetingCategories}
+      habits={calendarHabits}
     >
-      <CalendarContent handlersRef={handlersRef} />
+      <CalendarContent handlersRef={handlersRef} onMeetingTitlesLoaded={setMeetingTitles} onMeetingCategoriesLoaded={setMeetingCategories} onHabitsLoaded={setCalendarHabits} />
     </ModalProvider>
   )
 }

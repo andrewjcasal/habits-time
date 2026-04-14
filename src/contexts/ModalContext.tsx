@@ -125,9 +125,12 @@ interface ModalProviderProps {
   onAddHabitBlock?: (habitId: string, date: string, startTime: string, duration: number) => void
   onMeetingHabitLinked?: (meetingId: string, habitId: string) => void
   onAddNote?: () => void
+  meetingTitles?: { title: string; count: number; lastUsed: Date }[]
+  meetingCategories?: { id: string; name: string; color: string }[]
+  habits?: any[]
 }
 
-export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onCompleteTask, onDeleteTask, onHabitTimeChange, onHabitSkip, onUpdateSession, onTaskLogCreated, onUpdateMeetingEndTime, onDeleteTaskLog, onRemoveTaskLogFromUI, onAddHabitBlock, onMeetingHabitLinked, onAddNote }: ModalProviderProps) => {
+export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onCompleteTask, onDeleteTask, onHabitTimeChange, onHabitSkip, onUpdateSession, onTaskLogCreated, onUpdateMeetingEndTime, onDeleteTaskLog, onRemoveTaskLogFromUI, onAddHabitBlock, onMeetingHabitLinked, onAddNote, meetingTitles, meetingCategories, habits }: ModalProviderProps) => {
   const { user } = useUserContext()
   const [modalState, setModalState] = useState<ModalState>(initialModalState)
   const [userSettings, setUserSettings] = useState<any>(null)
@@ -405,6 +408,9 @@ export const ModalProvider = ({ children, onSaveMeeting, onDeleteMeeting, onComp
         onAddHabitBlock={onAddHabitBlock}
         onMeetingHabitLinked={onMeetingHabitLinked}
         onAddNote={onAddNote}
+        previousTitles={meetingTitles}
+        categories={meetingCategories}
+        calendarHabits={habits}
       />
       <CalendarTaskModal
         isOpen={modalState.showTaskModal}

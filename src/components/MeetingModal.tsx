@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
-import { ChevronDown, Pencil } from 'lucide-react'
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Pencil } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
 import { Meeting } from '../types'
 import { supabase } from '../lib/supabase'
 import ModalWrapper from './ModalWrapper'
@@ -17,9 +17,12 @@ interface MeetingModalProps {
   onAddHabitBlock?: (habitId: string, date: string, startTime: string, duration: number) => void
   onMeetingHabitLinked?: (meetingId: string, habitId: string) => void
   onAddNote?: () => void
+  previousTitles?: { title: string; count: number; lastUsed: Date }[]
+  categories?: Category[]
+  calendarHabits?: any[]
 }
 
-const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote }: MeetingModalProps) => {
+const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previousTitles = [], categories = [], calendarHabits = [] }: MeetingModalProps) => {
   const {
     showMeetingModal,
     newMeeting: meeting,
@@ -31,16 +34,10 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote }: Meet
     handleDeleteMeeting,
   } = useModal()
   const { user } = useUserContext()
-  const [previousTitles, setPreviousTitles] = useState<
-    { title: string; count: number; lastUsed: Date }[]
-  >([])
   const [showTitleDropdown, setShowTitleDropdown] = useState(false)
   const [showLocationField, setShowLocationField] = useState(false)
   const [showDescriptionField, setShowDescriptionField] = useState(false)
   const [showFullForm, setShowFullForm] = useState(false)
-  const [loadingTitles, setLoadingTitles] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [categoriesFetched, setCategoriesFetched] = useState(false)
   const [localTitle, setLocalTitle] = useState(meeting.title)
   const [viewMode, setViewMode] = useState<'readonly' | 'edit' | 'create-habit' | 'link-habit'>('readonly')
   const [newHabitName, setNewHabitName] = useState('')
@@ -50,7 +47,15 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote }: Meet
   const [allHabits, setAllHabits] = useState<any[]>([])
   const [selectedHabitId, setSelectedHabitId] = useState('')
   const [linkingHabit, setLinkingHabit] = useState(false)
-  const [skippedHabits, setSkippedHabits] = useState<any[]>([])
+
+  // Derive skipped habits from calendar data
+  const skippedHabits = useMemo(() => {
+    if (!selectedTimeSlot || calendarHabits.length === 0) return []
+    const dateStr = format(selectedTimeSlot.date, 'yyyy-MM-dd')
+    return calendarHabits.filter(h =>
+      h.habits_daily_logs?.some((log: any) => log.log_date === dateStr && log.is_skipped)
+    )
+  }, [calendarHabits, selectedTimeSlot])
 
   // Sync local title with meeting prop when modal opens
   useEffect(() => {
@@ -63,71 +68,6 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote }: Meet
       setShowFullForm(false)
     }
   }, [showMeetingModal, meeting.title])
-
-  // Fetch previous meeting titles when modal opens (only for new meetings, memoized)
-  useEffect(() => {
-    if (showMeetingModal && !editingMeeting && previousTitles.length === 0) {
-      setLoadingTitles(true)
-      fetchPreviousTitles().finally(() => setLoadingTitles(false))
-    }
-    // Fetch skipped habits for the selected date
-    if (showMeetingModal && !editingMeeting && selectedTimeSlot && user) {
-      fetchSkippedHabits()
-    }
-  }, [showMeetingModal, editingMeeting, previousTitles.length])
-
-  // Fetch categories when modal opens (memoized)
-  useEffect(() => {
-    if (showMeetingModal && !categoriesFetched) {
-      fetchCategories()
-    }
-  }, [showMeetingModal, categoriesFetched])
-
-  const fetchCategories = async () => {
-    try {
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('cassian_meeting_categories')
-        .select('id, name, color')
-        .eq('user_id', user.id)
-        .order('name')
-
-      if (error) {
-        console.error('Error fetching categories:', error)
-        return
-      }
-
-      setCategories(data || [])
-      setCategoriesFetched(true)
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-    }
-  }
-
-  const fetchPreviousTitles = async () => {
-    try {
-      if (!user) return
-
-      const { data, error } = await supabase
-        .rpc('get_recent_meeting_titles', { p_user_id: user.id, p_limit: 20 })
-
-      if (error) {
-        console.error('Error fetching previous meeting titles:', error)
-        return
-      }
-
-      setPreviousTitles(
-        (data || []).map((row: any) => ({
-          title: row.title,
-          count: row.count,
-          lastUsed: new Date(row.last_used),
-        }))
-      )
-    } catch (error) {
-      console.error('Error fetching previous meeting titles:', error)
-    }
-  }
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -166,20 +106,6 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote }: Meet
       .slice(0, 10)
   }, [previousTitles, localTitle])
 
-  const fetchSkippedHabits = async () => {
-    if (!user || !selectedTimeSlot) return
-    const dateStr = format(selectedTimeSlot.date, 'yyyy-MM-dd')
-    const { data: habits } = await supabase
-      .from('cassian_habits')
-      .select('id, name, duration, habits_daily_logs:cassian_habits_daily_logs(is_skipped, log_date)')
-      .eq('user_id', user.id)
-      .eq('is_visible', true)
-      .or('is_archived.eq.false,is_archived.is.null')
-    const skipped = (habits || []).filter(h =>
-      h.habits_daily_logs?.some((log: any) => log.log_date === dateStr && log.is_skipped)
-    )
-    setSkippedHabits(skipped)
-  }
 
   const handleAddHabitBlock = async (habit: any) => {
     if (!user || !selectedTimeSlot) return
@@ -466,7 +392,7 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote }: Meet
             </div>
           </div>
 
-        ) : !editingMeeting && !showFullForm && (previousTitles.length > 0 || loadingTitles) ? (
+        ) : !editingMeeting && !showFullForm && previousTitles.length > 0 ? (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-1.5">
                 {previousTitles.slice(0, 12).map((titleData, index) => (
