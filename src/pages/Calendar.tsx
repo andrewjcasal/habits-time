@@ -108,11 +108,6 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
     fetchMeetingData()
   }, [user])
 
-  // Propagate habits data to parent for meeting modal
-  useEffect(() => {
-    onHabitsLoaded(habits)
-  }, [habits])
-
   // Calendar notes come from useCalendarData (merged into single fetch)
 
   // Meeting resize state
@@ -219,6 +214,11 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
   } = useCalendarData(windowWidth, baseDate)
 
   // Calendar data already includes habits - no need for separate useHabits hook
+
+  // Propagate habits data to parent for meeting modal
+  useEffect(() => {
+    onHabitsLoaded(habits)
+  }, [habits])
 
   const gridCols =
     windowWidth > 1350
