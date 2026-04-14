@@ -104,6 +104,7 @@ export default function CalendarGrid({
     <div
       ref={containerRef}
       className="flex-1 overflow-y-auto relative"
+      style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
     >
       {hourSlots.map((hour, hourIndex) => {
         return (
