@@ -100,6 +100,9 @@ export default function CalendarGrid({
   getCurrentTimeLinePosition,
   habitDragPreview,
 }: CalendarGridProps) {
+  const timeColWidth = gridCols.split(' ')[0]
+  const dayGridCols = gridCols.split(' ').slice(1).join(' ')
+
   return (
     <div
       ref={containerRef}
@@ -263,10 +266,10 @@ export default function CalendarGrid({
           <div
             className="absolute"
             style={{
-              left: '80px',
+              left: timeColWidth,
               right: '0',
               display: 'grid',
-              gridTemplateColumns: gridCols.replace('80px ', ''),
+              gridTemplateColumns: dayGridCols,
             }}
           >
             {dayColumns.map((_, i) => (
@@ -298,11 +301,11 @@ export default function CalendarGrid({
               className="absolute z-20"
               style={{
                 top: `${timeLinePosition}px`,
-                left: '80px',
+                left: timeColWidth,
                 right: '0',
                 height: '2px',
                 display: 'grid',
-                gridTemplateColumns: gridCols.replace('80px ', ''),
+                gridTemplateColumns: dayGridCols,
               }}
             >
               {dayColumns.map((_, dayIndex) => (

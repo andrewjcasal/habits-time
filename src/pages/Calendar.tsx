@@ -198,6 +198,7 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
     isDataLoading,
     calendarNotes,
     habitNotes,
+    setHabitNotes,
     getNotesForDateTime,
     addCalendarNote,
     addHabitNote,
@@ -1090,7 +1091,7 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
         return (
           <div
             key={`note-badge-${note.id}`}
-            className="absolute left-0 z-30 cursor-pointer"
+            className="absolute left-0 z-10 cursor-pointer"
             style={{ top: `${topPercent}%` }}
             onClick={e => {
               e.stopPropagation()
@@ -1319,8 +1320,17 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
         note={viewingNote}
         isOpen={!!viewingNote}
         onClose={() => setViewingNote(null)}
+        onUpdate={(updatedNote) => {
+          setHabitNotes(prev => {
+            const exists = prev.some(n => n.id === updatedNote.id)
+            if (exists) return prev.map(n => n.id === updatedNote.id ? { ...n, ...updatedNote } : n)
+            return [updatedNote, ...prev]
+          })
+          setViewingNote((prev: any) => prev ? { ...prev, ...updatedNote } : prev)
+        }}
         onDelete={async (noteId) => {
           await supabase.from('cassian_habits_notes').delete().eq('id', noteId)
+          setHabitNotes(prev => prev.filter(n => n.id !== noteId))
           setViewingNote(null)
         }}
       />

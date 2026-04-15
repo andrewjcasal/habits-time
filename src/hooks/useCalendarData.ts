@@ -934,6 +934,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     settings,
     calendarNotes,
     habitNotes,
+    setHabitNotes,
     getNotesForDateTime,
     addCalendarNote,
     addHabitNote,
