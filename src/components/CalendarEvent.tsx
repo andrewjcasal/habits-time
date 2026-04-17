@@ -50,7 +50,7 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
   
   const baseClass = `absolute text-sm sm:text-xs p-1 sm:p-0.5 ${
     is15Min || is30Min ? 'pt-0 sm:pt-0' : ''
-  } rounded ${
+  } ${is15Min ? 'leading-none' : ''} rounded ${
     is30PlusMin ? 'flex-col items-start' : 'flex items-start justify-between'
   } shadow-sm overflow-hidden`
 

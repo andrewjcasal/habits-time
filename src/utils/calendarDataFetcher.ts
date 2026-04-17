@@ -25,7 +25,10 @@ export const fetchAllCalendarData = async (userId: string) => {
       withTimeout(supabase.from('cassian_tasks').select('*, projects:cassian_projects!inner(*)').eq('user_id', userId).neq('projects.status', 'archived')),
       withTimeout(supabase.from('cassian_user_settings').select('*').eq('user_id', userId).single()),
       withTimeout(supabase.from('cassian_calendar_notes').select('*, habits_notes:cassian_notes!calendar_notes_note_id_fkey(id, content, created_at)').order('pinned_date', { ascending: true })),
-      withTimeout(supabase.from('cassian_notes').select('*').order('created_at', { ascending: false })),
+      // Only the fields the calendar actually uses — content/title for the
+      // banner preview, start_date/start_time for grid indexing. Cap at 500
+      // most-recent so users with years of notes don't pay to fetch them all.
+      withTimeout(supabase.from('cassian_notes').select('id, user_id, title, content, start_date, start_time, created_at, updated_at').order('created_at', { ascending: false }).limit(500)),
       withTimeout(supabase.from('cassian_category_buffers').select('*, meeting_categories:cassian_meeting_categories(id, name, color)').eq('user_id', userId))
     ])
 

@@ -1097,10 +1097,7 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
   )
   const mobileDayNotePreview = useMemo(() => {
     if (!mobileDayNote) return null
-    const source = (mobileDayNote.title && mobileDayNote.title.trim())
-      || mobileDayNote.content
-      || ''
-    const trimmed = source.trim()
+    const trimmed = (mobileDayNote.content || '').trim()
     if (!trimmed) return null
     return trimmed.slice(0, 120)
   }, [mobileDayNote])
@@ -1254,7 +1251,10 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
         onAddMeeting={handleAddMeeting}
         mobileDayLabel={dayColumns[0]?.label}
         mobileDayNotePreview={mobileDayNotePreview}
-        onOpenMobileDayNote={openMobileDayNote}
+        // Suppress the "Add note" affordance until the notes fetch resolves,
+        // otherwise the empty-state label flashes briefly before an existing
+        // day note is rendered as the banner below.
+        onOpenMobileDayNote={isDataLoading ? undefined : openMobileDayNote}
       />
 
       {/* Mobile day-note banner — full-width preview of the current day's
