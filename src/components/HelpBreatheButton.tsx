@@ -96,10 +96,10 @@ export default function HelpBreatheButton({
               </h2>
               <button
                 onClick={close}
-                className="p-1 text-neutral-500 hover:text-neutral-700 rounded hover:bg-neutral-100"
+                className="p-1 text-neutral-400 hover:text-neutral-600 rounded hover:bg-neutral-100 transition-colors"
                 aria-label="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3 h-3" />
               </button>
             </div>
 
