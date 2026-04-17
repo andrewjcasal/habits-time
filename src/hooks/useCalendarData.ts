@@ -508,9 +508,9 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     })
     const workHours = getWorkHoursRange()
 
-    // Sort so shorter habits at the same scheduled time win their natural
-    // slot; longer habits get bumped up around them. This makes the bump-up
-    // behavior deterministic instead of depending on DB row order.
+    // Sort so the longer habit at a given start time wins its natural slot
+    // and shorter habits get pushed to start 15 min after it ends. Primary:
+    // earliest start first. Secondary (same start): longest first.
     const habitStartMinutes = (h: any): number => {
       const t = h.current_start_time
       if (!t) return Number.POSITIVE_INFINITY
@@ -520,7 +520,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const orderedHabits = [...habits].sort((a, b) => {
       const diff = habitStartMinutes(a) - habitStartMinutes(b)
       if (diff !== 0) return diff
-      return (a.duration || 0) - (b.duration || 0)
+      return (b.duration || 0) - (a.duration || 0)
     })
 
     for (const habit of orderedHabits) {
@@ -614,30 +614,31 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           topPosition = (habitStartMinute / 60) * 100
         }
 
-        // Habit-vs-habit conflict resolution: bump up so the current habit
-        // ends just before the earliest already-placed habit it overlaps.
-        // Re-check after each shift in case the new slot collides with a
-        // different placed habit; cap iterations defensively.
+        // Habit-vs-habit conflict resolution: push DOWN so the current
+        // habit starts 15 minutes after the latest already-placed habit it
+        // overlaps. Re-check after each shift in case the new slot still
+        // collides (or collides with a different placed habit); cap
+        // iterations defensively.
+        const CONFLICT_BUFFER_HOURS = 0.25 // 15 minutes
+        const GRID_LAST_HOUR = 29 // 5am next day (grid spans 6am → 5am)
         let finalStart = finalHour + topPosition / 100
         let finalEnd = finalStart + effectiveDuration / 60
         const placed = placedHabitsByDate.get(dateKey) || []
         for (let guard = 0; guard < 10; guard++) {
-          let earliestConflict: { start: number; end: number } | null = null
+          let latestConflictEnd: number | null = null
           for (const p of placed) {
             if (finalStart < p.end && finalEnd > p.start) {
-              if (!earliestConflict || p.start < earliestConflict.start) {
-                earliestConflict = p
+              if (latestConflictEnd === null || p.end > latestConflictEnd) {
+                latestConflictEnd = p.end
               }
             }
           }
-          if (!earliestConflict) break
-          finalEnd = earliestConflict.start
-          finalStart = finalEnd - effectiveDuration / 60
-          if (finalStart < 0) {
-            // Can't shift further without going past midnight — leave the
-            // habit at its last-valid position and accept the overlap.
-            finalStart = 0
-            finalEnd = effectiveDuration / 60
+          if (latestConflictEnd === null) break
+          finalStart = latestConflictEnd + CONFLICT_BUFFER_HOURS
+          finalEnd = finalStart + effectiveDuration / 60
+          if (finalEnd > GRID_LAST_HOUR) {
+            // Nowhere left in the day — accept the overflow rather than
+            // keep pushing past the end of the visible grid.
             break
           }
           isRescheduled = true
