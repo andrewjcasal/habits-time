@@ -213,7 +213,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
 
       // Get the actual notes with their aspect information
       const { data: notes, error: notesError } = await supabase
-        .from('cassian_habits_notes')
+        .from('cassian_notes')
         .select(`
           id,
           title,

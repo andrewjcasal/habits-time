@@ -26,8 +26,8 @@ interface Note {
   aspects?: Aspect[]
   created_at: string
   updated_at: string
-  start_time: string
-  end_time: string
+  start_date: string
+  start_time: string | null
 }
 
 const Notes = () => {
@@ -53,7 +53,7 @@ const Notes = () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
-        .from('cassian_habits_notes')
+        .from('cassian_notes')
         .select(
           `
           *,
@@ -123,16 +123,19 @@ const Notes = () => {
     if (!user) return
 
     try {
-      const now = new Date().toISOString()
+      const now = new Date()
+      const nowIso = now.toISOString()
+      const todayStr = nowIso.slice(0, 10)
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`
       const { data, error } = await supabase
-        .from('cassian_habits_notes')
+        .from('cassian_notes')
         .insert({
           user_id: user.id,
           content: '',
-          created_at: now,
-          updated_at: now,
-          start_time: now,
-          end_time: now,
+          created_at: nowIso,
+          updated_at: nowIso,
+          start_date: todayStr,
+          start_time: timeStr,
         })
         .select()
         .single()
@@ -153,7 +156,7 @@ const Notes = () => {
     try {
       setSaving(true)
       const { error } = await supabase
-        .from('cassian_habits_notes')
+        .from('cassian_notes')
         .update({
           content,
           updated_at: new Date().toISOString(),
@@ -188,27 +191,25 @@ const Notes = () => {
     }
   }
 
-  // Save note title
-  // Save note date
-  const saveNoteDate = async (noteId: string, dateStr: string) => {
+  // Save note date + time (time nullable — null means day-level note)
+  const saveNoteDate = async (noteId: string, startDate: string, startTime: string | null) => {
     try {
       setSaving(true)
-      const isoDate = new Date(dateStr).toISOString()
       const { error } = await supabase
-        .from('cassian_habits_notes')
-        .update({ start_time: isoDate })
+        .from('cassian_notes')
+        .update({ start_date: startDate, start_time: startTime })
         .eq('id', noteId)
 
       if (error) throw error
 
       setNotes(prev =>
         prev.map(note =>
-          note.id === noteId ? { ...note, start_time: isoDate } : note
+          note.id === noteId ? { ...note, start_date: startDate, start_time: startTime } : note
         )
       )
 
       if (selectedNote?.id === noteId) {
-        setSelectedNote(prev => prev ? { ...prev, start_time: isoDate } : null)
+        setSelectedNote(prev => prev ? { ...prev, start_date: startDate, start_time: startTime } : null)
       }
     } catch (err) {
       console.error('Error saving note date:', err)
@@ -221,7 +222,7 @@ const Notes = () => {
     try {
       setSaving(true)
       const { error } = await supabase
-        .from('cassian_habits_notes')
+        .from('cassian_notes')
         .update({
           title,
           updated_at: new Date().toISOString(),
@@ -499,7 +500,7 @@ const Notes = () => {
 
     try {
       setSaving(true)
-      const { error } = await supabase.from('cassian_habits_notes').delete().eq('id', noteId)
+      const { error } = await supabase.from('cassian_notes').delete().eq('id', noteId)
 
       if (error) throw error
 
@@ -541,12 +542,22 @@ const Notes = () => {
     return titleMatch || contentMatch || tagMatch || aspectMatch
   })
 
-  // Group filtered notes by month
+  // Group filtered notes by month — parse start_date as local date to avoid
+  // UTC-shift edge cases at month boundaries; fall back to created_at.
   const notesByMonth = useMemo(() => {
     const grouped = new Map<string, typeof filteredNotes>()
     filteredNotes.forEach(note => {
-      const d = new Date(note.start_time || note.created_at)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      let year: number, month: number
+      if (note.start_date) {
+        const [y, m] = note.start_date.split('-').map(Number)
+        year = y
+        month = m
+      } else {
+        const d = new Date(note.created_at)
+        year = d.getFullYear()
+        month = d.getMonth() + 1
+      }
+      const key = `${year}-${String(month).padStart(2, '0')}`
       const arr = grouped.get(key) || []
       arr.push(note)
       grouped.set(key, arr)

@@ -24,8 +24,8 @@ export const fetchAllCalendarData = async (userId: string) => {
       withTimeout(supabase.from('cassian_tasks_daily_logs').select('*, tasks:cassian_tasks(*, projects:cassian_projects(*))').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_tasks').select('*, projects:cassian_projects!inner(*)').eq('user_id', userId).neq('projects.status', 'archived')),
       withTimeout(supabase.from('cassian_user_settings').select('*').eq('user_id', userId).single()),
-      withTimeout(supabase.from('cassian_calendar_notes').select('*, habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey(id, content, created_at)').order('pinned_date', { ascending: true })),
-      withTimeout(supabase.from('cassian_habits_notes').select('*').order('created_at', { ascending: false })),
+      withTimeout(supabase.from('cassian_calendar_notes').select('*, habits_notes:cassian_notes!calendar_notes_note_id_fkey(id, content, created_at)').order('pinned_date', { ascending: true })),
+      withTimeout(supabase.from('cassian_notes').select('*').order('created_at', { ascending: false })),
       withTimeout(supabase.from('cassian_category_buffers').select('*, meeting_categories:cassian_meeting_categories(id, name, color)').eq('user_id', userId))
     ])
 

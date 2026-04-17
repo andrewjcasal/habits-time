@@ -13,7 +13,7 @@ export const useCalendarNotes = () => {
         .from('cassian_calendar_notes')
         .select(`
           *,
-          habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey (
+          habits_notes:cassian_notes!calendar_notes_note_id_fkey (
             id,
             content,
             created_at
@@ -32,7 +32,7 @@ export const useCalendarNotes = () => {
   const fetchHabitNotes = async () => {
     try {
       const { data: habitNotesData, error: habitNotesError } = await supabase
-        .from('cassian_habits_notes')
+        .from('cassian_notes')
         .select('*')
         .order('created_at', { ascending: false })
 
@@ -54,7 +54,7 @@ export const useCalendarNotes = () => {
         })
         .select(`
           *,
-          habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey (
+          habits_notes:cassian_notes!calendar_notes_note_id_fkey (
             id,
             content,
             created_at
@@ -75,7 +75,7 @@ export const useCalendarNotes = () => {
   const addHabitNote = async (content: string, noteDate: string) => {
     try {
       const { data, error } = await supabase
-        .from('cassian_habits_notes')
+        .from('cassian_notes')
         .insert({
           content,
         })

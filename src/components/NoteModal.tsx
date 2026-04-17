@@ -24,7 +24,7 @@ interface NoteModalProps {
   showExtended?: boolean
   saving?: boolean
   onSaveTitle?: (noteId: string, title: string) => void
-  onSaveDate?: (noteId: string, dateStr: string) => void
+  onSaveDate?: (noteId: string, startDate: string, startTime: string | null) => void
   onSaveContent?: (noteId: string, content: string) => void
   onAddTag?: (noteId: string, tagName: string) => void
   onRemoveTag?: (noteId: string, tagId: string) => void
@@ -46,7 +46,12 @@ export default function NoteModal({
   const [content, setContent] = useState(note?.content || '')
   const [editingDate, setEditingDate] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
-  const [startTime, setStartTime] = useState(note?.start_time || note?.created_at || '')
+  const [startDate, setStartDate] = useState<string>(
+    note?.start_date || (note?.created_at ? note.created_at.slice(0, 10) : '')
+  )
+  const [startTime, setStartTime] = useState<string | null>(
+    note?.start_time ? note.start_time.slice(0, 5) : null
+  )
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -68,7 +73,8 @@ export default function NoteModal({
     if (note) {
       setTitle(note.title || '')
       setContent(note.content || '')
-      setStartTime(note.start_time || note.created_at || '')
+      setStartDate(note.start_date || (note.created_at ? note.created_at.slice(0, 10) : ''))
+      setStartTime(note.start_time ? note.start_time.slice(0, 5) : null)
     }
   }, [note?.id])
 
@@ -172,9 +178,16 @@ export default function NoteModal({
     if (noteIdRef.current) return noteIdRef.current
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
+    const fallbackDate = startDate || new Date().toISOString().slice(0, 10)
     const { data, error } = await supabase
-      .from('cassian_habits_notes')
-      .insert({ title, content, start_time: startTime, user_id: user.id })
+      .from('cassian_notes')
+      .insert({
+        title,
+        content,
+        start_date: fallbackDate,
+        start_time: startTime ? `${startTime}:00` : null,
+        user_id: user.id,
+      })
       .select()
       .single()
     if (error || !data) return null
@@ -187,7 +200,7 @@ export default function NoteModal({
     if (!note) return
     const id = await ensureSaved()
     if (!id) return
-    await supabase.from('cassian_habits_notes').update({ [field]: value }).eq('id', id)
+    await supabase.from('cassian_notes').update({ [field]: value }).eq('id', id)
     onUpdate?.({ ...note, id, [field]: value })
   }
 
@@ -209,16 +222,30 @@ export default function NoteModal({
 
   if (!isOpen || !note) return null
 
-  const noteTime = new Date(startTime || note.created_at)
-  const localDatetimeValue = (() => {
-    const d = noteTime
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const hours = String(d.getHours()).padStart(2, '0')
-    const mins = String(d.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day}T${hours}:${mins}`
-  })()
+  const formatDateDisplay = () => {
+    if (!startDate) return 'No date'
+    const [y, m, d] = startDate.split('-').map(Number)
+    const dt = new Date(y, m - 1, d)
+    const dateStr = dt.toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    })
+    if (!startTime) return dateStr
+    const [h, min] = startTime.split(':').map(Number)
+    const timeStr = new Date(2000, 0, 1, h, min).toLocaleTimeString('en-US', {
+      hour: 'numeric', minute: '2-digit',
+    })
+    return `${dateStr}, ${timeStr}`
+  }
+
+  const persistDateTime = (nextDate: string, nextTime: string | null) => {
+    const timeForDb = nextTime ? `${nextTime}:00` : null
+    if (showExtended && onSaveDate && note.id) {
+      onSaveDate(note.id, nextDate, timeForDb)
+    } else {
+      saveField('start_date', nextDate)
+      saveField('start_time', timeForDb)
+    }
+  }
 
   const getNoteTitle = () => {
     if (note.title && note.title.trim()) return note.title
@@ -279,43 +306,55 @@ export default function NoteModal({
                 )
               )}
               {editingDate ? (
-                <input
-                  type="datetime-local"
-                  value={localDatetimeValue}
-                  onChange={e => {
-                    const iso = new Date(e.target.value).toISOString()
-                    setStartTime(iso)
-                    if (showExtended) onUpdate?.({ ...note, start_time: iso })
-                  }}
-                  onBlur={() => {
+                <div
+                  className="flex items-center gap-2"
+                  onBlur={e => {
+                    const next = e.relatedTarget as Node | null
+                    if (next && e.currentTarget.contains(next)) return
                     setEditingDate(false)
-                    if (showExtended && onSaveDate) {
-                      onSaveDate(note.id, startTime)
-                    } else {
-                      saveField('start_time', startTime)
-                    }
+                    persistDateTime(startDate, startTime)
                   }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === 'Escape') {
-                      setEditingDate(false)
-                      if (e.key === 'Enter') {
-                        if (showExtended && onSaveDate) onSaveDate(note.id, startTime)
-                        else saveField('start_time', startTime)
+                >
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => {
+                      setStartDate(e.target.value)
+                      if (showExtended) onUpdate?.({ ...note, start_date: e.target.value })
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === 'Escape') {
+                        setEditingDate(false)
+                        if (e.key === 'Enter') persistDateTime(startDate, startTime)
                       }
-                    }
-                  }}
-                  autoFocus
-                  className="text-sm text-neutral-500 bg-transparent border-b-2 border-primary-500 outline-none"
-                />
+                    }}
+                    autoFocus
+                    className="text-sm text-neutral-500 bg-transparent border-b-2 border-primary-500 outline-none"
+                  />
+                  <input
+                    type="time"
+                    value={startTime || ''}
+                    onChange={e => {
+                      const v = e.target.value || null
+                      setStartTime(v)
+                      if (showExtended) onUpdate?.({ ...note, start_time: v ? `${v}:00` : null })
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === 'Escape') {
+                        setEditingDate(false)
+                        if (e.key === 'Enter') persistDateTime(startDate, startTime)
+                      }
+                    }}
+                    placeholder="All day"
+                    className="text-sm text-neutral-500 bg-transparent border-b-2 border-primary-500 outline-none"
+                  />
+                </div>
               ) : (
                 <p
                   className="text-sm text-neutral-500 cursor-pointer hover:text-primary-600 transition-colors"
                   onClick={() => setEditingDate(true)}
                 >
-                  {noteTime.toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', year: 'numeric',
-                    hour: 'numeric', minute: '2-digit',
-                  })}
+                  {formatDateDisplay()}
                 </p>
               )}
             </div>

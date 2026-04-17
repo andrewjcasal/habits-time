@@ -16,9 +16,23 @@ interface NoteIssueRow {
   intensity: number
   note: {
     id: string
-    start_time: string
+    start_date: string | null
+    start_time: string | null
     created_at: string
   }
+}
+
+const monthKeyForNote = (note: { start_date?: string | null; created_at?: string } | undefined) => {
+  if (!note) return ''
+  if (note.start_date) {
+    const [y, m] = note.start_date.split('-').map(Number)
+    return `${y}-${String(m).padStart(2, '0')}`
+  }
+  if (note.created_at) {
+    const d = new Date(note.created_at)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  return ''
 }
 
 const Issues = () => {
@@ -74,7 +88,7 @@ const Issues = () => {
         .order('name'),
       supabase
         .from('cassian_note_issues')
-        .select('issue_id, intensity, note:cassian_habits_notes(id, start_time, created_at)')
+        .select('issue_id, intensity, note:cassian_notes(id, start_date, start_time, created_at)')
         .eq('user_id', user!.id),
     ])
     setIssues(issuesRes.data || [])
@@ -88,9 +102,8 @@ const Issues = () => {
     const monthSet = new Set<string>()
     noteIssues.forEach(ni => {
       const noteData = ni.note as any
-      const d = new Date(noteData?.start_time || noteData?.created_at)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      monthSet.add(key)
+      const key = monthKeyForNote(noteData)
+      if (key) monthSet.add(key)
     })
     return [...monthSet].sort()
   }, [noteIssues])
@@ -109,8 +122,8 @@ const Issues = () => {
     const data = new Map<string, Map<string, { total: number; count: number }>>()
     noteIssues.forEach(ni => {
       const noteData = ni.note as any
-      const d = new Date(noteData?.start_time || noteData?.created_at)
-      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const monthKey = monthKeyForNote(noteData)
+      if (!monthKey) return
 
       if (!data.has(ni.issue_id)) data.set(ni.issue_id, new Map())
       const issueMap = data.get(ni.issue_id)!

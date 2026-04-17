@@ -714,7 +714,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     const { data, error } = await supabase
       .from('cassian_calendar_notes')
       .insert({ pinned_date: pinnedDate, note_id: noteId })
-      .select('*, habits_notes:cassian_habits_notes!calendar_notes_note_id_fkey(id, content, created_at)')
+      .select('*, habits_notes:cassian_notes!calendar_notes_note_id_fkey(id, content, created_at)')
       .single()
     if (error) throw error
     setCalendarNotes(prev => [...prev, data])
@@ -723,7 +723,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   const addHabitNote = async (content: string, noteDate: string) => {
     const { data, error } = await supabase
-      .from('cassian_habits_notes')
+      .from('cassian_notes')
       .insert({ content })
       .select()
       .single()

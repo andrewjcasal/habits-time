@@ -58,13 +58,14 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
     if (params.get('google_callback') === 'true' && params.get('code')) {
       const code = params.get('code')!
       const handleCallback = async () => {
-        await supabase.functions.invoke('google-calendar', {
+        const { data, error } = await supabase.functions.invoke('google-calendar', {
           body: {
             action: 'callback',
             code,
             redirectUri: window.location.origin + '/calendar?google_callback=true',
           },
         })
+        console.log('[gcal callback] response:', data, 'error:', error)
         // Clean URL and sync
         window.history.replaceState({}, '', '/calendar')
         await syncGoogleCalendar()
@@ -1063,20 +1064,62 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
     ]
   )
 
-  // Pre-index habit notes by date-hour for note badges
+  // Pre-index habit notes by date-hour for note badges (only timed notes land
+  // on the grid — day-level notes with start_time=null surface via the mobile
+  // badge in CalendarTopBar instead).
   const noteBadgesIndex = useMemo(() => {
     const index = new Map<string, any[]>()
     habitNotes.forEach((note: any) => {
-      const noteTime = new Date(note.start_time || note.created_at)
-      const dateStr = format(noteTime, 'yyyy-MM-dd')
-      const hour = noteTime.getHours()
-      const key = `${dateStr}-${hour}`
+      if (!note.start_time) return
+      const dateStr = note.start_date || (note.created_at ? note.created_at.slice(0, 10) : '')
+      if (!dateStr) return
+      const [h, m] = note.start_time.split(':').map(Number)
+      const key = `${dateStr}-${h}`
       const arr = index.get(key) || []
-      arr.push({ ...note, minuteInHour: noteTime.getMinutes() })
+      arr.push({ ...note, minuteInHour: m })
       index.set(key, arr)
     })
     return index
   }, [habitNotes])
+
+  // Mobile day-note badge: the first whole-day note (start_time IS NULL) for
+  // the day currently displayed in the mobile top bar.
+  const mobileDayNoteDateStr = useMemo(
+    () => dayColumns[0]?.dateStr || format(baseDate, 'yyyy-MM-dd'),
+    [dayColumns, baseDate]
+  )
+  const mobileDayNote = useMemo(
+    () =>
+      habitNotes.find(
+        (n: any) => n.start_date === mobileDayNoteDateStr && !n.start_time
+      ) || null,
+    [habitNotes, mobileDayNoteDateStr]
+  )
+  const mobileDayNotePreview = useMemo(() => {
+    if (!mobileDayNote) return null
+    const source = (mobileDayNote.title && mobileDayNote.title.trim())
+      || mobileDayNote.content
+      || ''
+    const trimmed = source.trim()
+    if (!trimmed) return null
+    return trimmed.length > 20 ? trimmed.slice(0, 20) : trimmed
+  }, [mobileDayNote])
+
+  const openMobileDayNote = useCallback(() => {
+    if (mobileDayNote) {
+      setViewingNote(mobileDayNote)
+      return
+    }
+    setViewingNote({
+      id: null,
+      title: '',
+      content: '',
+      start_date: mobileDayNoteDateStr,
+      start_time: null,
+      created_at: new Date().toISOString(),
+      _isNew: true,
+    })
+  }, [mobileDayNote, mobileDayNoteDateStr])
 
   const renderNoteBadges = useCallback(
     (timeSlot: string, date: Date) => {
@@ -1132,14 +1175,15 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
       addNote: () => {
         if (modalTimeSlot) {
           const [hour, minute] = modalTimeSlot.time.split(':').map(Number)
-          const noteDate = new Date(modalTimeSlot.date)
-          noteDate.setHours(hour, minute, 0, 0)
+          const dateStr = format(modalTimeSlot.date, 'yyyy-MM-dd')
+          const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`
           setViewingNote({
             id: null,
             title: '',
             content: '',
-            start_time: noteDate.toISOString(),
-            created_at: noteDate.toISOString(),
+            start_date: dateStr,
+            start_time: timeStr,
+            created_at: new Date().toISOString(),
             _isNew: true,
           })
         }
@@ -1209,6 +1253,8 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
         onToggleMobileMenu={() => setMobileMenuOpen(true)}
         onAddMeeting={handleAddMeeting}
         mobileDayLabel={dayColumns[0]?.label}
+        mobileDayNotePreview={mobileDayNotePreview}
+        onOpenMobileDayNote={openMobileDayNote}
       />
 
       {/* Headers - hidden on mobile since date + add moved to top bar */}
@@ -1265,15 +1311,16 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
         renderNoteBadges={renderNoteBadges}
         onAddNoteClick={(timeSlot, date) => {
           const [hour, minute] = timeSlot.split(':').map(Number)
-          const noteDate = new Date(date)
-          noteDate.setHours(hour, minute, 0, 0)
+          const dateStr = format(date, 'yyyy-MM-dd')
+          const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`
           // Create a temporary note — only saved to DB when content is added
           setViewingNote({
             id: null,
             title: '',
             content: '',
-            start_time: noteDate.toISOString(),
-            created_at: noteDate.toISOString(),
+            start_date: dateStr,
+            start_time: timeStr,
+            created_at: new Date().toISOString(),
             _isNew: true,
           })
         }}
@@ -1329,7 +1376,7 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
           setViewingNote((prev: any) => prev ? { ...prev, ...updatedNote } : prev)
         }}
         onDelete={async (noteId) => {
-          await supabase.from('cassian_habits_notes').delete().eq('id', noteId)
+          await supabase.from('cassian_notes').delete().eq('id', noteId)
           setHabitNotes(prev => prev.filter(n => n.id !== noteId))
           setViewingNote(null)
         }}

@@ -406,7 +406,7 @@ Deno.serve(async (req: Request) => {
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
     
     const { data: recentNotes } = await supabase
-      .from('habits_notes')
+      .from('cassian_notes')
       .select('created_at, content')
       .eq('user_id', userId)
       .gte('created_at', threeDaysAgo.toISOString().split('T')[0])

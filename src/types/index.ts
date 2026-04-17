@@ -169,12 +169,14 @@ export interface RedditPost {
   comments: number
 }
 
-// Habit note
+// Note (formerly habits_notes). start_time is null for day-level notes.
 export interface HabitNote {
   id: string
   user_id: string
-  note_date: string
+  title?: string | null
   content: string
+  start_date: string
+  start_time: string | null
   created_at: string
   updated_at: string
 }
