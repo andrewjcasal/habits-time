@@ -106,7 +106,7 @@ export default function CalendarGrid({
   return (
     <div
       ref={containerRef}
-      className="md:flex-1 md:overflow-y-auto relative"
+      className="md:flex-1 md:overflow-y-auto relative z-0"
     >
       {hourSlots.map((hour, hourIndex) => {
         return (
