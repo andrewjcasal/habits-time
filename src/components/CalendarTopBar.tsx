@@ -1,6 +1,7 @@
 import React from 'react'
 import { format } from 'date-fns'
 import {
+  AlertCircle,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -13,7 +14,7 @@ import {
   Menu,
 } from 'lucide-react'
 import CalendarSettingsPanel from './CalendarSettingsPanel'
-import HelpBreatheButton from './HelpBreatheButton'
+import { useModal } from '../contexts/ModalContext'
 
 interface CalendarTopBarProps {
   settings: any
@@ -72,6 +73,7 @@ export default function CalendarTopBar({
   mobileDayNotePreview,
   onOpenMobileDayNote,
 }: CalendarTopBarProps) {
+  const { openNeedHelpModal } = useModal()
   const showBar = settings ? (settings.metadata?.showWorkHoursBar ?? true) : false
 
   return (
@@ -387,7 +389,14 @@ export default function CalendarTopBar({
         >
           <Settings className="w-2.5 h-2.5 text-neutral-500" />
         </button>
-        <HelpBreatheButton className="md:hidden p-0.5" iconClassName="w-2.5 h-2.5" />
+        <button
+          onClick={openNeedHelpModal}
+          className="md:hidden p-0.5 rounded-full text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200 transition-colors"
+          title="Need help?"
+          aria-label="Need help"
+        >
+          <AlertCircle className="w-2.5 h-2.5" />
+        </button>
         {onToggleMobileMenu && (
           <button
             onClick={onToggleMobileMenu}

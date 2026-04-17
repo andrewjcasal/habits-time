@@ -17,22 +17,19 @@ import {
   handleDeleteTask,
 } from '../utils/calendarDatabaseOperations'
 import { calculateWorkHours } from '../utils/workHoursCalculation'
-import { ModalProvider, useModal } from '../contexts/ModalContext'
+import { useModal, CalendarModalHandlers } from '../contexts/ModalContext'
 import { useUserContext } from '../contexts/UserContext'
 import CalendarEventSlots from '../components/CalendarEventSlots'
 import CalendarTopBar from '../components/CalendarTopBar'
 import CalendarGrid, { getQuarterFromMousePosition, quarterToTimeString } from '../components/CalendarGrid'
 
-interface CalendarContentProps {
-  handlersRef: React.MutableRefObject<Record<string, Function>>
-  onMeetingTitlesLoaded: (titles: { title: string; count: number; lastUsed: Date }[]) => void
-  onMeetingCategoriesLoaded: (categories: { id: string; name: string; color: string }[]) => void
-  onHabitsLoaded: (habits: any[]) => void
-}
+const CalendarContent = () => {
+  const handlersRef = useRef<Record<string, Function>>({})
+  const [meetingTitles, setMeetingTitles] = useState<{ title: string; count: number; lastUsed: Date }[]>([])
+  const [meetingCategories, setMeetingCategories] = useState<{ id: string; name: string; color: string }[]>([])
+  const [calendarHabits, setCalendarHabits] = useState<any[]>([])
 
-const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategoriesLoaded, onHabitsLoaded }: CalendarContentProps) => {
-
-  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals, openResizeConflictDialog, selectedTimeSlot: modalTimeSlot } = useModal()
+  const { openMeetingModal, openHabitModal, openTaskModal, openSessionModal, closeAllModals, openResizeConflictDialog, selectedTimeSlot: modalTimeSlot, registerModalHandlers, setCalendarModalData } = useModal()
   const { user } = useUserContext()
   const { setMobileMenuOpen } = useOutletContext<{ setMobileMenuOpen: (open: boolean) => void }>()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -99,10 +96,10 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
         supabase.from('cassian_meeting_categories').select('id, name, color').eq('user_id', user.id).order('name'),
       ])
       if (titlesRes.data) {
-        onMeetingTitlesLoaded(titlesRes.data.map((row: any) => ({ title: row.title, count: row.count, lastUsed: new Date(row.last_used) })))
+        setMeetingTitles(titlesRes.data.map((row: any) => ({ title: row.title, count: row.count, lastUsed: new Date(row.last_used) })))
       }
       if (categoriesRes.data) {
-        onMeetingCategoriesLoaded(categoriesRes.data)
+        setMeetingCategories(categoriesRes.data)
       }
       setMeetingDataLoaded(true)
     }
@@ -217,9 +214,9 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
 
   // Calendar data already includes habits - no need for separate useHabits hook
 
-  // Propagate habits data to parent for meeting modal
+  // Mirror habits into local state that's passed to MeetingModal via context
   useEffect(() => {
-    onHabitsLoaded(habits)
+    setCalendarHabits(habits)
   }, [habits])
 
   const gridCols =
@@ -1188,6 +1185,64 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
     }
   }, [handleSaveMeeting, handleDeleteMeeting, modalTimeSlot])
 
+  // Stable closures that dispatch through handlersRef.current. We register
+  // them once with the site-wide ModalProvider — handlers can be updated via
+  // the ref without re-registering, which keeps MeetingModal etc. from
+  // remounting on every render.
+  const modalHandlers = useMemo<CalendarModalHandlers>(() => ({
+    onSaveMeeting: async (e, updatedMeeting, editingMeeting) => {
+      await handlersRef.current.saveMeeting?.(e, updatedMeeting, editingMeeting)
+    },
+    onDeleteMeeting: async meeting => {
+      await handlersRef.current.deleteMeeting?.(meeting)
+    },
+    onCompleteTask: async task => {
+      const completedId = await handleCompleteTask(task)
+      if (completedId) handlersRef.current.removeTask?.(completedId)
+    },
+    onDeleteTask: async task => {
+      const deletedId = await handleDeleteTask(task)
+      if (deletedId) handlersRef.current.removeTask?.(deletedId)
+    },
+    onHabitTimeChange: async (habitId, date, newTime) => {
+      await handlersRef.current.habitTimeChange?.(habitId, date, newTime)
+    },
+    onHabitSkip: async (habitId, date) => {
+      await handlersRef.current.habitSkip?.(habitId, date)
+    },
+    onUpdateSession: async () => {},
+    onTaskLogCreated: () => { window.location.reload() },
+    onUpdateMeetingEndTime: async (meetingId, newEndTime) => {
+      await handlersRef.current.updateMeetingEndTime?.(meetingId, newEndTime)
+    },
+    onDeleteTaskLog: async logId => {
+      await supabase.from('cassian_tasks_daily_logs').delete().eq('id', logId)
+    },
+    onRemoveTaskLogFromUI: logId => {
+      handlersRef.current.removeTaskLog?.(logId)
+    },
+    onAddHabitBlock: (habitId, date, startTime, duration) => {
+      handlersRef.current.addHabitBlock?.(habitId, date, startTime, duration)
+    },
+    onMeetingHabitLinked: (meetingId, habitId) => {
+      handlersRef.current.linkMeetingHabit?.(meetingId, habitId)
+    },
+    onAddNote: () => {
+      handlersRef.current.addNote?.()
+    },
+  }), [])
+
+  useEffect(() => {
+    registerModalHandlers(modalHandlers)
+    // Clear when the Calendar page unmounts so non-calendar pages don't
+    // accidentally dispatch through stale closures.
+    return () => registerModalHandlers({})
+  }, [modalHandlers, registerModalHandlers])
+
+  useEffect(() => {
+    setCalendarModalData({ meetingTitles, meetingCategories, habits: calendarHabits })
+  }, [meetingTitles, meetingCategories, calendarHabits, setCalendarModalData])
+
   return (
     <div className="flex flex-col bg-white md:h-screen md:overflow-hidden">
       {/* CSS for drag animation */}
@@ -1397,61 +1452,4 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
   )
 }
 
-const Calendar = () => {
-  const handlersRef = useRef<Record<string, Function>>({})
-  const [meetingTitles, setMeetingTitles] = useState<{ title: string; count: number; lastUsed: Date }[]>([])
-  const [meetingCategories, setMeetingCategories] = useState<{ id: string; name: string; color: string }[]>([])
-  const [calendarHabits, setCalendarHabits] = useState<any[]>([])
-
-  return (
-    <ModalProvider
-      onSaveMeeting={async (e, updatedMeeting, editingMeeting) => {
-        await handlersRef.current.saveMeeting?.(e, updatedMeeting, editingMeeting)
-      }}
-      onDeleteMeeting={async (meeting) => {
-        await handlersRef.current.deleteMeeting?.(meeting)
-      }}
-      onCompleteTask={async (task) => {
-        const completedId = await handleCompleteTask(task)
-        if (completedId) handlersRef.current.removeTask?.(completedId)
-      }}
-      onDeleteTask={async (task) => {
-        const deletedId = await handleDeleteTask(task)
-        if (deletedId) handlersRef.current.removeTask?.(deletedId)
-      }}
-      onHabitTimeChange={async (habitId, date, newTime, newDuration) => {
-        await handlersRef.current.habitTimeChange?.(habitId, date, newTime, newDuration)
-      }}
-      onHabitSkip={async (habitId, date) => {
-        await handlersRef.current.habitSkip?.(habitId, date)
-      }}
-      onUpdateSession={async () => {}}
-      onTaskLogCreated={() => { window.location.reload() }}
-      onUpdateMeetingEndTime={async (meetingId, newEndTime) => {
-        await handlersRef.current.updateMeetingEndTime?.(meetingId, newEndTime)
-      }}
-      onDeleteTaskLog={async (logId) => {
-        await supabase.from('cassian_tasks_daily_logs').delete().eq('id', logId)
-      }}
-      onRemoveTaskLogFromUI={(logId) => {
-        handlersRef.current.removeTaskLog?.(logId)
-      }}
-      onAddHabitBlock={(habitId, date, startTime, duration) => {
-        handlersRef.current.addHabitBlock?.(habitId, date, startTime, duration)
-      }}
-      onMeetingHabitLinked={(meetingId, habitId) => {
-        handlersRef.current.linkMeetingHabit?.(meetingId, habitId)
-      }}
-      onAddNote={() => {
-        handlersRef.current.addNote?.()
-      }}
-      meetingTitles={meetingTitles}
-      meetingCategories={meetingCategories}
-      habits={calendarHabits}
-    >
-      <CalendarContent handlersRef={handlersRef} onMeetingTitlesLoaded={setMeetingTitles} onMeetingCategoriesLoaded={setMeetingCategories} onHabitsLoaded={setCalendarHabits} />
-    </ModalProvider>
-  )
-}
-
-export default memo(Calendar)
+export default memo(CalendarContent)

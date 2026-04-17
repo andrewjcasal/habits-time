@@ -34,7 +34,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useUserContext } from '../contexts/UserContext'
 import { supabase } from '../lib/supabase'
 import FeedbackButton from '../components/FeedbackButton'
-import HelpBreatheButton from '../components/HelpBreatheButton'
+import { ModalProvider } from '../contexts/ModalContext'
 // import { useAutoReflection } from '../hooks/useAutoReflection'
 
 const MainLayout = () => {
@@ -62,6 +62,7 @@ const MainLayout = () => {
   const isActive = (path: string) => location.pathname === path
 
   return (
+    <ModalProvider>
     <div className="flex min-h-screen bg-neutral-50">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-14 lg:w-56 flex-col bg-white border-r border-neutral-200 fixed h-screen z-10">
@@ -134,15 +135,12 @@ const MainLayout = () => {
           <Link to="/dashboard" className="flex items-center pl-1">
             <h1 className="text-base text-primary-700" style={{ fontFamily: "'DM Serif Display', serif" }}>Cassian</h1>
           </Link>
-          <div className="flex items-center gap-1">
-            <HelpBreatheButton className="p-1" iconClassName="h-3 w-3" />
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
-            >
-              {mobileMenuOpen ? <X className="h-3 w-3" /> : <Menu className="h-3 w-3" />}
-            </button>
-          </div>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-1 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          >
+            {mobileMenuOpen ? <X className="h-3 w-3" /> : <Menu className="h-3 w-3" />}
+          </button>
         </header>
       )}
 
@@ -249,6 +247,7 @@ const MainLayout = () => {
       {/* Feedback Button */}
       <FeedbackButton />
     </div>
+    </ModalProvider>
   )
 }
 

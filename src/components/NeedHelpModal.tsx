@@ -1,13 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
-import { AlertCircle, X } from 'lucide-react'
+import { X, ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-interface HelpBreatheButtonProps {
-  className?: string
-  iconClassName?: string
+interface NeedHelpModalProps {
+  isOpen: boolean
+  onClose: () => void
 }
 
-type Step = 'reset' | 'breathe' | 'update'
+type View = 'menu' | 'reset' | 'breathe' | 'update'
+
+const VIEW_LABELS: Record<Exclude<View, 'menu'>, string> = {
+  reset: 'Reset',
+  breathe: 'Breathe',
+  update: "Let's Update",
+}
 
 interface HabitRow {
   id: string
@@ -15,19 +21,20 @@ interface HabitRow {
   current_start_time: string | null
 }
 
-export default function HelpBreatheButton({
-  className = '',
-  iconClassName = 'w-4 h-4',
-}: HelpBreatheButtonProps) {
-  const [open, setOpen] = useState(false)
-  const [step, setStep] = useState<Step>('reset')
+export default function NeedHelpModal({ isOpen, onClose }: NeedHelpModalProps) {
+  const [view, setView] = useState<View>('menu')
   const [habits, setHabits] = useState<HabitRow[]>([])
   const [habitsLoaded, setHabitsLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
+  // Reset view to menu when the modal closes so next open starts fresh.
   useEffect(() => {
-    if (!open || habitsLoaded) return
+    if (!isOpen) setView('menu')
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen || habitsLoaded) return
     let cancelled = false
     const load = async () => {
       setLoading(true)
@@ -50,7 +57,7 @@ export default function HelpBreatheButton({
     }
     load()
     return () => { cancelled = true }
-  }, [open, habitsLoaded])
+  }, [isOpen, habitsLoaded])
 
   const updateHabitTime = (habitId: string, timeHHmm: string) => {
     const valueForDb = timeHHmm ? `${timeHHmm}:00` : null
@@ -64,109 +71,124 @@ export default function HelpBreatheButton({
     }, 400)
   }
 
-  const close = () => {
-    setOpen(false)
-    setStep('reset')
-  }
+  if (!isOpen) return null
 
   return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className={`rounded-full text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors ${className}`}
-        title="Need help?"
-        aria-label="Need help"
-      >
-        <AlertCircle className={iconClassName} />
-      </button>
-
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={e => { if (e.target === e.currentTarget) close() }}
-        >
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 flex flex-col max-h-[85vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-neutral-200">
-              <h2
-                className="text-xl text-neutral-900"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 flex flex-col max-h-[85vh]">
+        {/* Header — "Need Help?" on the menu, a back arrow + section title
+            once a sub-view is active. */}
+        <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-neutral-200">
+          {view === 'menu' ? (
+            <h2
+              className="text-xl text-neutral-900"
+              style={{ fontFamily: "'DM Serif Display', serif" }}
+            >
+              Need Help?
+            </h2>
+          ) : (
+            <button
+              onClick={() => setView('menu')}
+              className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+              aria-label="Back to menu"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span
+                className="text-lg text-neutral-900"
                 style={{ fontFamily: "'DM Serif Display', serif" }}
               >
-                Need Help?
-              </h2>
-              <button
-                onClick={close}
-                className="p-1 text-neutral-400 hover:text-neutral-600 rounded hover:bg-neutral-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-
-            {/* Stepper */}
-            <div className="flex items-stretch border-b border-neutral-200">
-              <StepTab
-                active={step === 'reset'}
-                onClick={() => setStep('reset')}
-                num={1}
-                label="Reset"
-              />
-              <StepTab
-                active={step === 'breathe'}
-                onClick={() => setStep('breathe')}
-                num={2}
-                label="Breathe"
-              />
-              <StepTab
-                active={step === 'update'}
-                onClick={() => setStep('update')}
-                num={3}
-                label="Let's Update"
-              />
-            </div>
-
-            {/* Content */}
-            {step === 'reset' && <ResetContent />}
-            {step === 'breathe' && <BreatheContent />}
-            {step === 'update' && (
-              <UpdateContent
-                habits={habits}
-                loading={loading && !habitsLoaded}
-                onUpdate={updateHabitTime}
-              />
-            )}
-          </div>
+                {VIEW_LABELS[view]}
+              </span>
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1 text-neutral-400 hover:text-neutral-600 rounded hover:bg-neutral-100 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
-      )}
-    </>
+
+        {/* Content */}
+        {view === 'menu' && <MenuView onSelect={setView} />}
+        {view === 'reset' && <ResetContent />}
+        {view === 'breathe' && <BreatheContent />}
+        {view === 'update' && (
+          <UpdateContent
+            habits={habits}
+            loading={loading && !habitsLoaded}
+            onUpdate={updateHabitTime}
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
-interface StepTabProps {
-  active: boolean
-  onClick: () => void
-  num: number
-  label: string
+interface MenuViewProps {
+  onSelect: (view: View) => void
 }
 
-function StepTab({ active, onClick, num, label }: StepTabProps) {
+function MenuView({ onSelect }: MenuViewProps) {
+  return (
+    <div className="p-4 space-y-2">
+      <MenuButton
+        num={1}
+        label="Reset"
+        onClick={() => onSelect('reset')}
+        bg="bg-rose-100"
+        bgHover="hover:bg-rose-200"
+        text="text-rose-900"
+        badgeBg="bg-rose-500"
+      />
+      <MenuButton
+        num={2}
+        label="Breathe"
+        onClick={() => onSelect('breathe')}
+        bg="bg-sky-100"
+        bgHover="hover:bg-sky-200"
+        text="text-sky-900"
+        badgeBg="bg-sky-500"
+      />
+      <MenuButton
+        num={3}
+        label="Let's Update"
+        onClick={() => onSelect('update')}
+        bg="bg-amber-100"
+        bgHover="hover:bg-amber-200"
+        text="text-amber-900"
+        badgeBg="bg-amber-500"
+      />
+    </div>
+  )
+}
+
+interface MenuButtonProps {
+  num: number
+  label: string
+  onClick: () => void
+  bg: string
+  bgHover: string
+  text: string
+  badgeBg: string
+}
+
+function MenuButton({ num, label, onClick, bg, bgHover, text, badgeBg }: MenuButtonProps) {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm transition-colors border-b-2 ${
-        active
-          ? 'bg-amber-50 text-neutral-900 border-amber-500'
-          : 'text-neutral-500 hover:bg-neutral-50 border-transparent'
-      }`}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${bg} ${bgHover} ${text} transition-colors text-left`}
     >
       <span
-        className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium ${
-          active ? 'bg-amber-500 text-white' : 'bg-neutral-200 text-neutral-600'
-        }`}
+        className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium text-white flex-shrink-0 ${badgeBg}`}
       >
         {num}
       </span>
-      <span>{label}</span>
+      <span className="text-base font-medium">{label}</span>
     </button>
   )
 }
