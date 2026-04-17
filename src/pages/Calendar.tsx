@@ -288,15 +288,25 @@ const CalendarContent = () => {
 
   // Update container height and scroll to 3 hours before now
   useEffect(() => {
-    if (containerRef.current) {
-      setContainerHeight(containerRef.current.clientHeight)
-      const now = new Date()
-      const currentHour = now.getHours()
-      // Grid: 6-23 = index 0-17, 0-4 = index 18-22
-      const isLateNight = currentHour >= 0 && currentHour < 5
-      const currentIndex = isLateNight ? (currentHour + 18) : (currentHour - 6)
-      const scrollIndex = Math.max(0, currentIndex - 3)
-      containerRef.current.scrollTop = scrollIndex * 64
+    if (!containerRef.current) return
+    setContainerHeight(containerRef.current.clientHeight)
+    const now = new Date()
+    const currentHour = now.getHours()
+    // Grid: 6-23 = index 0-17, 0-4 = index 18-22
+    const isLateNight = currentHour >= 0 && currentHour < 5
+    const currentIndex = isLateNight ? (currentHour + 18) : (currentHour - 6)
+    const scrollIndex = Math.max(0, currentIndex - 3)
+    const scrollOffset = scrollIndex * 64
+
+    // Desktop scrolls the inner container; mobile scrolls the whole page
+    // (CalendarGrid only sets overflow-y-auto at md+), so fall back to
+    // window.scrollTo using the grid's document-relative position.
+    const isMobile = window.innerWidth < 768
+    if (isMobile) {
+      const gridTop = containerRef.current.getBoundingClientRect().top + window.scrollY
+      window.scrollTo({ top: gridTop + scrollOffset })
+    } else {
+      containerRef.current.scrollTop = scrollOffset
     }
   }, [])
 
