@@ -487,6 +487,10 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   // Get habits for a specific time slot
   const habitsIndex = useMemo(() => {
     const index = new Map<string, any[]>()
+    // Track placements per date so habits that overlap each other can be
+    // "bumped up" (shifted earlier) to end just before the already-placed
+    // habit they conflict with.
+    const placedHabitsByDate = new Map<string, Array<{ start: number; end: number }>>()
     // Pre-index meetings and sessions by date for O(1) conflict lookups
     const meetingsByDate = new Map<string, any[]>()
     meetings.forEach(m => {
@@ -504,7 +508,22 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     })
     const workHours = getWorkHoursRange()
 
-    for (const habit of habits) {
+    // Sort so shorter habits at the same scheduled time win their natural
+    // slot; longer habits get bumped up around them. This makes the bump-up
+    // behavior deterministic instead of depending on DB row order.
+    const habitStartMinutes = (h: any): number => {
+      const t = h.current_start_time
+      if (!t) return Number.POSITIVE_INFINITY
+      const [hh, mm] = t.split(':').map(Number)
+      return hh * 60 + (mm || 0)
+    }
+    const orderedHabits = [...habits].sort((a, b) => {
+      const diff = habitStartMinutes(a) - habitStartMinutes(b)
+      if (diff !== 0) return diff
+      return (a.duration || 0) - (b.duration || 0)
+    })
+
+    for (const habit of orderedHabits) {
       if (habit.habits_types?.scheduling_rule === 'non_calendar') continue
 
       for (const col of dayColumns) {
@@ -594,6 +613,39 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           finalHour = habitStartHour
           topPosition = (habitStartMinute / 60) * 100
         }
+
+        // Habit-vs-habit conflict resolution: bump up so the current habit
+        // ends just before the earliest already-placed habit it overlaps.
+        // Re-check after each shift in case the new slot collides with a
+        // different placed habit; cap iterations defensively.
+        let finalStart = finalHour + topPosition / 100
+        let finalEnd = finalStart + effectiveDuration / 60
+        const placed = placedHabitsByDate.get(dateKey) || []
+        for (let guard = 0; guard < 10; guard++) {
+          let earliestConflict: { start: number; end: number } | null = null
+          for (const p of placed) {
+            if (finalStart < p.end && finalEnd > p.start) {
+              if (!earliestConflict || p.start < earliestConflict.start) {
+                earliestConflict = p
+              }
+            }
+          }
+          if (!earliestConflict) break
+          finalEnd = earliestConflict.start
+          finalStart = finalEnd - effectiveDuration / 60
+          if (finalStart < 0) {
+            // Can't shift further without going past midnight — leave the
+            // habit at its last-valid position and accept the overlap.
+            finalStart = 0
+            finalEnd = effectiveDuration / 60
+            break
+          }
+          isRescheduled = true
+        }
+        finalHour = Math.floor(finalStart)
+        topPosition = (finalStart - finalHour) * 100
+        placed.push({ start: finalStart, end: finalEnd })
+        placedHabitsByDate.set(dateKey, placed)
 
         const key = `${dateKey}-${finalHour}`
         const arr = index.get(key) || []
