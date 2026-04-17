@@ -36,6 +36,7 @@ const CalendarContent = () => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [containerHeight, setContainerHeight] = useState(600)
   const containerRef = useRef<HTMLDivElement>(null)
+  const stickyHeaderRef = useRef<HTMLDivElement>(null)
   const [showActualHoursTooltip, setShowActualHoursTooltip] = useState(false)
   const [showPlannedHoursTooltip, setShowPlannedHoursTooltip] = useState(false)
   const [showWorkHoursTooltip, setShowWorkHoursTooltip] = useState(false)
@@ -298,16 +299,32 @@ const CalendarContent = () => {
     const scrollIndex = Math.max(0, currentIndex - 3)
     const scrollOffset = scrollIndex * 64
 
-    // Desktop scrolls the inner container; mobile scrolls the whole page
-    // (CalendarGrid only sets overflow-y-auto at md+), so fall back to
-    // window.scrollTo using the grid's document-relative position.
-    const isMobile = window.innerWidth < 768
-    if (isMobile) {
-      const gridTop = containerRef.current.getBoundingClientRect().top + window.scrollY
-      window.scrollTo({ top: gridTop + scrollOffset })
-    } else {
-      containerRef.current.scrollTop = scrollOffset
+    const performScroll = () => {
+      if (!containerRef.current) return
+      // Desktop scrolls the inner container; mobile scrolls the whole page
+      // (CalendarGrid only sets overflow-y-auto at md+).
+      const isMobile = window.innerWidth < 768
+      if (isMobile) {
+        const gridTop = containerRef.current.getBoundingClientRect().top + window.scrollY
+        // The sticky top bar overlays the top of the viewport as you scroll,
+        // so offset by its height — otherwise the target hour is hidden under
+        // the bar.
+        const headerHeight = stickyHeaderRef.current?.offsetHeight ?? 0
+        window.scrollTo({ top: Math.max(0, gridTop + scrollOffset - headerHeight) })
+      } else {
+        containerRef.current.scrollTop = scrollOffset
+      }
     }
+
+    // Defer past paint so the sticky header + day-note banner have their
+    // final laid-out heights before we measure. Double-rAF works around an
+    // iOS Safari quirk where a scroll issued during the first frame after
+    // load can cause `position: sticky` children to render un-pinned.
+    const id1 = requestAnimationFrame(() => {
+      const id2 = requestAnimationFrame(performScroll)
+      ;(performScroll as any)._inner = id2
+    })
+    return () => cancelAnimationFrame(id1)
   }, [])
 
   // Hours 0-4 on a column visually belong to the next calendar day
@@ -1138,7 +1155,7 @@ const CalendarContent = () => {
         return (
           <div
             key={`note-badge-${note.id}`}
-            className="absolute left-0 z-10 cursor-pointer"
+            className="absolute left-0 z-30 cursor-pointer"
             style={{ top: `${topPercent}%` }}
             onClick={e => {
               e.stopPropagation()
@@ -1269,7 +1286,7 @@ const CalendarContent = () => {
         `}
       </style>
       {/* Sticky header on mobile, normal flow on desktop */}
-      <div className="sticky top-0 z-20 bg-white md:static">
+      <div ref={stickyHeaderRef} className="sticky top-0 z-20 bg-white md:static">
       {/* Calendar Setup Banner - shown when calendar is sparse */}
       {!isDataLoading && meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
         <div className="-mx-2 mb-2 px-4 py-2 bg-amber-50 border-b border-amber-100 sm:mx-0 sm:mb-0 sm:px-4 sm:py-3 sm:bg-amber-50 sm:border sm:border-amber-100 sm:rounded-lg sm:mx-0 sm:mt-0">
