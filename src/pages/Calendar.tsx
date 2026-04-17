@@ -303,8 +303,20 @@ const CalendarContent = () => {
   }, [])
 
   useEffect(() => {
+    if (containerRef.current) setContainerHeight(containerRef.current.clientHeight)
+  }, [])
+
+  // Scroll to ~3 hours before now once, after the calendar data has resolved.
+  // Gating on isDataLoading ensures the grid has rendered its full height
+  // (and for mobile, the spacer has settled) before we call scrollTo —
+  // otherwise the scroll clamps short because the document isn't tall yet.
+  const didInitialScrollRef = useRef(false)
+  useEffect(() => {
+    if (isDataLoading) return
+    if (didInitialScrollRef.current) return
     if (!containerRef.current) return
-    setContainerHeight(containerRef.current.clientHeight)
+    didInitialScrollRef.current = true
+
     const now = new Date()
     const currentHour = now.getHours()
     // Grid: 6-23 = index 0-17, 0-4 = index 18-22
@@ -320,16 +332,23 @@ const CalendarContent = () => {
         // Header is position:fixed on mobile + a spacer of equal height
         // precedes the grid, so the grid sits at document-Y = headerHeight.
         // Scrolling the window by scrollOffset lines the target hour up
-        // just below the fixed header, which is what the user wants.
-        window.scrollTo({ top: scrollOffset })
+        // just below the fixed header.
+        window.scrollTo(0, scrollOffset)
       } else {
         containerRef.current.scrollTop = scrollOffset
       }
     }
 
-    const id = requestAnimationFrame(() => requestAnimationFrame(performScroll))
-    return () => cancelAnimationFrame(id)
-  }, [])
+    // One rAF to let React flush the post-load commit, a setTimeout to
+    // catch the iOS-Safari case where layout/scrolling isn't fully
+    // settled for a beat after the address bar finishes adjusting.
+    const raf = requestAnimationFrame(performScroll)
+    const timer = setTimeout(performScroll, 150)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(timer)
+    }
+  }, [isDataLoading])
 
   // Hours 0-4 on a column visually belong to the next calendar day
   const adjustDateForLateNight = (time: string, columnDate: Date): Date => {
