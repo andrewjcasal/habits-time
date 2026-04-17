@@ -1102,7 +1102,7 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
       || ''
     const trimmed = source.trim()
     if (!trimmed) return null
-    return trimmed.length > 20 ? trimmed.slice(0, 20) : trimmed
+    return trimmed.slice(0, 120)
   }, [mobileDayNote])
 
   const openMobileDayNote = useCallback(() => {
@@ -1256,6 +1256,18 @@ const CalendarContent = ({ handlersRef, onMeetingTitlesLoaded, onMeetingCategori
         mobileDayNotePreview={mobileDayNotePreview}
         onOpenMobileDayNote={openMobileDayNote}
       />
+
+      {/* Mobile day-note banner — full-width preview of the current day's
+          whole-day note. Tap to edit. */}
+      {mobileDayNotePreview && (
+        <button
+          onClick={openMobileDayNote}
+          className="md:hidden w-full text-left px-3 py-1.5 bg-amber-50 border-b border-amber-100 text-sm text-neutral-700 truncate hover:bg-amber-100 transition-colors"
+          title="Edit day note"
+        >
+          {mobileDayNotePreview}
+        </button>
+      )}
 
       {/* Headers - hidden on mobile since date + add moved to top bar */}
       <div

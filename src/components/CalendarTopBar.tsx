@@ -134,18 +134,16 @@ export default function CalendarTopBar({
           <ChevronsRight className="w-2 h-2 text-neutral-600" />
         </button>
 
-        {/* Mobile day-note badge — click to add/edit a whole-day note */}
-        {onOpenMobileDayNote && (
+        {/* Mobile "add note" affordance — shown only when no day note exists.
+            When a day note is present it renders as a full-width banner below
+            the top bar (see Calendar.tsx). */}
+        {onOpenMobileDayNote && !mobileDayNotePreview && (
           <button
             onClick={onOpenMobileDayNote}
             className="md:hidden ml-1 flex-1 min-w-0 text-left text-sm hover:bg-neutral-200 rounded px-1.5 py-0.5 transition-colors truncate"
-            title={mobileDayNotePreview ? 'Edit day note' : 'Add note for this day'}
+            title="Add note for this day"
           >
-            {mobileDayNotePreview ? (
-              <span className="text-neutral-700">{mobileDayNotePreview}</span>
-            ) : (
-              <span className="italic text-neutral-400">Add note</span>
-            )}
+            <span className="italic text-neutral-400">Add note</span>
           </button>
         )}
 
