@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useUserContext } from '../contexts/UserContext'
 import { supabase } from '../lib/supabase'
 import FeedbackButton from '../components/FeedbackButton'
+import HelpBreatheButton from '../components/HelpBreatheButton'
 // import { useAutoReflection } from '../hooks/useAutoReflection'
 
 const MainLayout = () => {
@@ -133,12 +134,15 @@ const MainLayout = () => {
           <Link to="/dashboard" className="flex items-center pl-1">
             <h1 className="text-base text-primary-700" style={{ fontFamily: "'DM Serif Display', serif" }}>Cassian</h1>
           </Link>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-1 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
-          >
-            {mobileMenuOpen ? <X className="h-3 w-3" /> : <Menu className="h-3 w-3" />}
-          </button>
+          <div className="flex items-center gap-1">
+            <HelpBreatheButton className="p-1" iconClassName="h-3 w-3" />
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-1 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+            >
+              {mobileMenuOpen ? <X className="h-3 w-3" /> : <Menu className="h-3 w-3" />}
+            </button>
+          </div>
         </header>
       )}
 

@@ -13,6 +13,7 @@ import {
   Menu,
 } from 'lucide-react'
 import CalendarSettingsPanel from './CalendarSettingsPanel'
+import HelpBreatheButton from './HelpBreatheButton'
 
 interface CalendarTopBarProps {
   settings: any
@@ -386,6 +387,7 @@ export default function CalendarTopBar({
         >
           <Settings className="w-2.5 h-2.5 text-neutral-500" />
         </button>
+        <HelpBreatheButton className="md:hidden p-0.5" iconClassName="w-2.5 h-2.5" />
         {onToggleMobileMenu && (
           <button
             onClick={onToggleMobileMenu}
