@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { useSearchParams, useOutletContext } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plus, Info, FileText, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
@@ -37,6 +37,7 @@ const CalendarContent = () => {
   const [containerHeight, setContainerHeight] = useState(600)
   const containerRef = useRef<HTMLDivElement>(null)
   const stickyHeaderRef = useRef<HTMLDivElement>(null)
+  const [mobileHeaderHeight, setMobileHeaderHeight] = useState(0)
   const [showActualHoursTooltip, setShowActualHoursTooltip] = useState(false)
   const [showPlannedHoursTooltip, setShowPlannedHoursTooltip] = useState(false)
   const [showWorkHoursTooltip, setShowWorkHoursTooltip] = useState(false)
@@ -288,6 +289,19 @@ const CalendarContent = () => {
   }, [])
 
   // Update container height and scroll to 3 hours before now
+  // Measure the (position:fixed on mobile) top bar so we can render a spacer
+  // of matching height under it. Keep it live so conditional children like
+  // the day-note banner are accounted for.
+  useLayoutEffect(() => {
+    const el = stickyHeaderRef.current
+    if (!el) return
+    const update = () => setMobileHeaderHeight(el.offsetHeight)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   useEffect(() => {
     if (!containerRef.current) return
     setContainerHeight(containerRef.current.clientHeight)
@@ -301,30 +315,20 @@ const CalendarContent = () => {
 
     const performScroll = () => {
       if (!containerRef.current) return
-      // Desktop scrolls the inner container; mobile scrolls the whole page
-      // (CalendarGrid only sets overflow-y-auto at md+).
       const isMobile = window.innerWidth < 768
       if (isMobile) {
-        const gridTop = containerRef.current.getBoundingClientRect().top + window.scrollY
-        // The sticky top bar overlays the top of the viewport as you scroll,
-        // so offset by its height — otherwise the target hour is hidden under
-        // the bar.
-        const headerHeight = stickyHeaderRef.current?.offsetHeight ?? 0
-        window.scrollTo({ top: Math.max(0, gridTop + scrollOffset - headerHeight) })
+        // Header is position:fixed on mobile + a spacer of equal height
+        // precedes the grid, so the grid sits at document-Y = headerHeight.
+        // Scrolling the window by scrollOffset lines the target hour up
+        // just below the fixed header, which is what the user wants.
+        window.scrollTo({ top: scrollOffset })
       } else {
         containerRef.current.scrollTop = scrollOffset
       }
     }
 
-    // Defer past paint so the sticky header + day-note banner have their
-    // final laid-out heights before we measure. Double-rAF works around an
-    // iOS Safari quirk where a scroll issued during the first frame after
-    // load can cause `position: sticky` children to render un-pinned.
-    const id1 = requestAnimationFrame(() => {
-      const id2 = requestAnimationFrame(performScroll)
-      ;(performScroll as any)._inner = id2
-    })
-    return () => cancelAnimationFrame(id1)
+    const id = requestAnimationFrame(() => requestAnimationFrame(performScroll))
+    return () => cancelAnimationFrame(id)
   }, [])
 
   // Hours 0-4 on a column visually belong to the next calendar day
@@ -1285,8 +1289,9 @@ const CalendarContent = () => {
           }
         `}
       </style>
-      {/* Sticky header on mobile, normal flow on desktop */}
-      <div ref={stickyHeaderRef} className="sticky top-0 z-20 bg-white md:static">
+      {/* Fixed on mobile (position:sticky is unreliable on iOS Safari after a
+          programmatic window.scrollTo); static on desktop. */}
+      <div ref={stickyHeaderRef} className="fixed top-0 left-0 right-0 z-20 bg-white md:static">
       {/* Calendar Setup Banner - shown when calendar is sparse */}
       {!isDataLoading && meetings.length < 10 && habits.length < 3 && allTasks.length < 2 && (
         <div className="-mx-2 mb-2 px-4 py-2 bg-amber-50 border-b border-amber-100 sm:mx-0 sm:mb-0 sm:px-4 sm:py-3 sm:bg-amber-50 sm:border sm:border-amber-100 sm:rounded-lg sm:mx-0 sm:mt-0">
@@ -1393,7 +1398,15 @@ const CalendarContent = () => {
           </div>
         ))}
       </div>
-      </div>{/* end sticky header */}
+      </div>{/* end fixed header */}
+
+      {/* Mobile spacer — reserves the space the position:fixed header would
+          otherwise overlap. Height tracks the measured header height. */}
+      <div
+        className="md:hidden"
+        style={{ height: mobileHeaderHeight }}
+        aria-hidden
+      />
 
       {/* Calendar Grid */}
       <CalendarGrid
