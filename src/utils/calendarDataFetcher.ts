@@ -46,7 +46,7 @@ export const fetchAllCalendarData = async (userId: string) => {
       const parentIds = topLevelHabits.map((h: any) => h.id)
       const { data: subhabitRows } = await supabase
         .from('cassian_habits')
-        .select('id, parent_habit_id, name, duration, sort_order, aspect_id, created_at')
+        .select('id, parent_habit_id, name, duration, sort_order, aspect_id, created_at, habits_daily_logs:cassian_habits_daily_logs(*)')
         .in('parent_habit_id', parentIds)
       const byParent = new Map<string, any[]>()
       for (const s of subhabitRows || []) {

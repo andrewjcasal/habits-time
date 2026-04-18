@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import ModalWrapper from './ModalWrapper'
 import { useHabitTypes } from '../hooks/useHabitTypes'
 
 interface CreateHabitModalProps {
@@ -13,18 +13,32 @@ interface CreateHabitModalProps {
     background: string
     benefits: string
     consequences: string
+    weekly_days?: string[] | null
   }) => Promise<void>
+  defaultTime?: string
+  defaultDuration?: number
+  defaultWeeklyDays?: string[]
 }
 
-const CreateHabitModal = ({ isOpen, onClose, onCreateHabit }: CreateHabitModalProps) => {
+const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
+const CreateHabitModal = ({ isOpen, onClose, onCreateHabit, defaultTime, defaultDuration, defaultWeeklyDays }: CreateHabitModalProps) => {
   const [name, setName] = useState('')
-  const [duration, setDuration] = useState(30)
-  const [defaultStartTime, setDefaultStartTime] = useState('09:00')
+  const [duration, setDuration] = useState(defaultDuration ?? 30)
+  const [defaultStartTime, setDefaultStartTime] = useState(defaultTime ?? '09:00')
+  const [weeklyDays, setWeeklyDays] = useState<string[]>(defaultWeeklyDays ?? [])
   const [loading, setLoading] = useState(false)
 
-  const { habitTypes } = useHabitTypes()
+  // When the modal opens, re-sync from the latest defaults so re-triggering
+  // from a different slot pre-fills the new values.
+  useEffect(() => {
+    if (!isOpen) return
+    setDefaultStartTime(defaultTime ?? '09:00')
+    setDuration(defaultDuration ?? 30)
+    setWeeklyDays(defaultWeeklyDays ?? [])
+  }, [isOpen, defaultTime, defaultDuration, defaultWeeklyDays])
 
-  // Find the "fixed_time" habit type
+  const { habitTypes } = useHabitTypes()
   const fixedType = habitTypes.find(t => t.scheduling_rule === 'fixed_time')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,11 +55,13 @@ const CreateHabitModal = ({ isOpen, onClose, onCreateHabit }: CreateHabitModalPr
         background: '',
         benefits: '',
         consequences: '',
+        weekly_days: weeklyDays.length > 0 ? weeklyDays : null,
       })
 
       setName('')
       setDuration(30)
       setDefaultStartTime('09:00')
+      setWeeklyDays([])
       onClose()
     } catch (error) {
       console.error('Error creating habit:', error)
@@ -57,74 +73,82 @@ const CreateHabitModal = ({ isOpen, onClose, onCreateHabit }: CreateHabitModalPr
   if (!isOpen) return null
 
   return (
-    <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-neutral-100">
-          <h2 className="text-sm font-semibold text-neutral-900">New Habit</h2>
-          <button onClick={onClose} className="p-0.5 text-neutral-400 hover:text-neutral-600 rounded hover:bg-neutral-100 transition-colors">
-            <X className="w-3.5 h-3.5" />
-          </button>
+    <ModalWrapper isOpen={isOpen} onClose={onClose} title="New Habit" maxWidth="md">
+      <form onSubmit={handleSubmit} className="space-y-1">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Habit name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
+            autoFocus
+            required
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Habit name"
-              className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-              required
-              autoFocus
-            />
-          </div>
+        <div className="flex gap-1">
+          <input
+            type="time"
+            value={defaultStartTime}
+            onChange={e => setDefaultStartTime(e.target.value)}
+            className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
+            required
+          />
+          <input
+            type="number"
+            value={duration}
+            onChange={e => setDuration(parseInt(e.target.value) || 0)}
+            className="flex-1 px-1 py-1 border border-neutral-300 rounded-md text-xs"
+            min={1}
+            max={480}
+            placeholder="Duration (min)"
+            required
+          />
+        </div>
 
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-neutral-600 mb-1">Duration (min)</label>
-              <input
-                type="number"
-                value={duration}
-                onChange={e => setDuration(parseInt(e.target.value) || 0)}
-                className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm text-neutral-900 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                min="1"
-                max="480"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-neutral-600 mb-1">Start time</label>
-              <input
-                type="time"
-                value={defaultStartTime}
-                onChange={e => setDefaultStartTime(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm text-neutral-900 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
-          </div>
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {WEEKDAYS.map(day => {
+            const isActive = weeklyDays.includes(day)
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => {
+                  setWeeklyDays(prev =>
+                    isActive ? prev.filter(d => d !== day) : [...prev, day]
+                  )
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  isActive
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                }`}
+              >
+                {day.slice(0, 3)}
+              </button>
+            )
+          })}
+        </div>
 
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 text-xs text-neutral-600 hover:text-neutral-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !name.trim() || !fixedType}
-              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? 'Creating...' : 'Create'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex items-center justify-end gap-1 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-2 py-1 text-xs text-neutral-600 hover:text-neutral-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !name.trim() || !fixedType}
+            className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Creating...' : 'Create'}
+          </button>
+        </div>
+      </form>
+    </ModalWrapper>
   )
 }
 

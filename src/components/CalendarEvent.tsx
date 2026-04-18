@@ -1,7 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 
 interface CalendarEventProps {
-  type: 'habit' | 'session' | 'task' | 'placeholder' | 'meeting' | 'tasklog' | 'tasklog-urgent' | 'buffer' | 'reduced-buffer' | 'category-buffer' | 'todoist'
+  type: 'habit' | 'session' | 'task' | 'placeholder' | 'meeting' | 'tasklog' | 'tasklog-urgent' | 'buffer' | 'reduced-buffer' | 'category-buffer' | 'todoist' | 'clickup'
   style: React.CSSProperties
   onClick?: (e: React.MouseEvent) => void
   onResizeStart?: (e: React.MouseEvent) => void
@@ -13,6 +13,8 @@ interface CalendarEventProps {
   subtitle?: string
   icon?: React.ReactNode
   children?: React.ReactNode
+  /** Optional content rendered as a tooltip above the event while hovered. */
+  hoverTooltip?: React.ReactNode
 }
 
 const CalendarEvent: React.FC<CalendarEventProps> = ({
@@ -27,8 +29,10 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
   duration,
   subtitle,
   icon,
-  children
+  children,
+  hoverTooltip,
 }) => {
+  const [hovered, setHovered] = useState(false)
   
   // Check if duration is 30+ minutes - convert various formats to minutes
   const getDurationInMinutes = (dur: string | number): number => {
@@ -48,11 +52,14 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
   const is15Min = durationInMinutes == 15
   const is30Min = durationInMinutes == 30
   
+  // When a hoverTooltip is provided we skip overflow-hidden so the tooltip
+  // positioned at bottom-full isn't clipped by the event's bounds. Text
+  // truncation on children (via .truncate) still works.
   const baseClass = `absolute text-sm sm:text-xs p-1 sm:p-0.5 ${
     is15Min || is30Min ? 'pt-0 sm:pt-0' : ''
   } ${is15Min ? 'leading-none' : ''} rounded ${
     is30PlusMin ? 'flex-col items-start' : 'flex items-start justify-between'
-  } shadow-sm overflow-hidden`
+  } shadow-sm ${hoverTooltip ? 'overflow-visible' : 'overflow-hidden'}`
 
   const typeClasses = {
     habit: 'bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200 transition-colors',
@@ -66,6 +73,7 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
     'reduced-buffer': 'bg-orange-100 text-orange-800 opacity-80',
     'category-buffer': 'bg-gray-100 text-gray-800',
     todoist: 'bg-rose-100 text-rose-800 cursor-pointer hover:bg-rose-200',
+    clickup: 'bg-teal-100 text-teal-800 cursor-pointer hover:bg-teal-200',
   }
 
   return (
@@ -77,9 +85,21 @@ const CalendarEvent: React.FC<CalendarEventProps> = ({
         e.stopPropagation()
         if (onDragStart) onDragStart(e)
       }}
+      onMouseEnter={() => hoverTooltip && setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       title={title}
       data-calendar-event="true"
     >
+      {hoverTooltip && hovered && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none">
+          <div className="relative bg-white border border-neutral-200 rounded-md shadow-lg px-2 py-1.5 text-[11px] text-neutral-800 whitespace-nowrap max-w-xs">
+            {hoverTooltip}
+            {/* Arrow: centered on the tooltip's bottom edge so the upper half
+                is hidden behind the white body, leaving a clean triangle. */}
+            <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 top-full w-2 h-2 bg-white border-b border-r border-neutral-200 rotate-45" />
+          </div>
+        </div>
+      )}
       {children || (
         <>
           <div className={`font-medium truncate ${is30PlusMin ? 'w-full leading-tight' : 'flex-1'}`}>

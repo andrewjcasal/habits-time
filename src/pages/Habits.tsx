@@ -27,6 +27,7 @@ const Habits = () => {
     updateHabitStartTime,
     updateHabitStartTimes,
     createHabit,
+    unarchiveHabit,
     getNextHabit,
     lastSleepTime,
   } = useHabits(selectedDate)
@@ -297,6 +298,7 @@ const Habits = () => {
           onNavigateDate={navigateDate}
           onShowCreateModal={setShowCreateModal}
           onCreateHabit={createHabit}
+          onUnarchiveHabit={unarchiveHabit}
           formatDateDisplay={formatDateDisplay}
           getHabitScheduleDisplay={getHabitScheduleDisplay}
           formatTime={formatTime}

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Clock, Check } from 'lucide-react'
 import CalendarEvent from './CalendarEvent'
+import { GRID_START_HOUR, isLateNightHour } from '../utils/calendarGrid'
 
 // Unified duration format: takes minutes, outputs "Xh Ym" or "Ym"
 const formatDuration = (minutes: number): string => {
@@ -92,9 +93,35 @@ function CalendarEventSlots({
         const adjustedTopPosition = habit.topPosition || 0
 
         const isDraggingThis = draggingHabitId === habit.id && draggingHabitDateStr === dateStr
+        // Habits sit above meetings in the stacking order (meetings use z=15).
+        // When a meeting conflict bumps a habit into the next hour-slot, the
+        // meeting's own box can visually overlap that slot — without this, it
+        // would obscure the bumped habit.
         const habitStyle = isDraggingThis
-          ? { ...getEventStyle(adjustedTopPosition, habitHeight), transform: `translateY(${habitDragY}px)`, opacity: 0.8, zIndex: 50 }
-          : getEventStyle(adjustedTopPosition, habitHeight)
+          ? { ...getEventStyle(adjustedTopPosition, habitHeight, 20), transform: `translateY(${habitDragY}px)`, opacity: 0.8, zIndex: 50 }
+          : getEventStyle(adjustedTopPosition, habitHeight, 20)
+
+        // Completed subhabits for this date — shown in the hover tooltip.
+        const finishedSubhabits = (habit.subhabits || []).filter((s: any) =>
+          (s.habits_daily_logs || []).some(
+            (l: any) => l.log_date === dateStr && l.is_completed === true
+          )
+        )
+        const hoverTooltip = finishedSubhabits.length > 0 ? (
+          <div>
+            <div className="font-medium text-neutral-900 mb-1">
+              Finished ({finishedSubhabits.length}/{(habit.subhabits || []).length})
+            </div>
+            <ul className="space-y-0.5">
+              {finishedSubhabits.map((s: any) => (
+                <li key={s.id} className="flex items-center gap-1">
+                  <Check className="w-3 h-3 text-green-500 shrink-0" />
+                  <span className="truncate">{s.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : undefined
 
         return (
           <CalendarEvent
@@ -114,6 +141,7 @@ function CalendarEventSlots({
               effectiveDuration > 0 ? formatDuration(effectiveDuration) : undefined
             }
             icon={isRescheduled ? <Clock className="w-1.5 h-1.5" /> : undefined}
+            hoverTooltip={hoverTooltip}
           />
         )
       })}
@@ -180,19 +208,20 @@ function CalendarEventSlots({
         let topPositionInSlot: number
 
         if (isClipped) {
-          // Clipped entry: starts at 6am, ends at original end
+          // Clipped entry: starts at the grid's start hour, ends at the
+          // original meeting end.
           meetingStart = new Date(meeting.start_time)
-          meetingStart.setHours(6, 0, 0, 0)
+          meetingStart.setHours(GRID_START_HOUR, 0, 0, 0)
           topPositionInSlot = 0
           meetingDuration = (meetingEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
         } else {
           meetingStart = new Date(meeting.start_time)
           const startHour = meetingStart.getHours()
-          // If late-night meeting extends past 5am, clip at 5am
-          if (startHour >= 0 && startHour < 5) {
-            const fiveAm = new Date(meetingStart)
-            fiveAm.setHours(5, 0, 0, 0)
-            const clippedEnd = meetingEnd > fiveAm ? fiveAm : meetingEnd
+          // Late-night meeting extending past the grid start clips there.
+          if (isLateNightHour(startHour)) {
+            const splitAt = new Date(meetingStart)
+            splitAt.setHours(GRID_START_HOUR, 0, 0, 0)
+            const clippedEnd = meetingEnd > splitAt ? splitAt : meetingEnd
             meetingDuration = (clippedEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
           } else {
             meetingDuration = (meetingEnd.getTime() - meetingStart.getTime()) / (1000 * 60)
@@ -231,6 +260,7 @@ function CalendarEventSlots({
         const todayStr = new Date().toLocaleDateString('en-CA')
         const isDatedTodoist = log.tasks?.source === 'todoist' && log.tasks?.due_date
         const isUrgentTodoist = isDatedTodoist && (log.tasks.due_date <= todayStr || log.tasks.due_date === log.log_date)
+        const isClickUp = log.tasks?.source === 'clickup'
         const isDragging = draggingTaskLogId === log.id
         const dragStyle = isDragging
           ? { ...getEventStyle(log.topPosition, logHeight, 20), transform: `translateY(${taskLogDragY}px)`, opacity: 0.8, zIndex: 50 }
@@ -238,7 +268,7 @@ function CalendarEventSlots({
         return (
           <CalendarEvent
             key={`task-daily-log-${log.id}`}
-            type={isUrgentTodoist ? 'tasklog-urgent' : 'tasklog'}
+            type={isClickUp ? 'clickup' : isUrgentTodoist ? 'tasklog-urgent' : 'tasklog'}
             style={dragStyle}
             onClick={e => {
               if (isDragging) return

@@ -11,6 +11,7 @@ interface UserSettings {
   week_ending_timezone: string // e.g., 'America/New_York'
   weekend_days: string[] // Array of weekday names like ['saturday', 'sunday']
   todoist_api_key?: string
+  clickup_api_key?: string
   billable_hours_enabled?: boolean
   default_hourly_rate?: number
   weekly_revenue_target?: number

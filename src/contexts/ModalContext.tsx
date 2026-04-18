@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef, useEffect, ReactNode } from 'react'
+import { useState, useCallback, useRef, useEffect, ReactNode } from 'react'
 import { Meeting } from '../types'
 import { useUserContext } from './UserContext'
 import { supabase } from '../lib/supabase'
@@ -7,119 +7,14 @@ import CalendarTaskModal from '../components/CalendarTaskModal'
 import HabitModal from '../components/HabitModal'
 import SessionEditModal from '../components/SessionEditModal'
 import NeedHelpModal from '../components/NeedHelpModal'
-
-interface ModalState {
-  // Meeting Modal
-  showMeetingModal: boolean
-  newMeeting: {
-    title: string
-    description: string
-    start_time: string
-    end_time: string
-    date: string
-    location: string
-    meeting_type: Meeting['meeting_type']
-    priority: Meeting['priority']
-    category_id?: string
-  }
-  selectedTimeSlot: { time: string; date: Date } | null
-  editingMeeting: Meeting | null
-
-  // Habit Modal
-  showHabitModal: boolean
-  selectedHabit: any | null
-  selectedHabitDate: Date | null
-
-  // Task Modal
-  showTaskModal: boolean
-  selectedTask: any | null
-
-  // Session Modal
-  showSessionModal: boolean
-  selectedSession: any | null
-
-  // Resize Conflict Dialog
-  showResizeConflictDialog: boolean
-  resizeConflictingTasks: any[]
-  resizeConflictMeeting: any | null
-  resizeConflictNewEndTime: Date | null
-
-  // Need Help modal — rendered at MainLayout level so it's not trapped in
-  // the calendar header's stacking context.
-  showNeedHelpModal: boolean
-}
-
-// Calendar-specific handlers. The Calendar page registers these on mount via
-// registerModalHandlers so the ModalProvider can live at MainLayout level
-// without depending on calendar-internal state.
-export interface CalendarModalHandlers {
-  onSaveMeeting?: (e: React.FormEvent, meeting: any, editingMeeting?: Meeting) => Promise<void>
-  onDeleteMeeting?: (meeting: Meeting) => Promise<void>
-  onCompleteTask?: (task: any) => Promise<void>
-  onDeleteTask?: (task: any) => Promise<void>
-  onHabitTimeChange?: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
-  onHabitSkip?: (habit: any, date: Date) => Promise<void>
-  onUpdateSession?: (sessionId: string, updates: any) => Promise<void>
-  onTaskLogCreated?: () => void
-  onUpdateMeetingEndTime?: (meetingId: string, newEndTime: string) => Promise<void>
-  onDeleteTaskLog?: (logId: string) => Promise<void>
-  onRemoveTaskLogFromUI?: (logId: string) => void
-  onAddHabitBlock?: (habitId: string, date: string, startTime: string, duration: number) => void
-  onMeetingHabitLinked?: (meetingId: string, habitId: string) => void
-  onAddNote?: () => void
-}
-
-export interface CalendarModalData {
-  meetingTitles?: { title: string; count: number; lastUsed: Date }[]
-  meetingCategories?: { id: string; name: string; color: string }[]
-  habits?: any[]
-}
-
-interface ModalActions {
-  // Meeting actions
-  openMeetingModal: (timeSlot?: { time: string; date: Date; endTime?: string }, editing?: Meeting) => void
-  closeMeetingModal: () => void
-  setNewMeeting: (meeting: any) => void
-  handleSaveMeeting: (e: React.FormEvent, updatedMeeting: ModalState['newMeeting'], editingMeeting?: Meeting) => Promise<void>
-  handleDeleteMeeting: (meeting: Meeting) => Promise<void>
-
-  // Habit actions
-  openHabitModal: (habit: any, date: Date) => void
-  closeHabitModal: () => void
-
-  // Task actions
-  openTaskModal: (task: any) => void
-  closeTaskModal: () => void
-
-  // Session actions
-  openSessionModal: (session: any) => void
-  closeSessionModal: () => void
-
-  // Global close
-  closeAllModals: () => void
-
-  // Resize conflict actions
-  openResizeConflictDialog: (meeting: any, newEndTime: Date, conflictingTasks: any[]) => void
-  closeResizeConflictDialog: () => void
-  confirmResizeConflict: (deleteTasks: boolean) => Promise<void>
-
-  // Cross-modal actions
-  addMeetingFromTask: () => void
-
-  // Need Help
-  openNeedHelpModal: () => void
-  closeNeedHelpModal: () => void
-
-  // Registration hooks used by Calendar
-  registerModalHandlers: (handlers: CalendarModalHandlers) => void
-  setCalendarModalData: (data: CalendarModalData) => void
-}
-
-interface ModalContextType extends ModalState, ModalActions {
-  calendarData: CalendarModalData
-}
-
-const ModalContext = createContext<ModalContextType | undefined>(undefined)
+import CreateHabitModal from '../components/CreateHabitModal'
+import {
+  ModalContext,
+  ModalState,
+  ModalContextType,
+  CalendarModalHandlers,
+  CalendarModalData,
+} from './useModal'
 
 const initialModalState: ModalState = {
   showMeetingModal: false,
@@ -148,6 +43,8 @@ const initialModalState: ModalState = {
   resizeConflictMeeting: null,
   resizeConflictNewEndTime: null,
   showNeedHelpModal: false,
+  showCreateHabitModal: false,
+  createHabitDefaults: null,
 }
 
 export const ModalProvider = ({ children }: { children: ReactNode }) => {
@@ -204,6 +101,8 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
     resizeConflictingTasks: [],
     resizeConflictMeeting: null,
     resizeConflictNewEndTime: null,
+    showCreateHabitModal: false,
+    createHabitDefaults: null,
   }), [])
 
   const registerModalHandlers = useCallback((next: CalendarModalHandlers) => {
@@ -389,24 +288,24 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
     closeResizeConflictDialog()
   }
 
-  const addMeetingFromTask = () => {
-    if (modalState.selectedTask) {
-      const taskDate = new Date(modalState.selectedTask.startTime ? modalState.selectedTask.startTime * 60 * 60 * 1000 : Date.now())
-      const timeSlot = modalState.selectedTask.startTime ?
-        `${Math.floor(modalState.selectedTask.startTime).toString().padStart(2, '0')}:${((modalState.selectedTask.startTime % 1) * 60).toString().padStart(2, '0')}` :
-        '09:00'
-
-      closeTaskModal()
-      openMeetingModal({ time: timeSlot, date: taskDate })
-    }
-  }
-
   const openNeedHelpModal = () => {
     setModalState(prev => ({ ...prev, showNeedHelpModal: true }))
   }
 
   const closeNeedHelpModal = () => {
     setModalState(prev => ({ ...prev, showNeedHelpModal: false }))
+  }
+
+  const openCreateHabitModal = (defaults?: { time?: string; duration?: number; weeklyDays?: string[] }) => {
+    setModalState(prev => ({
+      ...getClosedModalState(prev),
+      showCreateHabitModal: true,
+      createHabitDefaults: defaults ?? null,
+    }))
+  }
+
+  const closeCreateHabitModal = () => {
+    setModalState(prev => ({ ...prev, showCreateHabitModal: false, createHabitDefaults: null }))
   }
 
   const value: ModalContextType = {
@@ -435,9 +334,10 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
     openResizeConflictDialog,
     closeResizeConflictDialog,
     confirmResizeConflict,
-    addMeetingFromTask,
     openNeedHelpModal,
     closeNeedHelpModal,
+    openCreateHabitModal,
+    closeCreateHabitModal,
     registerModalHandlers,
     setCalendarModalData,
   }
@@ -448,9 +348,22 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
         onAddHabitBlock={handlers.onAddHabitBlock}
         onMeetingHabitLinked={handlers.onMeetingHabitLinked}
         onAddNote={handlers.onAddNote}
+        onCreateHabit={defaults => openCreateHabitModal(defaults)}
         previousTitles={calendarData.meetingTitles}
         categories={calendarData.meetingCategories}
         calendarHabits={calendarData.habits}
+      />
+      <CreateHabitModal
+        isOpen={modalState.showCreateHabitModal}
+        onClose={closeCreateHabitModal}
+        defaultTime={modalState.createHabitDefaults?.time}
+        defaultDuration={modalState.createHabitDefaults?.duration}
+        defaultWeeklyDays={modalState.createHabitDefaults?.weeklyDays}
+        onCreateHabit={async habitData => {
+          if (handlersRef.current.onCreateHabit) {
+            await handlersRef.current.onCreateHabit(habitData)
+          }
+        }}
       />
       <CalendarTaskModal
         isOpen={modalState.showTaskModal}
@@ -458,7 +371,6 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
         task={modalState.selectedTask}
         onComplete={async () => { await handlersRef.current.onCompleteTask?.(modalState.selectedTask); closeTaskModal(); }}
         onDelete={async () => { await handlersRef.current.onDeleteTask?.(modalState.selectedTask); closeTaskModal(); }}
-        onAddMeeting={() => addMeetingFromTask()}
       />
       <HabitModal
         onTimeChange={handlers.onHabitTimeChange ?? (async () => {})}
@@ -515,29 +427,4 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </ModalContext.Provider>
   )
-}
-
-export const useModal = () => {
-  const context = useContext(ModalContext)
-  if (context === undefined) {
-    throw new Error('useModal must be used within a ModalProvider')
-  }
-  return context
-}
-
-/**
- * Calendar page calls this on mount to wire its handlers + data into the
- * site-wide ModalProvider. Passing new objects re-registers automatically.
- */
-export const useRegisterCalendarModal = (
-  handlers: CalendarModalHandlers,
-  data: CalendarModalData
-) => {
-  const { registerModalHandlers, setCalendarModalData } = useModal()
-  useEffect(() => {
-    registerModalHandlers(handlers)
-  }, [handlers, registerModalHandlers])
-  useEffect(() => {
-    setCalendarModalData(data)
-  }, [data, setCalendarModalData])
 }

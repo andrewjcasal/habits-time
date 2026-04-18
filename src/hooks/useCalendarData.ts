@@ -13,20 +13,24 @@ import { BufferBlock } from '../types'
 import { startOfWeek } from 'date-fns'
 import { calculateCategoryBufferBlocks } from '../utils/categoryBufferCalculation'
 import { syncTodoistTasks } from '../utils/todoistSync'
-
-// Hours 0-4 on the grid belong to the previous day's column
-function getColumnDate(dateStr: string, hour: number): string {
-  if (hour >= 0 && hour < 5) {
-    const d = new Date(dateStr + 'T12:00:00')
-    d.setDate(d.getDate() - 1)
-    return format(d, 'yyyy-MM-dd')
-  }
-  return dateStr
-}
+import { syncClickUpTasks } from '../utils/clickupSync'
+import { resolveHabitPlacements } from '../utils/habitPlacement'
+import {
+  GRID_START_HOUR,
+  GRID_LAST_HOUR,
+  GRID_START_CLOCK,
+  GRID_START_MINUTES,
+  isLateNightHour,
+  hourToGridIndex,
+  getColumnDate,
+} from '../utils/calendarGrid'
 
 // Todoist tasks are scheduled in personal hours, separate from work tasks
 const TODOIST_WEEKDAY_HOURS = { start: 19, end: 23 }
-const TODOIST_WEEKEND_HOURS = { start: 10, end: 22 }
+const TODOIST_WEEKEND_HOURS = { start: 10, end: 23 }
+
+// ClickUp tasks = work tasks; weekdays only (skip Sat/Sun entirely).
+const CLICKUP_WORK_HOURS = { start: 11, end: 18 }
 
 export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()) => {
   const { user, loading: userLoading } = useUserContext()
@@ -244,23 +248,17 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   }
 
   const getHourSlots = () => {
+    // Render one row per hour starting at GRID_START_HOUR, wrapping past
+    // midnight through GRID_START_HOUR - 1 of the next day.
     const hours = []
-    // Go from 6am to 4am next day (22 hours total)
-    // 6am-11pm (6-23), then 12am-4am (0-4)
-    for (let i = 6; i <= 23; i++) {
-      const hour12 = i > 12 ? i - 12 : i === 0 ? 12 : i
-      const ampm = i >= 12 ? 'PM' : 'AM'
-      const hourStr = hour12.toString() + ':00 ' + ampm
-      const timeValue = i.toString().padStart(2, '0') + ':00'
-      hours.push({ display: hourStr, time: timeValue })
-    }
-    // Add 12am-4am (0-4)
-    for (let i = 0; i <= 4; i++) {
-      const hour12 = i === 0 ? 12 : i
-      const ampm = 'AM'
-      const hourStr = hour12.toString() + ':00 ' + ampm
-      const timeValue = i.toString().padStart(2, '0') + ':00'
-      hours.push({ display: hourStr, time: timeValue })
+    for (let step = 0; step < 24; step++) {
+      const h = (GRID_START_HOUR + step) % 24
+      const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+      const ampm = h >= 12 ? 'PM' : 'AM'
+      hours.push({
+        display: `${hour12}:00 ${ampm}`,
+        time: `${h.toString().padStart(2, '0')}:00`,
+      })
     }
     return hours
   }
@@ -268,30 +266,23 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
   const getCurrentTimeLinePosition = (date: Date) => {
     const currentHour = currentTime.getHours()
     const currentMinute = currentTime.getMinutes()
-
-    // Grid layout: 6am-11pm (hours 6-23), then 12am-4am (hours 0-4)
-    // Hours 0-4 visually belong to the PREVIOUS day's column
-    const isLateNight = currentHour >= 0 && currentHour < 5
+    const isLateNight = isLateNightHour(currentHour)
     const todayStr = format(currentTime, 'yyyy-MM-dd')
     const dateStr = format(date, 'yyyy-MM-dd')
 
+    // Late-night hours belong to the previous day's visual column.
     if (isLateNight) {
-      // At 12:15am Mar 27, the line should show in the Mar 26 column
       const yesterday = new Date(currentTime)
       yesterday.setDate(yesterday.getDate() - 1)
       const yesterdayStr = format(yesterday, 'yyyy-MM-dd')
       if (dateStr !== yesterdayStr) return null
     } else {
       if (dateStr !== todayStr) return null
-      if (currentHour < 6) return null // 5am gap — not on grid
     }
 
-    // Calculate position: hours 6-23 = index 0-17, hours 0-4 = index 18-22
-    const hourIndex = isLateNight ? (currentHour + 18) : (currentHour - 6)
+    const hourIndex = hourToGridIndex(currentHour)
     const minutePercentage = currentMinute / 60
-    const totalPosition = (hourIndex + minutePercentage) * 64
-
-    return totalPosition
+    return (hourIndex + minutePercentage) * 64
   }
 
   // Meeting management functions
@@ -420,7 +411,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     scheduledTasksCache.forEach((chunks, dateKey) => {
       chunks.forEach(chunk => {
         const hour = chunk.startTime ? Math.floor(chunk.startTime) : chunk.startHour
-        if (hour === 5) return
         const key = `${dateKey}-${hour}`
         const arr = index.get(key) || []
         arr.push(chunk)
@@ -448,24 +438,23 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       const endTotalMin = startTotalMin + durationHours * 60
 
       // Index at the start hour (primary entry)
-      if (startHour !== 5) {
-        const key = `${getColumnDate(startDateStr, startHour)}-${startHour}`
-        const arr = index.get(key) || []
-        arr.push(meeting)
-        index.set(key, arr)
-      }
+      const key = `${getColumnDate(startDateStr, startHour)}-${startHour}`
+      const arr = index.get(key) || []
+      arr.push(meeting)
+      index.set(key, arr)
 
-      // Check if meeting crosses the 5am gap (late-night → morning = column split)
-      // Late night hours 0-4 are on prev day's column, hours 6+ are on the actual date's column
-      if (startHour >= 0 && startHour < 5 && endTotalMin > 360) {
-        // Meeting starts in late-night (prev day column) and extends past 6am (current day column)
-        // Add a clipped entry at hour 6 on the current day's column
+      // Check if the meeting crosses the column split.
+      // Late-night hours sit on the previous day's column; GRID_START_HOUR
+      // onward is on the current day's column. A late-night meeting
+      // extending past the split needs a clipped entry anchored at the
+      // grid start in the current day's column.
+      if (isLateNightHour(startHour) && endTotalMin > GRID_START_MINUTES) {
         const clippedMeeting = {
           ...meeting,
-          _clippedStart: '06:00:00',
+          _clippedStart: GRID_START_CLOCK,
           _originalStart: meeting.start_time,
         }
-        const morningKey = `${startDateStr}-6`
+        const morningKey = `${startDateStr}-${GRID_START_HOUR}`
         const morningArr = index.get(morningKey) || []
         morningArr.push(clippedMeeting)
         index.set(morningKey, morningArr)
@@ -484,184 +473,33 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     return meetingsIndex.get(key) || EMPTY
   }
 
-  // Get habits for a specific time slot
+  // Resolve every habit occurrence's effective time window once, using the
+  // shared placement algorithm. The render path indexes the results
+  // per-hour-slot; the task-scheduler conflict map reads the same list so
+  // both sides agree on where habits actually live on the calendar.
+  const habitPlacements = useMemo(
+    () => resolveHabitPlacements(habits, meetings, sessions, dayColumns),
+    [habits, meetings, sessions, dayColumns]
+  )
+
   const habitsIndex = useMemo(() => {
     const index = new Map<string, any[]>()
-    // Track placements per date so habits that overlap each other can be
-    // "bumped up" (shifted earlier) to end just before the already-placed
-    // habit they conflict with.
-    const placedHabitsByDate = new Map<string, Array<{ start: number; end: number }>>()
-    // Pre-index meetings and sessions by date for O(1) conflict lookups
-    const meetingsByDate = new Map<string, any[]>()
-    meetings.forEach(m => {
-      const start = new Date(m.start_time)
-      const key = format(start, 'yyyy-MM-dd')
-      const arr = meetingsByDate.get(key) || []
-      arr.push(m)
-      meetingsByDate.set(key, arr)
-    })
-    const sessionsByDate = new Map<string, any[]>()
-    sessions.forEach(s => {
-      const arr = sessionsByDate.get(s.scheduled_date) || []
-      arr.push(s)
-      sessionsByDate.set(s.scheduled_date, arr)
-    })
-    const workHours = getWorkHoursRange()
-
-    // Sort so the longer habit at a given start time wins its natural slot
-    // and shorter habits get pushed to start 15 min after it ends. Primary:
-    // earliest start first. Secondary (same start): longest first.
-    const habitStartMinutes = (h: any): number => {
-      const t = h.current_start_time
-      if (!t) return Number.POSITIVE_INFINITY
-      const [hh, mm] = t.split(':').map(Number)
-      return hh * 60 + (mm || 0)
-    }
-    const orderedHabits = [...habits].sort((a, b) => {
-      const diff = habitStartMinutes(a) - habitStartMinutes(b)
-      if (diff !== 0) return diff
-      return (b.duration || 0) - (a.duration || 0)
-    })
-
-    for (const habit of orderedHabits) {
-      if (habit.habits_types?.scheduling_rule === 'non_calendar') continue
-
-      for (const col of dayColumns) {
-        const dateKey = col.dateStr
-        if (habit.created_at) {
-          const creationDate = new Date(habit.created_at).toLocaleDateString('en-CA')
-          if (dateKey < creationDate) continue
-        }
-
-        // Weekly habits: only show on configured days, unless an explicit
-        // (non-skipped) daily log overrides the pattern for that date
-        if (habit.weekly_days && habit.weekly_days.length > 0) {
-          const dayName = col.date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
-          const matchesPattern = habit.weekly_days.includes(dayName)
-          const hasOverrideLog = (habit.habits_daily_logs || []).some(
-            (log: any) => log.log_date === dateKey && !log.is_skipped
-          )
-          if (!matchesPattern && !hasOverrideLog) continue
-        }
-
-        // Get all daily logs for this date (supports multiple blocks per day)
-        const dailyLogs = (habit.habits_daily_logs || []).filter((log: any) => log.log_date === dateKey)
-
-        // If only skipped logs exist and no unskipped blocks, skip the habit for this day
-        const unskippedLogs = dailyLogs.filter((log: any) => !log.is_skipped)
-        const hasSkippedLog = dailyLogs.some((log: any) => log.is_skipped)
-
-        if (hasSkippedLog && unskippedLogs.length === 0) continue
-
-        // If there are specific blocks, render each one
-        const logsToRender = unskippedLogs.length > 0 ? unskippedLogs : [null]
-
-        for (const dailyLog of logsToRender) {
-        const effectiveStartTime = getEffectiveHabitStartTime(habit, dateKey, dailyLog)
-        const effectiveDuration = dailyLog?.duration || habit.duration || 0
-        if (!effectiveStartTime) continue
-
-        const habitStartHour = parseInt(effectiveStartTime.split(':')[0])
-        const habitStartMinute = parseInt(effectiveStartTime.split(':')[1])
-        if (habitStartHour === 5) continue
-
-        const habitStartInHours = habitStartHour + habitStartMinute / 60
-        const habitEndInHours = habitStartInHours + effectiveDuration / 60
-
-        // Check meeting conflicts (O(1) date lookup, then small array scan)
-        const dateMeetings = meetingsByDate.get(dateKey) || []
-        const conflictingMeeting = dateMeetings.find(meeting => {
-          const meetingStart = new Date(meeting.start_time)
-          const meetingEnd = new Date(meeting.end_time)
-          const meetingStartH = meetingStart.getHours() + meetingStart.getMinutes() / 60
-          const meetingEndH = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
-          return habitStartInHours < meetingEndH && habitEndInHours > meetingStartH
-        })
-
-        // Check session conflicts
-        const dateSessions = sessionsByDate.get(dateKey) || []
-        const conflictingSession = !conflictingMeeting ? dateSessions.find(session => {
-          const defaultStart = `${workHours.start.toString().padStart(2, '0')}:00`
-          const sTime = session.actual_start_time || defaultStart
-          const sH = parseInt(sTime.split(':')[0])
-          const sM = parseInt(sTime.split(':')[1])
-          const sStartH = sH + sM / 60
-          const sEndH = sStartH + ((session.scheduled_hours || 1) * 60) / 60
-          return habitStartInHours < sEndH && habitEndInHours > sStartH
-        }) : null
-
-        // Determine final hour and position
-        let finalHour: number
-        let topPosition: number
-        let isRescheduled = false
-
-        if (conflictingMeeting) {
-          const meetingEnd = new Date(conflictingMeeting.end_time)
-          const endMin = meetingEnd.getMinutes()
-          finalHour = meetingEnd.getHours() + (endMin > 30 ? 1 : 0)
-          const newStartMinute = endMin === 0 ? 0 : endMin <= 30 ? 30 : 0
-          topPosition = (newStartMinute / 60) * 100
-          isRescheduled = true
-        } else if (conflictingSession) {
-          const sTime = conflictingSession.actual_start_time!
-          const sH = parseInt(sTime.split(':')[0])
-          const sM = parseInt(sTime.split(':')[1])
-          const sDur = (conflictingSession.scheduled_hours || 1) * 60
-          const sEndM = sM + sDur
-          const sEndHour = sH + Math.floor(sEndM / 60)
-          const finalEndMin = sEndM % 60
-          finalHour = sEndHour + (finalEndMin > 30 ? 1 : 0)
-          const newStartMinute = finalEndMin === 0 ? 0 : finalEndMin <= 30 ? 30 : 0
-          topPosition = (newStartMinute / 60) * 100
-          isRescheduled = true
-        } else {
-          finalHour = habitStartHour
-          topPosition = (habitStartMinute / 60) * 100
-        }
-
-        // Habit-vs-habit conflict resolution: push DOWN so the current
-        // habit starts 15 minutes after the latest already-placed habit it
-        // overlaps. Re-check after each shift in case the new slot still
-        // collides (or collides with a different placed habit); cap
-        // iterations defensively.
-        const CONFLICT_BUFFER_HOURS = 0.25 // 15 minutes
-        const GRID_LAST_HOUR = 29 // 5am next day (grid spans 6am → 5am)
-        let finalStart = finalHour + topPosition / 100
-        let finalEnd = finalStart + effectiveDuration / 60
-        const placed = placedHabitsByDate.get(dateKey) || []
-        for (let guard = 0; guard < 10; guard++) {
-          let latestConflictEnd: number | null = null
-          for (const p of placed) {
-            if (finalStart < p.end && finalEnd > p.start) {
-              if (latestConflictEnd === null || p.end > latestConflictEnd) {
-                latestConflictEnd = p.end
-              }
-            }
-          }
-          if (latestConflictEnd === null) break
-          finalStart = latestConflictEnd + CONFLICT_BUFFER_HOURS
-          finalEnd = finalStart + effectiveDuration / 60
-          if (finalEnd > GRID_LAST_HOUR) {
-            // Nowhere left in the day — accept the overflow rather than
-            // keep pushing past the end of the visible grid.
-            break
-          }
-          isRescheduled = true
-        }
-        finalHour = Math.floor(finalStart)
-        topPosition = (finalStart - finalHour) * 100
-        placed.push({ start: finalStart, end: finalEnd })
-        placedHabitsByDate.set(dateKey, placed)
-
-        const key = `${dateKey}-${finalHour}`
-        const arr = index.get(key) || []
-        arr.push({ ...habit, topPosition, isRescheduled })
-        index.set(key, arr)
-        } // end for dailyLog of logsToRender
-      }
+    // Quick lookup from habit id → source habit row so we can merge the
+    // placement window back onto the full object the UI renders.
+    const byId = new Map<string, any>(habits.map(h => [h.id, h]))
+    for (const p of habitPlacements) {
+      const habit = byId.get(p.habitId)
+      if (!habit) continue
+      if (p.end > GRID_LAST_HOUR && p.start > GRID_LAST_HOUR) continue
+      const finalHour = Math.floor(p.start)
+      const topPosition = (p.start - finalHour) * 100
+      const key = `${p.dateKey}-${finalHour}`
+      const arr = index.get(key) || []
+      arr.push({ ...habit, topPosition, isRescheduled: p.isRescheduled })
+      index.set(key, arr)
     }
     return index
-  }, [habits, meetings, sessions, dayColumns])
+  }, [habitPlacements, habits])
 
   const getHabitsForTimeSlot = (timeSlot: string, date: Date) => {
     const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0])}`
@@ -678,7 +516,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       if (!dateStr) return
       const startTime = session.actual_start_time || defaultStartTime
       const hour = parseInt(startTime.split(':')[0])
-      if (hour === 5) return
       const minutes = parseInt(startTime.split(':')[1])
       const key = `${getColumnDate(dateStr, hour)}-${hour}`
       const arr = index.get(key) || []
@@ -699,7 +536,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       const startTime = log.actual_start_time || log.scheduled_start_time
       if (!startTime) return
       const hour = parseInt(startTime.split(':')[0])
-      if (hour === 5) return
       const minutes = parseInt(startTime.split(':')[1])
       const key = `${getColumnDate(log.log_date, hour)}-${hour}`
       const arr = index.get(key) || []
@@ -720,7 +556,6 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     generatedBuffers.forEach((buffer, dateStr) => {
       if (!buffer || !buffer.isActive) return
       const hour = parseInt(buffer.startTime.split(':')[0])
-      if (hour === 5) return
       const minutes = parseInt(buffer.startTime.split(':')[1])
       const key = `${dateStr}-${hour}`
       index.set(key, [{ ...buffer, topPosition: (minutes / 60) * 100 }])
@@ -823,40 +658,44 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     getMeetingsForTimeSlot,
     getHabitsForTimeSlot,
     getSessionsForTimeSlot,
-    syncTodoist: async () => {
+    syncTodoist: async (options?: { skipApi?: boolean; meetingsOverride?: any[] }) => {
       if (!user) return
+      const skipApi = !!options?.skipApi
+      let todoistApiTasks: any[] = []
 
-      // 1. Call Todoist API
-      const { data: todoistData, error: fnError } = await supabase.functions.invoke('todoist', { body: { action: 'list_all' } })
-      if (fnError || !todoistData?.tasks) return
+      if (!skipApi) {
+        // 1. Call Todoist API
+        const { data: todoistData, error: fnError } = await supabase.functions.invoke('todoist', { body: { action: 'list_all' } })
+        if (fnError || !todoistData?.tasks) return
 
-      const todoistApiTasks = todoistData.tasks
+        todoistApiTasks = todoistData.tasks
 
-      // 2. Remove excluded tasks from DB (hold_off + habit-imported labels)
-      const habitImportedLabels = habits
-        .flatMap((h: any) => h.todoist_filter_labels || [])
-      const excludedLabels = new Set(['hold_off', ...habitImportedLabels])
+        // 2. Remove excluded tasks from DB (hold_off + habit-imported labels)
+        const habitImportedLabels = habits
+          .flatMap((h: any) => h.todoist_filter_labels || [])
+        const excludedLabels = new Set(['hold_off', ...habitImportedLabels])
 
-      const excludedTaskIds = todoistApiTasks
-        .filter((t: any) => t.labels?.some((l: string) => excludedLabels.has(l)))
-        .map((t: any) => t.id)
+        const excludedTaskIds = todoistApiTasks
+          .filter((t: any) => t.labels?.some((l: string) => excludedLabels.has(l)))
+          .map((t: any) => t.id)
 
-      if (excludedTaskIds.length > 0) {
-        const { data: excludedDbTasks } = await supabase
-          .from('cassian_tasks')
-          .select('id')
-          .in('todoist_task_id', excludedTaskIds)
+        if (excludedTaskIds.length > 0) {
+          const { data: excludedDbTasks } = await supabase
+            .from('cassian_tasks')
+            .select('id')
+            .in('todoist_task_id', excludedTaskIds)
 
-        if (excludedDbTasks && excludedDbTasks.length > 0) {
-          const dbIds = excludedDbTasks.map((t: any) => t.id)
-          await supabase.from('cassian_tasks_daily_logs').delete().in('task_id', dbIds)
-          await supabase.from('cassian_tasks').delete().in('id', dbIds)
+          if (excludedDbTasks && excludedDbTasks.length > 0) {
+            const dbIds = excludedDbTasks.map((t: any) => t.id)
+            await supabase.from('cassian_tasks_daily_logs').delete().in('task_id', dbIds)
+            await supabase.from('cassian_tasks').delete().in('id', dbIds)
+          }
         }
+        const tasksForScheduling = todoistApiTasks.filter(
+          (t: any) => !t.labels?.some((l: string) => excludedLabels.has(l))
+        )
+        await syncTodoistTasks(tasksForScheduling, user.id)
       }
-      const tasksForScheduling = todoistApiTasks.filter(
-        (t: any) => !t.labels?.some((l: string) => excludedLabels.has(l))
-      )
-      await syncTodoistTasks(tasksForScheduling, user.id)
 
       // 4. Fetch all active todoist tasks from DB
       const { data: todoistDbTasks } = await supabase
@@ -896,11 +735,24 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
       // 7. Schedule in priority order with date pinning
       const futureDayColumns = dayColumns.filter((col: any) => col.dateStr >= todayStr)
-      // Filter out deleted todoist daily logs from conflict maps (we just wiped them)
-      const nonTodoistDailyLogs = tasksDailyLogs.filter(
+
+      // Fetch daily logs fresh from the DB rather than trusting the in-memory
+      // state — callers may have deleted a just-completed task's logs right
+      // before calling syncTodoist, and React hasn't flushed the state update
+      // yet. A stale log would phantom-block the freed slot.
+      const { data: freshLogs } = await supabase
+        .from('cassian_tasks_daily_logs')
+        .select('*, tasks:cassian_tasks(*, projects:cassian_projects(*))')
+        .eq('user_id', user.id)
+      const nonTodoistDailyLogs = (freshLogs || []).filter(
         (log: any) => !todoistDbIds.includes(log.task_id)
       )
-      const todoistConflictMaps = computeConflictMaps(habits, sessions, meetings, futureDayColumns, nonTodoistDailyLogs)
+      // Use caller-supplied meetings if provided — e.g. a just-resized
+      // meeting whose new end_time hasn't flushed into our `meetings`
+      // state yet. Saves a round-trip when the caller already knows the
+      // updated row locally.
+      const meetingsForConflicts = options?.meetingsOverride ?? meetings
+      const todoistConflictMaps = computeConflictMaps(habits, sessions, meetingsForConflicts, futureDayColumns, nonTodoistDailyLogs)
       const weekendDayNames = settings?.weekend_days || ['saturday', 'sunday']
 
       const getTodoistHoursForDate = (date?: Date) => {
@@ -975,6 +827,134 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       })
 
       // 9. Re-fetch daily logs to update UI
+      const { data: refreshedLogs } = await supabase
+        .from('cassian_tasks_daily_logs')
+        .select('*, tasks:cassian_tasks(*, projects:cassian_projects(*))')
+        .eq('user_id', user.id)
+
+      if (refreshedLogs) {
+        setTasksDailyLogs(refreshedLogs)
+      }
+    },
+    syncClickUp: async (options?: { skipApi?: boolean; meetingsOverride?: any[] }) => {
+      if (!user) return
+      const skipApi = !!options?.skipApi
+
+      if (!skipApi) {
+        // 1. Pull all open tasks assigned to the current user from ClickUp.
+        const { data: clickupData, error: fnError } = await supabase.functions.invoke('clickup', {
+          body: { action: 'list_all' },
+        })
+        if (fnError || !clickupData?.tasks) return
+
+        const clickupApiTasks = clickupData.tasks as any[]
+
+        // 2. Reconcile into cassian_tasks (insert/update/close).
+        await syncClickUpTasks(clickupApiTasks, user.id)
+      }
+
+      // 3. Fetch all active clickup tasks from DB.
+      const { data: clickupDbTasks } = await supabase
+        .from('cassian_tasks')
+        .select('*')
+        .eq('source', 'clickup')
+        .eq('user_id', user.id)
+        .eq('is_complete', false)
+
+      if (!clickupDbTasks || clickupDbTasks.length === 0) return
+
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
+      const clickupDbIds = clickupDbTasks.map((t: any) => t.id)
+
+      // 4. Clear future clickup daily logs — we'll regenerate them below.
+      await supabase
+        .from('cassian_tasks_daily_logs')
+        .delete()
+        .in('task_id', clickupDbIds)
+        .gte('log_date', todayStr)
+
+      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
+      const byPriority = (a: any, b: any) =>
+        (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2)
+
+      // 5. Weekday-only columns from today forward.
+      const weekendDayNames = settings?.weekend_days || ['saturday', 'sunday']
+      const isWeekday = (date: Date) => {
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+        return !weekendDayNames.includes(dayName)
+      }
+      const futureWorkdayColumns = dayColumns.filter(
+        (col: any) => col.dateStr >= todayStr && isWeekday(col.date)
+      )
+
+      // Pull daily logs fresh from the DB — callers may have deleted a
+      // just-completed task's logs immediately before invoking this
+      // function and React hasn't flushed the state update yet.
+      const { data: freshLogs } = await supabase
+        .from('cassian_tasks_daily_logs')
+        .select('*, tasks:cassian_tasks(*, projects:cassian_projects(*))')
+        .eq('user_id', user.id)
+      const nonAutoDailyLogs = (freshLogs || []).filter(
+        (log: any) => !clickupDbIds.includes(log.task_id)
+      )
+      const meetingsForConflicts = options?.meetingsOverride ?? meetings
+      const clickupConflictMaps = computeConflictMaps(
+        habits, sessions, meetingsForConflicts, futureWorkdayColumns, nonAutoDailyLogs
+      )
+
+      const getClickUpHours = () => CLICKUP_WORK_HOURS
+
+      const overdueOrToday = clickupDbTasks
+        .filter((t: any) => t.due_date && t.due_date <= todayStr)
+        .sort(byPriority)
+      const restTasks = clickupDbTasks
+        .filter((t: any) => !(t.due_date && t.due_date <= todayStr) && !t.due_date)
+        .sort(byPriority)
+
+      const scheduledTaskIds = new Set<string>()
+      const combinedResult = new Map<string, any[]>()
+
+      for (const dayCol of futureWorkdayColumns) {
+        const datedForThisDay = clickupDbTasks
+          .filter((t: any) => t.due_date && t.due_date > todayStr && t.due_date === dayCol.dateStr)
+          .sort(byPriority)
+
+        const dayTasks = [
+          ...overdueOrToday.filter(t => !scheduledTaskIds.has(t.id)),
+          ...datedForThisDay.filter(t => !scheduledTaskIds.has(t.id)),
+          ...restTasks.filter(t => !scheduledTaskIds.has(t.id)),
+        ]
+        if (dayTasks.length === 0) continue
+
+        const dayResult = await scheduleAllTasks(
+          dayTasks, clickupConflictMaps, [dayCol], getClickUpHours,
+          scheduleTaskInAvailableSlots, saveTaskChunks,
+          user.id, nonAutoDailyLogs, [], null, dayTasks, new Map()
+        )
+
+        dayResult.forEach((tasks, dateKey) => {
+          tasks.forEach((t: any) => {
+            const taskId = t.id?.split('-chunk-')[0]
+            if (taskId) scheduledTaskIds.add(taskId)
+          })
+          const existing = combinedResult.get(dateKey) || []
+          combinedResult.set(dateKey, [...existing, ...tasks])
+        })
+      }
+
+      // 6. Update UI cache.
+      setScheduledTasksCache(prev => {
+        const merged = new Map(prev)
+        combinedResult.forEach((tasks, dateKey) => {
+          const existing = merged.get(dateKey) || []
+          const existingIds = new Set(existing.map((t: any) => t.id))
+          const newTasks = tasks.filter((t: any) => !existingIds.has(t.id))
+          if (newTasks.length > 0) merged.set(dateKey, [...existing, ...newTasks])
+        })
+        return merged
+      })
+
+      // 7. Refresh task logs for render.
       const { data: refreshedLogs } = await supabase
         .from('cassian_tasks_daily_logs')
         .select('*, tasks:cassian_tasks(*, projects:cassian_projects(*))')
@@ -1084,5 +1064,13 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     setAllTasks,
     setScheduledTasksCache,
     setTasksScheduled,
+    // Push a newly-created habit (returned from the insert) into local state
+    // so the calendar renders it without a refetch.
+    addHabit: (habit: any) => {
+      setHabits(prev => [
+        ...prev,
+        { ...habit, habits_daily_logs: [], subhabits: [], habit_todoist_tasks: [] },
+      ])
+    },
   }
 }

@@ -4,8 +4,9 @@ import { useEffect, useState, useMemo } from 'react'
 import { Meeting } from '../types'
 import { supabase } from '../lib/supabase'
 import ModalWrapper from './ModalWrapper'
-import { useModal } from '../contexts/ModalContext'
+import { useModal } from '../contexts/useModal'
 import { useUserContext } from '../contexts/UserContext'
+import { toHHMM, minutesBetween } from '../utils/formatTime'
 
 interface Category {
   id: string
@@ -17,12 +18,13 @@ interface MeetingModalProps {
   onAddHabitBlock?: (habitId: string, date: string, startTime: string, duration: number) => void
   onMeetingHabitLinked?: (meetingId: string, habitId: string) => void
   onAddNote?: () => void
+  onCreateHabit?: (defaults?: { time?: string; duration?: number; weeklyDays?: string[] }) => void
   previousTitles?: { title: string; count: number; lastUsed: Date }[]
   categories?: Category[]
   calendarHabits?: any[]
 }
 
-const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previousTitles = [], categories = [], calendarHabits = [] }: MeetingModalProps) => {
+const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, onCreateHabit, previousTitles = [], categories = [], calendarHabits = [] }: MeetingModalProps) => {
   const {
     showMeetingModal,
     newMeeting: meeting,
@@ -111,7 +113,12 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previo
     if (!user || !selectedTimeSlot) return
     const dateStr = format(selectedTimeSlot.date, 'yyyy-MM-dd')
     const startTime = `${selectedTimeSlot.time}:00`
-    const durationMin = habit.duration || 15
+
+    // Prefer the dragged range (meeting.start_time → meeting.end_time) for
+    // duration so a 9:30–10:00 drag creates a 30-min block instead of the
+    // habit's full default duration. Fall back to habit.duration.
+    const draggedMin = minutesBetween(meeting.start_time, meeting.end_time)
+    const durationMin = draggedMin ?? habit.duration ?? 15
 
     // Delete skipped log for this habit+date (if any)
     await supabase
@@ -405,7 +412,7 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previo
                       setNewMeeting(updatedMeeting)
                       handleSaveMeeting(new Event('submit') as any, updatedMeeting)
                     }}
-                    className="px-3 py-1.5 rounded-full text-xs border bg-neutral-50 border-neutral-200 text-neutral-700 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors"
+                    className="px-2 py-0.5 rounded-full text-xs border bg-neutral-50 border-neutral-200 text-neutral-700 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors"
                   >
                     {titleData.title.length > 25 ? titleData.title.slice(0, 25) + '…' : titleData.title}
                   </button>
@@ -431,6 +438,34 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previo
                     + Add note
                   </button>
                 )}
+                {onCreateHabit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Pre-populate the Create Habit modal with the clicked
+                      // slot's start time and duration.
+                      const startHHMM = toHHMM(meeting.start_time)
+                      const durationMin = minutesBetween(meeting.start_time, meeting.end_time)
+                      // Derive the weekday for the clicked date so the habit
+                      // starts as weekly-on-that-day. User can toggle others.
+                      let weeklyDays: string[] | undefined
+                      if (meeting.date) {
+                        const [y, m, d] = meeting.date.split('-').map(Number)
+                        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                          const dayName = new Date(y, m - 1, d)
+                            .toLocaleDateString('en-US', { weekday: 'long' })
+                            .toLowerCase()
+                          weeklyDays = [dayName]
+                        }
+                      }
+                      closeMeetingModal()
+                      onCreateHabit({ time: startHHMM || undefined, duration: durationMin, weeklyDays })
+                    }}
+                    className="text-xs text-primary-600 hover:text-primary-800"
+                  >
+                    + Create habit
+                  </button>
+                )}
               </div>
               {skippedHabits.length > 0 && (
                 <div className="pt-2 border-t border-neutral-100">
@@ -441,7 +476,7 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previo
                         key={habit.id}
                         type="button"
                         onClick={() => handleAddHabitBlock(habit)}
-                        className="px-3 py-1.5 rounded-full text-xs border bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                        className="px-2 py-0.5 rounded-full text-xs border bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors"
                       >
                         {habit.name}
                       </button>

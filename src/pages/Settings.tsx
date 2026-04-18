@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, Save, RotateCcw, Calendar, DollarSign, Tag, Target, CheckSquare, Sparkles, Layers } from 'lucide-react'
+import { Clock, Save, RotateCcw, Calendar, DollarSign, Tag, Target, CheckSquare, Sparkles, Layers, Briefcase } from 'lucide-react'
 import { useSettings } from '../hooks/useSettings'
 
 interface SettingsSectionProps {
@@ -66,6 +66,7 @@ const Settings = () => {
   const [defaultHourlyRate, setDefaultHourlyRate] = useState('65.00')
   const [weeklyRevenueTarget, setWeeklyRevenueTarget] = useState('1000.00')
   const [showWorkHoursBar, setShowWorkHoursBar] = useState(true)
+  const [clickupApiKey, setClickupApiKey] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
 
@@ -84,6 +85,7 @@ const Settings = () => {
         billable_hours_enabled: billableHoursEnabled,
         default_hourly_rate: parseFloat(defaultHourlyRate) || 65.00,
         weekly_revenue_target: parseFloat(weeklyRevenueTarget) || 1000.00,
+        clickup_api_key: clickupApiKey.trim() || null,
         metadata: { showWorkHoursBar },
       })
 
@@ -124,6 +126,7 @@ const Settings = () => {
       setDefaultHourlyRate((settings.default_hourly_rate || 65.00).toString())
       setWeeklyRevenueTarget((settings.weekly_revenue_target || 1000.00).toString())
       setShowWorkHoursBar(settings.metadata?.showWorkHoursBar ?? true)
+      setClickupApiKey(settings.clickup_api_key || '')
     }
   }, [settings])
 
@@ -365,6 +368,20 @@ const Settings = () => {
                     </div>
                   )}
                 </div>
+              </SettingsSection>
+
+              <SettingsSection
+                icon={Briefcase}
+                title="ClickUp"
+                description="Personal API token for ClickUp. Work tasks assigned to you are auto-scheduled on weekdays 11am–6pm. Get a token from your ClickUp account settings → Apps → API Token."
+              >
+                <SettingsInput
+                  label="API Token"
+                  type="password"
+                  value={clickupApiKey}
+                  onChange={setClickupApiKey}
+                  placeholder="pk_…"
+                />
               </SettingsSection>
 
               {/* Save Actions */}

@@ -3,9 +3,9 @@ import { format } from 'date-fns'
 import { Play, Pause, SkipForward, Check, Pencil } from 'lucide-react'
 import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
 import { formatTimeOfDay } from '../utils/formatTime'
-import { supabase } from '../lib/supabase'
 import ModalWrapper from './ModalWrapper'
-import { useModal } from '../contexts/ModalContext'
+import { useModal } from '../contexts/useModal'
+import { supabase } from '../lib/supabase'
 
 interface HabitModalProps {
   onTimeChange: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
@@ -16,6 +16,7 @@ interface Subhabit {
   id: string
   title: string
   duration_minutes: number | null
+  habits_daily_logs?: any[]
 }
 
 const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
@@ -68,6 +69,9 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
   const [totalSeconds, setTotalSeconds] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [completedIndices, setCompletedIndices] = useState<Set<number>>(new Set())
+  // Subhabit completions persisted to cassian_habits_daily_logs for the
+  // selected date. Keyed by subhabit (child habit) id.
+  const [completedSubhabitIds, setCompletedSubhabitIds] = useState<Set<string>>(new Set())
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -89,6 +93,93 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [])
+
+  // Derive today's completed-state for each subhabit from the daily logs that
+  // are already embedded on each subhabit (fetched by useCalendarData), no
+  // extra network round-trip needed.
+  useEffect(() => {
+    if (!selectedDate || subhabits.length === 0) {
+      setCompletedSubhabitIds(new Set())
+      return
+    }
+    const dateKey = format(selectedDate, 'yyyy-MM-dd')
+    const done = new Set<string>()
+    for (const s of subhabits) {
+      const completedToday = (s.habits_daily_logs || []).some(
+        (l: any) => l.log_date === dateKey && l.is_completed === true
+      )
+      if (completedToday) done.add(s.id)
+    }
+    setCompletedSubhabitIds(done)
+  }, [selectedDate, subhabits])
+
+  const toggleSubhabitComplete = async (subhabitId: string) => {
+    if (!selectedDate || !habit) return
+    const dateKey = format(selectedDate, 'yyyy-MM-dd')
+    const nowCompleted = !completedSubhabitIds.has(subhabitId)
+
+    // Optimistic UI update.
+    setCompletedSubhabitIds(prev => {
+      const next = new Set(prev)
+      if (nowCompleted) next.add(subhabitId)
+      else next.delete(subhabitId)
+      return next
+    })
+
+    // Keep the subhabit's embedded habits_daily_logs array in sync so the
+    // derivation useEffect doesn't snap back to the stale embed if it re-runs.
+    const sub = subhabits.find(s => s.id === subhabitId)
+    if (sub) {
+      const logs = sub.habits_daily_logs || []
+      const existingIdx = logs.findIndex((l: any) => l.log_date === dateKey)
+      if (existingIdx >= 0) {
+        logs[existingIdx] = { ...logs[existingIdx], is_completed: nowCompleted }
+      } else if (nowCompleted) {
+        logs.push({ habit_id: subhabitId, log_date: dateKey, is_completed: true })
+      }
+      sub.habits_daily_logs = logs
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Find an existing log for this subhabit+date (any scheduled_start_time).
+      const { data: existing } = await supabase
+        .from('cassian_habits_daily_logs')
+        .select('id')
+        .eq('habit_id', subhabitId)
+        .eq('user_id', user.id)
+        .eq('log_date', dateKey)
+        .limit(1)
+        .maybeSingle()
+
+      if (existing?.id) {
+        await supabase
+          .from('cassian_habits_daily_logs')
+          .update({ is_completed: nowCompleted })
+          .eq('id', existing.id)
+      } else if (nowCompleted) {
+        await supabase
+          .from('cassian_habits_daily_logs')
+          .insert({
+            habit_id: subhabitId,
+            user_id: user.id,
+            log_date: dateKey,
+            is_completed: true,
+          })
+      }
+    } catch (err) {
+      console.error('Error toggling subhabit completion:', err)
+      // Revert optimistic state on failure.
+      setCompletedSubhabitIds(prev => {
+        const next = new Set(prev)
+        if (nowCompleted) next.delete(subhabitId)
+        else next.add(subhabitId)
+        return next
+      })
+    }
+  }
 
   useEffect(() => {
     if (!isWeekly || !habit) return
@@ -119,27 +210,13 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
     updateRow(key, { saving: true })
     try {
       const movedToNewDate = row.date !== row.originalDate
-      const logs: any[] = habit.habits_daily_logs || []
-      const timeWithSeconds = row.time.length === 5 ? `${row.time}:00` : row.time
-
-      if (movedToNewDate) {
-        // Moving to a different date: skip the original date, then upsert on the new date
-        if (onSkip) await onSkip(habit.id, row.originalDate)
-        await onTimeChange(habit.id, row.date, row.time, row.duration)
-      } else {
-        // Same date: update the existing non-skipped log in place (avoids creating
-        // a duplicate, since the upsert keys on scheduled_start_time).
-        const existing = logs.find(l => l.log_date === row.date && !l.is_skipped)
-        if (existing?.id) {
-          const { error } = await supabase
-            .from('cassian_habits_daily_logs')
-            .update({ scheduled_start_time: timeWithSeconds, duration: row.duration })
-            .eq('id', existing.id)
-          if (error) throw error
-        } else {
-          await onTimeChange(habit.id, row.date, row.time, row.duration)
-        }
+      if (movedToNewDate && onSkip) {
+        await onSkip(habit.id, row.originalDate)
       }
+      // onTimeChange is wired to update-by-id when a non-skipped log already
+      // exists on this date, and also pushes the change into the calendar's
+      // local state, so the UI reflects the edit without a refetch.
+      await onTimeChange(habit.id, row.date, row.time, row.duration)
       updateRow(key, { editing: false, saving: false })
     } catch (error) {
       console.error('Error saving occurrence:', error)
@@ -162,10 +239,13 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
       const sorted = [...habit.subhabits].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       // After the subhabits→habits merge, children are cassian_habits rows —
       // map their native fields (name, duration) onto the UI's expected shape.
+      // Pass through habits_daily_logs so we can derive today's completion
+      // state without a separate DB query.
       setSubhabits(sorted.map((s: any) => ({
         id: s.id,
         title: s.name ?? s.title,
         duration_minutes: s.duration ?? s.duration_minutes ?? null,
+        habits_daily_logs: s.habits_daily_logs || [],
       })))
     } else {
       setSubhabits([])
@@ -487,40 +567,53 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
               <ul className="space-y-0.5 max-h-48 overflow-y-auto pr-1">
                 {subhabits.map((sub, i) => {
                   const isActive = routineActive && i === currentSubhabitIndex
-                  const isDone = completedIndices.has(i)
+                  // DB-backed completion (only set by explicit click).
+                  const isDone = completedSubhabitIds.has(sub.id)
+                  // Routine timer elapsed past this step — visual hint only, no
+                  // DB write until the user actually clicks to mark it done.
+                  const isTimerElapsed = completedIndices.has(i) && !isDone
                   return (
                   <li
                     key={sub.id}
                     className={`flex items-center gap-2 text-xs ${
                       isActive ? 'text-blue-700 font-semibold'
                       : isDone ? 'text-neutral-400 line-through'
+                      : isTimerElapsed ? 'text-neutral-500'
                       : 'text-neutral-600'
                     }`}
                   >
-                    {isDone ? (
-                      <Check className="w-3 h-3 text-green-500 shrink-0" />
-                    ) : (
-                      <svg className="w-3.5 h-3.5 shrink-0 -rotate-90" viewBox="0 0 20 20">
-                        <circle
-                          cx="10" cy="10" r={miniR}
-                          fill="none"
-                          stroke={isActive ? '#dbeafe' : '#e5e7eb'}
-                          strokeWidth={isActive ? 3 : 1.5}
-                        />
-                        {isActive && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSubhabitComplete(sub.id)}
+                      className="shrink-0 flex items-center justify-center rounded-full group"
+                      title={isDone ? 'Mark as not done' : 'Mark as done'}
+                    >
+                      {isDone ? (
+                        <Check className="w-3.5 h-3.5 text-green-500" />
+                      ) : (
+                        <svg className="w-3.5 h-3.5 -rotate-90" viewBox="0 0 20 20">
                           <circle
                             cx="10" cy="10" r={miniR}
-                            fill="none"
-                            stroke={secondsRemaining <= 10 ? '#ef4444' : '#2563eb'}
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeDasharray={miniCirc}
-                            strokeDashoffset={miniOffset}
-                            className="transition-all duration-1000 ease-linear"
+                            fill={isTimerElapsed ? '#bfdbfe' : 'none'}
+                            stroke={isActive ? '#dbeafe' : isTimerElapsed ? '#93c5fd' : '#e5e7eb'}
+                            strokeWidth={isActive ? 3 : 1.5}
+                            className="group-hover:stroke-orange-400 group-hover:fill-orange-100"
                           />
-                        )}
-                      </svg>
-                    )}
+                          {isActive && (
+                            <circle
+                              cx="10" cy="10" r={miniR}
+                              fill="none"
+                              stroke={secondsRemaining <= 10 ? '#ef4444' : '#2563eb'}
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeDasharray={miniCirc}
+                              strokeDashoffset={miniOffset}
+                              className="transition-all duration-1000 ease-linear"
+                            />
+                          )}
+                        </svg>
+                      )}
+                    </button>
                     <span className="truncate">{sub.title}</span>
                     {sub.duration_minutes && (
                       <span className="ml-auto text-neutral-400 shrink-0">

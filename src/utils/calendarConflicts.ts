@@ -1,11 +1,11 @@
 import { format } from 'date-fns'
-import { getEffectiveHabitStartTime } from './habitScheduling'
 import { generateBuffersForDays, BufferTime } from './bufferManager'
+import { resolveHabitPlacements } from './habitPlacement'
 
 export const computeConflictMaps = (
-  habitsData: any[], 
-  sessionsData: any[], 
-  meetingsData: any[], 
+  habitsData: any[],
+  sessionsData: any[],
+  meetingsData: any[],
   dayColumns: any[],
   tasksDailyLogsData: any[] = []
 ) => {
@@ -14,97 +14,32 @@ export const computeConflictMaps = (
   const meetingConflicts = new Map()
   const tasksDailyLogsConflicts = new Map()
   const bufferConflicts = new Map()
-  
+
   // Get valid date strings for current view to filter conflicts
   const validDateStrs = new Set(dayColumns.map(({ dateStr }) => dateStr))
 
-  // Pre-compute habit conflicts (exclude non-calendar habits and skipped habits)
-  habitsData.filter(habit => habit.habits_types?.scheduling_rule !== 'non_calendar').forEach(habit => {
-    dayColumns.forEach(({ dateStr }) => {
-      const dailyLog = habit.habits_daily_logs?.find((log: any) => log.log_date === dateStr)
-      
-      // Skip habits that are marked as skipped for this date
-      if (dailyLog?.is_skipped) return
-      
-      const effectiveStartTime = getEffectiveHabitStartTime(habit, dateStr, dailyLog)
-      
-      if (effectiveStartTime) {
-        const [hours, minutes] = effectiveStartTime.split(':').map(Number)
-        const startTimeInHours = hours + minutes / 60
-        const duration = dailyLog?.duration || habit.duration || 0
-        const endTimeInHours = startTimeInHours + duration / 60
-        
-        // Check for meeting conflicts and adjust habit time
-        let adjustedStartTime = startTimeInHours
-        const conflictingMeeting = meetingsData.find(meeting => {
-          const meetingStart = new Date(meeting.start_time)
-          const meetingEnd = new Date(meeting.end_time)
-          const meetingDateStr = format(meetingStart, 'yyyy-MM-dd')
-          
-          if (meetingDateStr !== dateStr) return false
-          
-          const meetingStartInHours = meetingStart.getHours() + meetingStart.getMinutes() / 60
-          const meetingEndInHours = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
-          
-          return startTimeInHours < meetingEndInHours && endTimeInHours > meetingStartInHours
-        })
-        
-        if (conflictingMeeting) {
-          const meetingEnd = new Date(conflictingMeeting.end_time)
-          adjustedStartTime = meetingEnd.getHours() + meetingEnd.getMinutes() / 60
-        }
-        
-        // Check for session conflicts and adjust habit time (after meeting conflicts)
-        const conflictingSession = sessionsData.find(session => {
-          if (!session.actual_start_time || session.scheduled_date !== dateStr) return false
-          
-          const timeOnly = session.actual_start_time.split(/[+-]/)[0] // Remove timezone part
-          const [sessionHours, sessionMinutes] = timeOnly.split(':').map(Number)
-          const sessionStartInHours = sessionHours + sessionMinutes / 60
-          const sessionDuration = (session.scheduled_hours || 1) // Duration in hours
-          const sessionEndInHours = sessionStartInHours + sessionDuration
-          
-          // Check if habit conflicts with session (using adjusted start time from meeting conflicts)
-          const habitEndInHours = adjustedStartTime + duration / 60
-          return adjustedStartTime < sessionEndInHours && habitEndInHours > sessionStartInHours
-        })
-        
-        if (conflictingSession) {
-          const timeOnly = conflictingSession.actual_start_time.split(/[+-]/)[0]
-          const [sessionHours, sessionMinutes] = timeOnly.split(':').map(Number)
-          const sessionDuration = (conflictingSession.scheduled_hours || 1)
-          const sessionEndInHours = sessionHours + sessionMinutes / 60 + sessionDuration
-          adjustedStartTime = sessionEndInHours
-        }
-        
-        const adjustedEndTime = adjustedStartTime + duration / 60
-        
-        
-        // Mark all affected time slots in 15-minute increments
-        // Round to nearest 15-minute boundary for precise conflict detection
-        const startSlot = Math.round(adjustedStartTime * 4) / 4
-        const endSlot = Math.round(adjustedEndTime * 4) / 4
-        
-        // Debug Morning Routine conflicts
-        if (habit.name === 'Morning Routine' && (dateStr === '2025-08-30' || dateStr === '2025-08-31')) {
-          console.log(`🐛 Morning Routine conflict detection for ${dateStr}:`, {
-            adjustedStartTime,
-            adjustedEndTime,
-            startSlot,
-            endSlot,
-            duration: duration / 60
-          })
-        }
-        
-        for (let time = startSlot; time < endSlot; time += 0.25) {
-          const normalizedTime = Math.round(time * 4) / 4
-          const key = `${dateStr}-${normalizedTime}`
-          habitConflicts.set(key, habit)
-          
-        }
-      }
-    })
-  })
+  // Pre-compute habit conflicts using the shared placement resolver so the
+  // task scheduler sees habits in their *rendered* positions (after
+  // meeting/session bumping + habit-vs-habit cascading), not at their raw
+  // log times. Without this the scheduler would park a task in a slot that
+  // the UI actually shows a habit in.
+  const habitById = new Map<string, any>(habitsData.map(h => [h.id, h]))
+  const placements = resolveHabitPlacements(
+    habitsData.filter(h => h.habits_types?.scheduling_rule !== 'non_calendar'),
+    meetingsData,
+    sessionsData,
+    dayColumns
+  )
+  for (const p of placements) {
+    const startSlot = Math.round(p.start * 4) / 4
+    const endSlot = Math.round(p.end * 4) / 4
+    const habit = habitById.get(p.habitId) || { id: p.habitId }
+    for (let time = startSlot; time < endSlot; time += 0.25) {
+      const normalizedTime = Math.round(time * 4) / 4
+      const key = `${p.dateKey}-${normalizedTime}`
+      habitConflicts.set(key, habit)
+    }
+  }
   
   // Pre-compute session conflicts (only for dates in current view)
   sessionsData.forEach(session => {

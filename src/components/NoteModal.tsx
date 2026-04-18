@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, MoreVertical, Tag, Trash2, Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import ModalWrapper from './ModalWrapper'
 
 interface Issue {
   id: string
@@ -259,11 +260,8 @@ export default function NoteModal({
   )
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
+    <ModalWrapper isOpen={isOpen} onClose={onClose} bare maxWidth="2xl">
+      <div className="bg-white rounded-xl shadow-xl w-full max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="pl-5 pr-3 py-1.5 border-b border-neutral-200 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -634,6 +632,6 @@ export default function NoteModal({
           )}
         </div>
       </div>
-    </div>
+    </ModalWrapper>
   )
 }

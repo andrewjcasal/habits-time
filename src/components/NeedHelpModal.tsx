@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import ModalWrapper from './ModalWrapper'
 
 interface NeedHelpModalProps {
   isOpen: boolean
@@ -71,49 +72,38 @@ export default function NeedHelpModal({ isOpen, onClose }: NeedHelpModalProps) {
     }, 400)
   }
 
-  if (!isOpen) return null
+  const titleNode = view === 'menu' ? (
+    <h2
+      className="text-xl text-neutral-900"
+      style={{ fontFamily: "'DM Serif Display', serif" }}
+    >
+      Need Help?
+    </h2>
+  ) : (
+    <button
+      onClick={() => setView('menu')}
+      className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+      aria-label="Back to menu"
+    >
+      <ArrowLeft className="w-3.5 h-3.5" />
+      <span
+        className="text-lg text-neutral-900"
+        style={{ fontFamily: "'DM Serif Display', serif" }}
+      >
+        {VIEW_LABELS[view]}
+      </span>
+    </button>
+  )
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    <ModalWrapper
+      isOpen={isOpen}
+      onClose={onClose}
+      title={titleNode}
+      maxWidth="md"
+      contentClassName="p-0"
     >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 flex flex-col max-h-[85vh]">
-        {/* Header — "Need Help?" on the menu, a back arrow + section title
-            once a sub-view is active. */}
-        <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-neutral-200">
-          {view === 'menu' ? (
-            <h2
-              className="text-xl text-neutral-900"
-              style={{ fontFamily: "'DM Serif Display', serif" }}
-            >
-              Need Help?
-            </h2>
-          ) : (
-            <button
-              onClick={() => setView('menu')}
-              className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
-              aria-label="Back to menu"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span
-                className="text-lg text-neutral-900"
-                style={{ fontFamily: "'DM Serif Display', serif" }}
-              >
-                {VIEW_LABELS[view]}
-              </span>
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="p-1 text-neutral-400 hover:text-neutral-600 rounded hover:bg-neutral-100 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-
-        {/* Content */}
+      <div className="flex flex-col max-h-[85vh]">
         {view === 'menu' && <MenuView onSelect={setView} />}
         {view === 'reset' && <ResetContent />}
         {view === 'breathe' && <BreatheContent />}
@@ -125,7 +115,7 @@ export default function NeedHelpModal({ isOpen, onClose }: NeedHelpModalProps) {
           />
         )}
       </div>
-    </div>
+    </ModalWrapper>
   )
 }
 

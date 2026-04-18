@@ -264,6 +264,23 @@ export function useHabits(selectedDate?: string) {
     }
   }
 
+  const unarchiveHabit = async (habitId: string) => {
+    if (!user) return
+    try {
+      const { error } = await supabase
+        .from('cassian_habits')
+        .update({ is_archived: false })
+        .eq('id', habitId)
+        .eq('user_id', user.id)
+      if (error) throw error
+      // Refetch so the newly-unarchived habit reappears in the main list.
+      await fetchHabits()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to unarchive habit')
+      throw err
+    }
+  }
+
   const deleteHabit = async (habitId: string) => {
     if (!user) return
 
@@ -292,6 +309,7 @@ export function useHabits(selectedDate?: string) {
     background: string
     benefits: string
     consequences: string
+    weekly_days?: string[] | null
   }) => {
     if (!user) return
 
@@ -313,12 +331,22 @@ export function useHabits(selectedDate?: string) {
         insertData.current_start_time = habitData.default_start_time
       }
 
-      const { error } = await supabase.from('cassian_habits').insert(insertData)
+      if (habitData.weekly_days && habitData.weekly_days.length > 0) {
+        insertData.weekly_days = habitData.weekly_days
+      }
+
+      const { data, error } = await supabase
+        .from('cassian_habits')
+        .insert(insertData)
+        .select('*, habits_types:cassian_habits_types(*)')
+        .single()
 
       if (error) throw error
 
       // Refresh habits to show the new habit
       await fetchHabits()
+
+      return data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create habit')
       throw err
@@ -438,6 +466,7 @@ export function useHabits(selectedDate?: string) {
     updateHabitName,
     updateHabitDefaultStartTime,
     archiveHabit,
+    unarchiveHabit,
     deleteHabit,
     createHabit,
     updateHabitStartTimes,

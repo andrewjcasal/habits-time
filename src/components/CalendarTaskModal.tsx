@@ -1,6 +1,4 @@
-import { Calendar } from 'lucide-react'
 import ModalWrapper from './ModalWrapper'
-import SidebarActionButton from './SidebarActionButton'
 
 interface CalendarTaskModalProps {
   isOpen: boolean
@@ -8,7 +6,6 @@ interface CalendarTaskModalProps {
   task: any
   onComplete: () => void
   onDelete: () => void
-  onAddMeeting?: () => void
 }
 
 const CalendarTaskModal = ({
@@ -17,26 +14,15 @@ const CalendarTaskModal = ({
   task,
   onComplete,
   onDelete,
-  onAddMeeting,
 }: CalendarTaskModalProps) => {
   if (!isOpen || !task) return null
-
-  const rightSidebarActions = onAddMeeting ? (
-    <SidebarActionButton
-      onClick={onAddMeeting}
-      title="Add Meeting"
-    >
-      <Calendar className="w-3 h-3" />
-    </SidebarActionButton>
-  ) : undefined
 
   return (
     <ModalWrapper
       isOpen={isOpen}
       onClose={onClose}
       title="Task Action"
-      rightSidebarActions={rightSidebarActions}
-      maxWidth={onAddMeeting ? 'lg' : 'md'}
+      maxWidth="md"
     >
       <div className="mb-3">
         <h3 className="font-medium text-neutral-900 mb-1">{task.title}</h3>

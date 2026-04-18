@@ -14,7 +14,7 @@ import {
   Menu,
 } from 'lucide-react'
 import CalendarSettingsPanel from './CalendarSettingsPanel'
-import { useModal } from '../contexts/ModalContext'
+import { useModal } from '../contexts/useModal'
 
 interface CalendarTopBarProps {
   settings: any

@@ -1,7 +1,9 @@
-import { ChevronLeft, ChevronRight, Plus, Info } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronLeft, ChevronRight, Plus, Archive } from 'lucide-react'
 import HabitsList from './HabitsList'
 import HabitDetailTabs from './HabitDetailTabs'
 import CreateHabitModal from './CreateHabitModal'
+import ArchivedHabitsModal from './ArchivedHabitsModal'
 
 interface HabitsMainContentProps {
   habits: any[]
@@ -17,6 +19,7 @@ interface HabitsMainContentProps {
   onNavigateDate: (direction: 'prev' | 'next') => void
   onShowCreateModal: (show: boolean) => void
   onCreateHabit: (habitData: any) => void
+  onUnarchiveHabit: (habitId: string) => Promise<void>
   formatDateDisplay: (date: string) => string
   getHabitScheduleDisplay: (habit: any, dailyLog: any) => { label: string; time: string }
   formatTime: (time: string) => string
@@ -36,11 +39,13 @@ const HabitsMainContent = ({
   onNavigateDate,
   onShowCreateModal,
   onCreateHabit,
+  onUnarchiveHabit,
   formatDateDisplay,
   getHabitScheduleDisplay,
   formatTime,
 }: HabitsMainContentProps) => {
   const selectedHabit = selectedHabitId ? habits.find(h => h.id === selectedHabitId) : null
+  const [showArchivedModal, setShowArchivedModal] = useState(false)
 
   return (
     <>
@@ -67,6 +72,13 @@ const HabitsMainContent = ({
                   className="p-0.5 hover:bg-gray-200 rounded transition-colors"
                 >
                   <ChevronRight className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setShowArchivedModal(true)}
+                  className="p-1 hover:bg-gray-200 rounded transition-colors"
+                  title="View archived habits"
+                >
+                  <Archive className="w-3 h-3 text-gray-600" />
                 </button>
                 <button
                   onClick={() => onShowCreateModal(true)}
@@ -116,6 +128,12 @@ const HabitsMainContent = ({
         isOpen={showCreateModal}
         onClose={() => onShowCreateModal(false)}
         onCreateHabit={onCreateHabit}
+      />
+
+      <ArchivedHabitsModal
+        isOpen={showArchivedModal}
+        onClose={() => setShowArchivedModal(false)}
+        onUnarchive={onUnarchiveHabit}
       />
     </>
   )
