@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { format } from 'date-fns'
-import { Clock, Play, Pause, SkipForward, Check } from 'lucide-react'
+import { Play, Pause, SkipForward, Check, Pencil } from 'lucide-react'
 import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
+import { formatTimeOfDay } from '../utils/formatTime'
+import { supabase } from '../lib/supabase'
 import ModalWrapper from './ModalWrapper'
 import { useModal } from '../contexts/ModalContext'
 
@@ -26,6 +28,37 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
   const [newTime, setNewTime] = useState('')
   const [newDuration, setNewDuration] = useState<number>(0)
   const [loading, setLoading] = useState(false)
+
+  interface OccurrenceRow {
+    originalDate: string
+    date: string
+    time: string
+    duration: number
+    editing: boolean
+    saving: boolean
+  }
+  const [occurrenceRows, setOccurrenceRows] = useState<Record<string, OccurrenceRow>>({})
+
+  const isWeekly = !!(habit?.weekly_days && habit.weekly_days.length > 0)
+
+  const upcomingOccurrences = useMemo(() => {
+    if (!isWeekly || !habit || !selectedDate) return [] as { date: Date; dateStr: string }[]
+    const logs = habit.habits_daily_logs || []
+    const results: { date: Date; dateStr: string }[] = []
+    const cursor = new Date(selectedDate)
+    cursor.setHours(0, 0, 0, 0)
+    for (let i = 0; i < 90 && results.length < 3; i++) {
+      const dateStr = format(cursor, 'yyyy-MM-dd')
+      const dayName = cursor.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+      const matchesPattern = habit.weekly_days.includes(dayName)
+      const hasSkipped = logs.some((l: any) => l.log_date === dateStr && l.is_skipped)
+      const nonSkippedLog = logs.find((l: any) => l.log_date === dateStr && !l.is_skipped)
+      const include = (matchesPattern && !hasSkipped) || !!nonSkippedLog
+      if (include) results.push({ date: new Date(cursor), dateStr })
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    return results
+  }, [isWeekly, habit, selectedDate])
 
   // Subhabits & routine timer state
   const [subhabits, setSubhabits] = useState<Subhabit[]>([])
@@ -57,6 +90,63 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
     }
   }, [])
 
+  useEffect(() => {
+    if (!isWeekly || !habit) return
+    const logs = habit.habits_daily_logs || []
+    setOccurrenceRows(prev => {
+      const next: Record<string, OccurrenceRow> = {}
+      for (const occ of upcomingOccurrences) {
+        const log = logs.find((l: any) => l.log_date === occ.dateStr && !l.is_skipped)
+        const time = getEffectiveHabitStartTime(habit, occ.dateStr, log) || ''
+        const duration = log?.duration || habit.duration || 0
+        const existing = prev[occ.dateStr]
+        next[occ.dateStr] = existing && existing.editing
+          ? existing
+          : { originalDate: occ.dateStr, date: occ.dateStr, time, duration, editing: false, saving: false }
+      }
+      return next
+    })
+  }, [isWeekly, habit, upcomingOccurrences])
+
+  const updateRow = (key: string, patch: Partial<OccurrenceRow>) => {
+    setOccurrenceRows(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }))
+  }
+
+  const handleRowSave = async (key: string) => {
+    if (!habit) return
+    const row = occurrenceRows[key]
+    if (!row || !row.time || !row.date) return
+    updateRow(key, { saving: true })
+    try {
+      const movedToNewDate = row.date !== row.originalDate
+      const logs: any[] = habit.habits_daily_logs || []
+      const timeWithSeconds = row.time.length === 5 ? `${row.time}:00` : row.time
+
+      if (movedToNewDate) {
+        // Moving to a different date: skip the original date, then upsert on the new date
+        if (onSkip) await onSkip(habit.id, row.originalDate)
+        await onTimeChange(habit.id, row.date, row.time, row.duration)
+      } else {
+        // Same date: update the existing non-skipped log in place (avoids creating
+        // a duplicate, since the upsert keys on scheduled_start_time).
+        const existing = logs.find(l => l.log_date === row.date && !l.is_skipped)
+        if (existing?.id) {
+          const { error } = await supabase
+            .from('cassian_habits_daily_logs')
+            .update({ scheduled_start_time: timeWithSeconds, duration: row.duration })
+            .eq('id', existing.id)
+          if (error) throw error
+        } else {
+          await onTimeChange(habit.id, row.date, row.time, row.duration)
+        }
+      }
+      updateRow(key, { editing: false, saving: false })
+    } catch (error) {
+      console.error('Error saving occurrence:', error)
+      updateRow(key, { saving: false })
+    }
+  }
+
   const loadSubhabits = () => {
     if (!habit) return
 
@@ -70,7 +160,13 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
       })))
     } else if (habit.subhabits?.length > 0) {
       const sorted = [...habit.subhabits].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      setSubhabits(sorted)
+      // After the subhabits→habits merge, children are cassian_habits rows —
+      // map their native fields (name, duration) onto the UI's expected shape.
+      setSubhabits(sorted.map((s: any) => ({
+        id: s.id,
+        title: s.name ?? s.title,
+        duration_minutes: s.duration ?? s.duration_minutes ?? null,
+      })))
     } else {
       setSubhabits([])
     }
@@ -194,93 +290,10 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
 
   if (!showHabitModal || !habit || !selectedDate) return null
 
-  // Routine timer view
-  if (routineActive) {
-    const currentSub = subhabits[currentSubhabitIndex]
-    return (
-      <ModalWrapper
-        isOpen={showHabitModal}
-        onClose={() => {
-          if (timerRef.current) clearInterval(timerRef.current)
-          setRoutineActive(false)
-          closeHabitModal()
-        }}
-        title={habit.name}
-        maxWidth="sm"
-      >
-        <div className="flex flex-col items-center py-4">
-          {/* Radial timer */}
-          <div className="relative w-32 h-32 mb-4">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" strokeWidth="6" />
-              <circle
-                cx="50" cy="50" r="45" fill="none"
-                stroke={secondsRemaining <= 10 ? '#ef4444' : '#3b82f6'}
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                className="transition-all duration-1000 ease-linear"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-2xl font-semibold text-neutral-800">{formatTime(secondsRemaining)}</span>
-            </div>
-          </div>
-
-          {/* Current subhabit */}
-          <div className="text-sm font-medium text-neutral-900 mb-1">{currentSub?.title}</div>
-          <div className="text-xs text-neutral-500 mb-4">
-            {currentSubhabitIndex + 1} of {subhabits.length}
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={togglePause}
-              className="p-2 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-colors"
-              title={isPaused ? 'Resume' : 'Pause'}
-            >
-              {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={skipToNext}
-              className="p-2 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-colors"
-              title="Skip to next"
-            >
-              <SkipForward className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Subhabit list */}
-          <div className="w-full mt-4 space-y-1">
-            {subhabits.map((sub, i) => (
-              <div
-                key={sub.id}
-                className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${
-                  i === currentSubhabitIndex ? 'bg-blue-50 text-blue-800 font-medium' :
-                  completedIndices.has(i) ? 'text-neutral-400 line-through' :
-                  'text-neutral-600'
-                }`}
-              >
-                {completedIndices.has(i) ? (
-                  <Check className="w-3 h-3 text-green-500 flex-shrink-0" />
-                ) : i === currentSubhabitIndex ? (
-                  <div className="w-3 h-3 rounded-full border-2 border-blue-500 flex-shrink-0" />
-                ) : (
-                  <div className="w-3 h-3 rounded-full border border-neutral-300 flex-shrink-0" />
-                )}
-                <span>{sub.title}</span>
-                {sub.duration_minutes && (
-                  <span className="ml-auto text-neutral-400">{sub.duration_minutes}m</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </ModalWrapper>
-    )
-  }
+  // Circumference used by the small per-subhabit progress rings.
+  const miniR = 7
+  const miniCirc = 2 * Math.PI * miniR
+  const miniOffset = miniCirc * (1 - progress)
 
   // Normal edit view
   return (
@@ -289,60 +302,238 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
       onClose={closeHabitModal}
       title="Edit Habit"
 
-      maxWidth="md"
+      maxWidth={subhabits.length > 0 ? 'lg' : 'md'}
     >
       <form onSubmit={handleSubmit} className="space-y-1">
-        <div className="mb-1">
-          <div className="flex items-center mb-1">
-            <Clock className="w-3 h-3 text-blue-500 mr-1" />
-            <span className="font-medium text-neutral-900 text-sm">{habit.name}</span>
-          </div>
-          <p className="text-xs text-neutral-600">
-            {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-          </p>
-        </div>
+        <div className="flex gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="mb-1">
+              <div className="flex items-center mb-1">
+                <span className="font-medium text-neutral-900 text-sm">{habit.name}</span>
+              </div>
+              <p className="text-xs text-neutral-600">
+                {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+              </p>
+            </div>
 
-        {/* Time + Duration on one line */}
-        <div className="flex gap-2 mb-1">
-          <div className="flex-1">
-            <label htmlFor="time" className="block text-xs font-medium text-neutral-700 mb-1">
-              Time
-            </label>
-            <input
-              type="time"
-              id="time"
-              value={newTime}
-              onChange={e => setNewTime(e.target.value)}
-              className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
-              required
-            />
+        {isWeekly ? (
+          /* Next 3 occurrences table — supports moving a single iteration to another day */
+          <div className="mb-1 overflow-hidden border border-neutral-200 rounded-md">
+            <table className="w-full text-xs">
+              <thead className="bg-neutral-50 text-neutral-600">
+                <tr>
+                  <th className="text-left font-medium px-1 py-1">Date</th>
+                  <th className="text-left font-medium px-1 py-1">Time</th>
+                  <th className="text-left font-medium px-1 py-1">Dur</th>
+                  <th className="px-1 py-1 w-6"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcomingOccurrences.map(occ => {
+                  const row = occurrenceRows[occ.dateStr]
+                  if (!row) return null
+                  const displayDate = row.date
+                    ? format(new Date(`${row.date}T00:00:00`), 'EEEEEE M/d')
+                    : ''
+                  return (
+                    <tr key={occ.dateStr} className="border-t border-neutral-100">
+                      <td className="px-1 py-1 align-middle">
+                        {row.editing ? (
+                          <input
+                            type="date"
+                            value={row.date}
+                            onChange={e => updateRow(occ.dateStr, { date: e.target.value })}
+                            className="w-full px-0.5 py-0.5 border border-neutral-300 rounded text-xs appearance-none bg-white"
+                            style={{ WebkitAppearance: 'none', colorScheme: 'light', fontSize: '12px' }}
+                          />
+                        ) : (
+                          <span className="text-neutral-900">{displayDate}</span>
+                        )}
+                      </td>
+                      <td className="px-1 py-1 align-middle">
+                        {row.editing ? (
+                          <input
+                            type="time"
+                            value={row.time}
+                            onChange={e => updateRow(occ.dateStr, { time: e.target.value })}
+                            className="w-full px-0.5 py-0.5 border border-neutral-300 rounded text-xs appearance-none bg-white"
+                            style={{ WebkitAppearance: 'none', colorScheme: 'light', fontSize: '12px' }}
+                          />
+                        ) : (
+                          <span className="text-neutral-900">{formatTimeOfDay(row.time, '—')}</span>
+                        )}
+                      </td>
+                      <td className="px-1 py-1 align-middle">
+                        {row.editing ? (
+                          <input
+                            type="number"
+                            min="0"
+                            value={row.duration}
+                            onChange={e => updateRow(occ.dateStr, { duration: parseInt(e.target.value) || 0 })}
+                            className="w-10 px-0.5 py-0.5 border border-neutral-300 rounded text-xs appearance-none bg-white"
+                            style={{ WebkitAppearance: 'none', fontSize: '12px' }}
+                          />
+                        ) : (
+                          <span className="text-neutral-900">{row.duration}m</span>
+                        )}
+                      </td>
+                      <td className="px-1 py-1 text-right align-middle">
+                        {row.editing ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRowSave(occ.dateStr)}
+                            disabled={row.saving || !row.time || !row.date}
+                            className="px-2 py-0.5 bg-primary-600 text-white rounded text-[11px] hover:bg-primary-700 disabled:opacity-50"
+                          >
+                            {row.saving ? '…' : 'Save'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => updateRow(occ.dateStr, { editing: true })}
+                            className="p-1 text-neutral-500 hover:text-neutral-800"
+                            aria-label="Edit occurrence"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+                {upcomingOccurrences.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-2 py-2 text-center text-neutral-500">
+                      No upcoming occurrences
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          <div className="flex-1">
-            <label htmlFor="duration" className="block text-xs font-medium text-neutral-700 mb-1">
-              Duration (min)
-            </label>
-            <input
-              type="number"
-              id="duration"
-              value={newDuration}
-              onChange={e => setNewDuration(parseInt(e.target.value) || 0)}
-              className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
-              min="0"
-            />
+        ) : (
+          /* Time + Duration stacked under the date — borderless, tap to edit */
+          <div className="space-y-1 mb-2">
+            <div className="flex items-baseline gap-2">
+              <label htmlFor="time" className="text-xs font-medium text-neutral-700 w-16 shrink-0">
+                Time
+              </label>
+              <input
+                type="time"
+                id="time"
+                value={newTime}
+                onChange={e => setNewTime(e.target.value)}
+                className="flex-1 min-w-0 bg-transparent border-0 p-0 text-sm text-neutral-900 appearance-none cursor-pointer focus:outline-none focus:ring-0 no-picker-icon"
+                style={{ WebkitAppearance: 'none', colorScheme: 'light', fontSize: '14px' }}
+                required
+              />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <label htmlFor="duration" className="text-xs font-medium text-neutral-700 w-16 shrink-0">
+                Duration
+              </label>
+              <input
+                type="number"
+                id="duration"
+                value={newDuration}
+                onChange={e => setNewDuration(parseInt(e.target.value) || 0)}
+                className="w-14 bg-transparent border-0 p-0 text-sm text-neutral-900 appearance-none cursor-pointer focus:outline-none focus:ring-0"
+                style={{ WebkitAppearance: 'none', fontSize: '14px' }}
+                min="0"
+              />
+              <span className="text-sm text-neutral-500">min</span>
+            </div>
           </div>
-        </div>
-
-        {/* Start Routine button */}
-        {subhabits.length > 0 && (
-          <button
-            type="button"
-            onClick={startRoutine}
-            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-          >
-            <Play className="w-3 h-3" />
-            Start Routine ({subhabits.length} steps)
-          </button>
         )}
+          </div>
+
+          {subhabits.length > 0 && (
+            <div className="w-48 shrink-0 border-l border-neutral-200 pl-3">
+              <div className="flex items-center justify-between mb-1">
+                {routineActive ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={togglePause}
+                      className="p-0.5 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                      title={isPaused ? 'Resume' : 'Pause'}
+                    >
+                      {isPaused ? <Play className="w-2.5 h-2.5" /> : <Pause className="w-2.5 h-2.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={skipToNext}
+                      className="p-0.5 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                      title="Skip to next"
+                    >
+                      <SkipForward className="w-2.5 h-2.5" />
+                    </button>
+                    <span className="text-[11px] text-neutral-500 ml-1">
+                      {currentSubhabitIndex + 1}/{subhabits.length}
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startRoutine}
+                    className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    <Play className="w-3 h-3" />
+                    Start Routine
+                    <span className="text-neutral-400 font-normal">· {subhabits.length}</span>
+                  </button>
+                )}
+              </div>
+              <ul className="space-y-0.5 max-h-48 overflow-y-auto pr-1">
+                {subhabits.map((sub, i) => {
+                  const isActive = routineActive && i === currentSubhabitIndex
+                  const isDone = completedIndices.has(i)
+                  return (
+                  <li
+                    key={sub.id}
+                    className={`flex items-center gap-2 text-xs ${
+                      isActive ? 'text-blue-700 font-semibold'
+                      : isDone ? 'text-neutral-400 line-through'
+                      : 'text-neutral-600'
+                    }`}
+                  >
+                    {isDone ? (
+                      <Check className="w-3 h-3 text-green-500 shrink-0" />
+                    ) : (
+                      <svg className="w-3.5 h-3.5 shrink-0 -rotate-90" viewBox="0 0 20 20">
+                        <circle
+                          cx="10" cy="10" r={miniR}
+                          fill="none"
+                          stroke={isActive ? '#dbeafe' : '#e5e7eb'}
+                          strokeWidth={isActive ? 3 : 1.5}
+                        />
+                        {isActive && (
+                          <circle
+                            cx="10" cy="10" r={miniR}
+                            fill="none"
+                            stroke={secondsRemaining <= 10 ? '#ef4444' : '#2563eb'}
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeDasharray={miniCirc}
+                            strokeDashoffset={miniOffset}
+                            className="transition-all duration-1000 ease-linear"
+                          />
+                        )}
+                      </svg>
+                    )}
+                    <span className="truncate">{sub.title}</span>
+                    {sub.duration_minutes && (
+                      <span className="ml-auto text-neutral-400 shrink-0">
+                        {isActive ? formatTime(secondsRemaining) : `${sub.duration_minutes}m`}
+                      </span>
+                    )}
+                  </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
 
         <div className="flex justify-between gap-1 pt-1">
           <div className="flex gap-1">
@@ -364,13 +555,15 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
               </button>
             )}
           </div>
-          <button
-            type="submit"
-            disabled={loading || !newTime}
-            className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Saving...' : 'Save Time'}
-          </button>
+          {!isWeekly && (
+            <button
+              type="submit"
+              disabled={loading || !newTime}
+              className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Saving...' : 'Save Time'}
+            </button>
+          )}
         </div>
       </form>
     </ModalWrapper>

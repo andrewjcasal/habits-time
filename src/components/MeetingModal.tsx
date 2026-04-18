@@ -261,7 +261,7 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previo
             {editingMeeting.description && (
               <p className="text-xs text-neutral-500">{editingMeeting.description}</p>
             )}
-            <div className="pt-2 border-t border-neutral-100">
+            <div className="pt-2 border-t border-neutral-100 flex gap-2">
               <button
                 onClick={() => {
                   setNewHabitName(editingMeeting.title)
@@ -271,9 +271,9 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previo
                   setNewHabitDuration(dur > 0 ? dur : 30)
                   setViewMode('create-habit')
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors w-full justify-center"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Create habit from meeting
+                Create new habit
               </button>
               <button
                 onClick={() => {
@@ -281,9 +281,9 @@ const MeetingModal = ({ onAddHabitBlock, onMeetingHabitLinked, onAddNote, previo
                   setSelectedHabitId('')
                   setViewMode('link-habit')
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-neutral-700 bg-neutral-200 rounded-lg hover:bg-neutral-300 transition-colors w-full justify-center"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs text-neutral-700 bg-neutral-200 rounded-lg hover:bg-neutral-300 transition-colors"
               >
-                Associate to existing habit
+                Link existing habit
               </button>
               {editingMeeting.google_event_id && (
                 <button

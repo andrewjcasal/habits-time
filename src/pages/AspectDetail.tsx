@@ -36,16 +36,16 @@ const AspectDetail = () => {
 
     try {
       setLoading(true)
+      // Subhabits are now cassian_habits rows linked via aspect_id.
       const { data, error } = await supabase
         .from('cassian_aspects')
         .select(`
           *,
-          subhabits (
+          subhabits:cassian_habits!cassian_habits_aspect_id_fkey (
             id,
-            title,
+            title:name,
             aspect_id,
-            created_at,
-            updated_at
+            created_at
           )
         `)
         .eq('id', aspectId)
@@ -77,9 +77,9 @@ const AspectDetail = () => {
           comment,
           comment_date,
           created_at,
-          subhabits!inner (
+          subhabits:cassian_habits!cassian_subhabit_comments_subhabit_id_fkey!inner (
             id,
-            title,
+            title:name,
             aspect_id
           )
         `)

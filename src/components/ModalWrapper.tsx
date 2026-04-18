@@ -8,7 +8,7 @@ interface ModalWrapperProps {
   children: ReactNode
   rightSidebarActions?: ReactNode
   headerActions?: ReactNode
-  maxWidth?: 'sm' | 'md' | 'lg'
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 }
 
 const ModalWrapper = ({
@@ -24,8 +24,10 @@ const ModalWrapper = ({
 
   const maxWidthClass = {
     sm: 'max-w-sm',
-    md: 'max-w-md', 
-    lg: 'max-w-lg'
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+    '2xl': 'max-w-2xl'
   }[maxWidth]
 
   return (

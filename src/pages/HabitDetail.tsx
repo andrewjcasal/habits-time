@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, Circle } from 'lucide-react'
 import { useHabits } from '../hooks/useHabits'
 import HabitDetailTabs from '../components/HabitDetailTabs'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { formatTimeOfDay } from '../utils/formatTime'
 
 const HabitDetail = () => {
   const { habitId } = useParams<{ habitId: string }>()
@@ -29,14 +30,7 @@ const HabitDetail = () => {
     )
   }
 
-  const formatTime = (time: string | null) => {
-    if (!time) return '9:00 AM'
-    const [hours, minutes] = time.split(':')
-    const hour = parseInt(hours)
-    const ampm = hour >= 12 ? 'PM' : 'AM'
-    const displayHour = hour % 12 || 12
-    return `${displayHour}:${minutes} ${ampm}`
-  }
+  const formatTime = (time: string | null) => formatTimeOfDay(time, '9:00 AM')
 
   const handleHabitDeleted = () => {
     navigate('/habits')

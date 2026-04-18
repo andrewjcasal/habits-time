@@ -35,16 +35,17 @@ const Aspects = () => {
   const fetchAspects = async () => {
     try {
       setLoading(true)
+      // Subhabits are now cassian_habits rows linked via aspect_id.
+      // Alias title:name so the UI keeps reading subhabit.title.
       const { data, error } = await supabase
         .from('cassian_aspects')
         .select(`
           *,
-          subhabits (
+          subhabits:cassian_habits!cassian_habits_aspect_id_fkey (
             id,
-            title,
+            title:name,
             aspect_id,
-            created_at,
-            updated_at
+            created_at
           )
         `)
         .order('title', { ascending: true })
@@ -65,6 +66,8 @@ const Aspects = () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       
+      // subhabit_id now FKs to cassian_habits(id). Embed via cassian_habits
+      // and alias it back to `subhabits` so downstream code is unchanged.
       let query = supabase
         .from('cassian_subhabit_comments')
         .select(`
@@ -72,9 +75,9 @@ const Aspects = () => {
           comment,
           comment_date,
           created_at,
-          subhabits!inner (
+          subhabits:cassian_habits!cassian_subhabit_comments_subhabit_id_fkey!inner (
             id,
-            title,
+            title:name,
             aspect_id
           )
         `)

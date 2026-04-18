@@ -4,6 +4,7 @@ import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useHabits } from '../hooks/useHabits'
+import { formatTimeOfDay } from '../utils/formatTime'
 
 interface HabitLog {
   log_date: string
@@ -31,14 +32,7 @@ const HabitsLast7Days = () => {
   const [weekData, setWeekData] = useState<WeekData[]>([])
   const [loading, setLoading] = useState(true)
 
-  const formatTime = (time: string | null) => {
-    if (!time) return '-'
-    const [hours, minutes] = time.split(':')
-    const hour = parseInt(hours)
-    const ampm = hour >= 12 ? 'PM' : 'AM'
-    const displayHour = hour % 12 || 12
-    return `${displayHour}:${minutes} ${ampm}`
-  }
+  const formatTime = (time: string | null) => formatTimeOfDay(time, '-')
 
   const formatWeekDisplay = (weekStart: Date, weekEnd: Date) => {
     return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}`

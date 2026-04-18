@@ -123,3 +123,9 @@
     opacity: 1;
   }
 }
+
+/* Hide the native clock/calendar picker icon on <input type="time"> / <input type="date"> */
+.no-picker-icon::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}

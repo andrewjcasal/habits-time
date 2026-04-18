@@ -1254,8 +1254,8 @@ const CalendarContent = () => {
       const deletedId = await handleDeleteTask(task)
       if (deletedId) handlersRef.current.removeTask?.(deletedId)
     },
-    onHabitTimeChange: async (habitId, date, newTime) => {
-      await handlersRef.current.habitTimeChange?.(habitId, date, newTime)
+    onHabitTimeChange: async (habitId, date, newTime, newDuration) => {
+      await handlersRef.current.habitTimeChange?.(habitId, date, newTime, newDuration)
     },
     onHabitSkip: async (habitId, date) => {
       await handlersRef.current.habitSkip?.(habitId, date)

@@ -17,7 +17,10 @@ export const fetchAllCalendarData = async (userId: string) => {
   try {
     // Fetch all data sources in parallel with timeout protection
     const [habitsResult, sessionsResult, projectsResult, meetingsResult, tasksDailyLogsResult, tasksResult, settingsResult, calendarNotesResult, habitNotesResult, categoryBuffersResult] = await Promise.allSettled([
-      withTimeout(supabase.from('cassian_habits').select('*, habits_daily_logs:cassian_habits_daily_logs(*), habits_types:cassian_habits_types(*), subhabits:cassian_subhabits(*), habit_todoist_tasks:cassian_habit_todoist_tasks(*)').eq('user_id', userId).eq('is_visible', true).or('is_archived.eq.false,is_archived.is.null')),
+      // Top-level habits only. Subhabits (parent_habit_id IS NOT NULL) are
+      // fetched separately below and merged in — PostgREST can be fussy about
+      // self-referencing embeds, so we avoid that hint here.
+      withTimeout(supabase.from('cassian_habits').select('*, habits_daily_logs:cassian_habits_daily_logs(*), habits_types:cassian_habits_types(*), habit_todoist_tasks:cassian_habit_todoist_tasks(*)').eq('user_id', userId).eq('is_visible', true).is('parent_habit_id', null).or('is_archived.eq.false,is_archived.is.null')),
       withTimeout(supabase.from('cassian_sessions').select('*, projects:cassian_projects(*)').eq('user_id', userId)),
       withTimeout(supabase.from('cassian_projects').select('*').eq('user_id', userId).neq('status', 'archived')),
       withTimeout(supabase.from('cassian_meetings').select('*, meeting_habits:cassian_meeting_habits(habit_id)').eq('user_id', userId).or('is_ignored.is.null,is_ignored.eq.false')),
@@ -33,7 +36,29 @@ export const fetchAllCalendarData = async (userId: string) => {
     ])
 
     // Extract data with fallbacks
-    const habits = habitsResult.status === 'fulfilled' ? (habitsResult.value.data || []) : []
+    const topLevelHabits = habitsResult.status === 'fulfilled' ? (habitsResult.value.data || []) : []
+
+    // Second-pass: pull subhabits (children of the habits we just fetched) and
+    // attach them under `habit.subhabits` so downstream code sees the same shape
+    // it did before the subhabits→habits merge.
+    let habits = topLevelHabits
+    if (topLevelHabits.length > 0) {
+      const parentIds = topLevelHabits.map((h: any) => h.id)
+      const { data: subhabitRows } = await supabase
+        .from('cassian_habits')
+        .select('id, parent_habit_id, name, duration, sort_order, aspect_id, created_at')
+        .in('parent_habit_id', parentIds)
+      const byParent = new Map<string, any[]>()
+      for (const s of subhabitRows || []) {
+        const arr = byParent.get(s.parent_habit_id) || []
+        arr.push(s)
+        byParent.set(s.parent_habit_id, arr)
+      }
+      habits = topLevelHabits.map((h: any) => ({
+        ...h,
+        subhabits: byParent.get(h.id) || [],
+      }))
+    }
     const sessions = sessionsResult.status === 'fulfilled' ? (sessionsResult.value.data || []) : []
     const projects = projectsResult.status === 'fulfilled' ? (projectsResult.value.data || []) : []
     const meetings = meetingsResult.status === 'fulfilled' ? (meetingsResult.value.data || []) : []

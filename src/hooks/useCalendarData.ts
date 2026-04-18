@@ -533,10 +533,15 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
           if (dateKey < creationDate) continue
         }
 
-        // Weekly habits: only show on configured days
+        // Weekly habits: only show on configured days, unless an explicit
+        // (non-skipped) daily log overrides the pattern for that date
         if (habit.weekly_days && habit.weekly_days.length > 0) {
           const dayName = col.date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
-          if (!habit.weekly_days.includes(dayName)) continue
+          const matchesPattern = habit.weekly_days.includes(dayName)
+          const hasOverrideLog = (habit.habits_daily_logs || []).some(
+            (log: any) => log.log_date === dateKey && !log.is_skipped
+          )
+          if (!matchesPattern && !hasOverrideLog) continue
         }
 
         // Get all daily logs for this date (supports multiple blocks per day)

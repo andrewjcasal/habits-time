@@ -57,7 +57,7 @@ export interface CalendarModalHandlers {
   onDeleteMeeting?: (meeting: Meeting) => Promise<void>
   onCompleteTask?: (task: any) => Promise<void>
   onDeleteTask?: (task: any) => Promise<void>
-  onHabitTimeChange?: (habit: any, date: Date, newTime: string) => Promise<void>
+  onHabitTimeChange?: (habitId: string, date: string, newTime: string, newDuration?: number) => Promise<void>
   onHabitSkip?: (habit: any, date: Date) => Promise<void>
   onUpdateSession?: (sessionId: string, updates: any) => Promise<void>
   onTaskLogCreated?: () => void

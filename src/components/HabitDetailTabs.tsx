@@ -67,13 +67,15 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const currentHabitType = currentHabit?.habits_types
   const navigate = useNavigate()
 
-  // Fetch subhabits and aspects
+  // Fetch subhabits (now rows in cassian_habits with parent_habit_id set).
+  // Alias the columns so the rest of this component can still read
+  // sub.title / sub.duration_minutes without churn.
   const fetchSubhabits = async () => {
     try {
       const { data, error } = await supabase
-        .from('cassian_subhabits')
-        .select('*')
-        .eq('habit_id', habitId)
+        .from('cassian_habits')
+        .select('id, title:name, duration_minutes:duration, sort_order, aspect_id, created_at, parent_habit_id')
+        .eq('parent_habit_id', habitId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true })
 
@@ -181,9 +183,9 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     try {
       // First, get the aspect IDs from this habit's subhabits
       const { data: habitSubhabits, error: subhabitsError } = await supabase
-        .from('cassian_subhabits')
+        .from('cassian_habits')
         .select('aspect_id')
-        .eq('habit_id', habitId)
+        .eq('parent_habit_id', habitId)
         .not('aspect_id', 'is', null)
 
       if (subhabitsError) throw subhabitsError
@@ -328,20 +330,25 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     }, 1000) // 1 second delay like in notes
   }
 
-  // Add new subhabit
+  // Add new subhabit (inserts a child row into cassian_habits).
   const handleAddSubhabit = async () => {
     if (!newSubhabitTitle.trim() || !newSubhabitMinutes) return
 
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
       const { data, error } = await supabase
-        .from('cassian_subhabits')
+        .from('cassian_habits')
         .insert({
-          habit_id: habitId,
-          title: newSubhabitTitle.trim(),
-          duration_minutes: newSubhabitMinutes ? parseInt(newSubhabitMinutes) : null,
+          parent_habit_id: habitId,
+          user_id: user.id,
+          name: newSubhabitTitle.trim(),
+          duration: newSubhabitMinutes ? parseInt(newSubhabitMinutes) : 0,
           sort_order: subhabits.length + 1,
+          is_visible: false,
+          is_archived: false,
         })
-        .select('*')
+        .select('id, title:name, duration_minutes:duration, sort_order, aspect_id, created_at, parent_habit_id')
         .single()
 
       if (error) throw error
@@ -366,7 +373,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     const updates = reordered.map((sub, i) => ({ id: sub.id, sort_order: i + 1 }))
     for (const update of updates) {
       await supabase
-        .from('cassian_subhabits')
+        .from('cassian_habits')
         .update({ sort_order: update.sort_order })
         .eq('id', update.id)
     }
@@ -377,8 +384,8 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     if (!editTitle.trim() || !editMinutes) return
     try {
       await supabase
-        .from('cassian_subhabits')
-        .update({ title: editTitle.trim(), duration_minutes: parseInt(editMinutes) })
+        .from('cassian_habits')
+        .update({ name: editTitle.trim(), duration: parseInt(editMinutes) })
         .eq('id', subhabitId)
       setSubhabits(prev => prev.map(s =>
         s.id === subhabitId ? { ...s, title: editTitle.trim(), duration_minutes: parseInt(editMinutes) } : s
@@ -394,7 +401,7 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
     if (!confirm('Delete this subhabit?')) return
     try {
       const { error } = await supabase
-        .from('cassian_subhabits')
+        .from('cassian_habits')
         .delete()
         .eq('id', subhabitId)
 
