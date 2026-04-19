@@ -1327,6 +1327,54 @@ const CalendarContent = () => {
       const deletedId = await handleDeleteTask(task)
       if (deletedId) handlersRef.current.removeTask?.(deletedId)
     },
+    onUpdateTask: async (task, changes) => {
+      const taskId: string = task?.id
+      if (!taskId) return
+      // 1. Local DB write-through so the UI reflects the change instantly.
+      const patch: Record<string, any> = {}
+      if (changes.dueDate !== undefined) patch.due_date = changes.dueDate
+      if (typeof changes.durationMinutes === 'number') {
+        patch.estimated_hours = changes.durationMinutes / 60
+      }
+      if (Object.keys(patch).length > 0) {
+        await supabase.from('cassian_tasks').update(patch).eq('id', taskId)
+      }
+      // 2. Regen the schedule locally so the new duration / due date
+      //    reshapes placement immediately.
+      if (task?.source === 'todoist') {
+        await handlersRef.current.syncTodoist?.({ skipApi: true })
+      } else if (task?.source === 'clickup') {
+        await handlersRef.current.syncClickUp?.({ skipApi: true })
+      }
+      // 3. Push the edit upstream so the next full sync doesn't overwrite
+      //    it from the external API. Fire-and-forget — the modal has
+      //    already shown "Saved" by now.
+      ;(async () => {
+        try {
+          if (task?.source === 'todoist' && task?.todoist_task_id) {
+            await supabase.functions.invoke('todoist', {
+              body: {
+                action: 'update',
+                taskId: task.todoist_task_id,
+                dueDate: changes.dueDate,
+                durationMinutes: changes.durationMinutes,
+              },
+            })
+          } else if (task?.source === 'clickup' && task?.clickup_task_id) {
+            await supabase.functions.invoke('clickup', {
+              body: {
+                action: 'update',
+                taskId: task.clickup_task_id,
+                dueDate: changes.dueDate,
+                durationMinutes: changes.durationMinutes,
+              },
+            })
+          }
+        } catch (err) {
+          console.error('Error pushing task edit upstream:', err)
+        }
+      })()
+    },
     onHabitTimeChange: async (habitId, date, newTime, newDuration) => {
       await handlersRef.current.habitTimeChange?.(habitId, date, newTime, newDuration)
     },

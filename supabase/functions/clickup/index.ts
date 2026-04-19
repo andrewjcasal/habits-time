@@ -30,8 +30,13 @@ Deno.serve(async (req: Request) => {
 
   const startedAt = Date.now()
   try {
-    const body = await req.json()
-    const { action, taskId } = body as { action: string; taskId?: string }
+    const body = await req.json() as {
+      action: string
+      taskId?: string
+      dueDate?: string | null
+      durationMinutes?: number
+    }
+    const { action, taskId, dueDate, durationMinutes } = body
     console.log('[clickup] request', { action, taskId })
 
     const authHeader = req.headers.get('Authorization')!
@@ -275,6 +280,37 @@ Deno.serve(async (req: Request) => {
 
       console.log('[clickup] list_spaces done', { ms: Date.now() - startedAt })
       return new Response(JSON.stringify({ teams: result }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'update' && taskId) {
+      // Push user edits back to ClickUp. due_date is milliseconds since
+      // epoch (or null to clear). time_estimate is milliseconds.
+      const patch: Record<string, any> = {}
+      if (dueDate !== undefined) {
+        if (dueDate === null || dueDate === '') {
+          patch.due_date = null
+        } else {
+          // Convert yyyy-MM-dd → ms at local noon so timezones don't roll
+          // the date across midnight.
+          const [y, m, d] = dueDate.split('-').map(Number)
+          patch.due_date = new Date(y, (m || 1) - 1, d || 1, 12, 0, 0).getTime()
+          patch.due_date_time = false
+        }
+      }
+      if (typeof durationMinutes === 'number') {
+        patch.time_estimate = Math.max(0, Math.round(durationMinutes * 60 * 1000))
+      }
+      console.log('[clickup] update', { taskId, patch })
+      if (Object.keys(patch).length > 0) {
+        await clickupFetch(`https://api.clickup.com/api/v2/task/${taskId}`, {
+          method: 'PUT',
+          body: JSON.stringify(patch),
+        }, apiKey)
+      }
+      return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

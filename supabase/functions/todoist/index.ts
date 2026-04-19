@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json()
-    const { action, taskId, label } = body
+    const { action, taskId, label, dueDate, durationMinutes } = body
 
     const authHeader = req.headers.get('Authorization')!
     const supabase = createClient(
@@ -173,6 +173,40 @@ Deno.serve(async (req: Request) => {
     if (action === 'skip') {
       // Skip = reviewed but no action, just tag with review label
       await addReviewLabel(taskId, apiKey)
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'update') {
+      // Apply user edits to the upstream Todoist task so the next sync
+      // reads the same values back and doesn't clobber the local edit.
+      // Duration is encoded in the task content as `[N]` (minutes) — we
+      // strip any existing marker and append the new one when provided.
+      const patch: Record<string, any> = {}
+
+      if (dueDate !== undefined) {
+        // Todoist accepts either `due_date: 'YYYY-MM-DD'` or `due_string`.
+        // An empty string clears the due date.
+        patch.due_date = dueDate || null
+      }
+
+      if (durationMinutes !== undefined) {
+        const current = await todoistFetch(`https://api.todoist.com/api/v1/tasks/${taskId}`, {}, apiKey)
+        const rawContent = (current?.content || '') as string
+        const stripped = rawContent.replace(/\s*\[(\d+)\]\s*/, ' ').trim()
+        patch.content = durationMinutes > 0
+          ? `${stripped} [${durationMinutes}]`
+          : stripped
+      }
+
+      if (Object.keys(patch).length > 0) {
+        await todoistFetch(`https://api.todoist.com/api/v1/tasks/${taskId}`, {
+          method: 'POST',
+          body: JSON.stringify(patch),
+        }, apiKey)
+      }
+
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

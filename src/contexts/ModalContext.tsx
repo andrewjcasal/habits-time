@@ -371,6 +371,7 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
         task={modalState.selectedTask}
         onComplete={async () => { await handlersRef.current.onCompleteTask?.(modalState.selectedTask); closeTaskModal(); }}
         onDelete={async () => { await handlersRef.current.onDeleteTask?.(modalState.selectedTask); closeTaskModal(); }}
+        onUpdate={handlers.onUpdateTask}
       />
       <HabitModal
         onTimeChange={handlers.onHabitTimeChange ?? (async () => {})}
