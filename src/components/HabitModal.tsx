@@ -29,6 +29,8 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
   const [newTime, setNewTime] = useState('')
   const [newDuration, setNewDuration] = useState<number>(0)
   const [loading, setLoading] = useState(false)
+  const [savingFuture, setSavingFuture] = useState(false)
+  const [viewMode, setViewMode] = useState<'readonly' | 'edit'>('readonly')
 
   interface OccurrenceRow {
     originalDate: string
@@ -86,6 +88,10 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
       loadSubhabits()
     }
   }, [habit, selectedDate])
+
+  useEffect(() => {
+    if (showHabitModal) setViewMode('readonly')
+  }, [showHabitModal])
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -268,6 +274,32 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
     }
   }
 
+  const handleSaveFuture = async () => {
+    if (!habit || !newTime) return
+
+    setSavingFuture(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      const { error } = await supabase
+        .from('cassian_habits')
+        .update({
+          default_start_time: newTime,
+          current_start_time: newTime,
+          duration: newDuration,
+        })
+        .eq('id', habit.id)
+        .eq('user_id', user.id)
+      if (error) throw error
+      closeHabitModal()
+    } catch (error) {
+      console.error('Error updating habit defaults:', error)
+    } finally {
+      setSavingFuture(false)
+    }
+  }
+
   const handleSkip = async () => {
     if (!habit || !selectedDate || !onSkip) return
 
@@ -383,6 +415,16 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
       title="Edit Habit"
 
       maxWidth={subhabits.length > 0 ? 'lg' : 'md'}
+      headerActions={!isWeekly && viewMode === 'readonly' ? (
+        <button
+          type="button"
+          onClick={() => setViewMode('edit')}
+          className="p-1 text-neutral-400 hover:text-neutral-600 rounded hover:bg-neutral-100 transition-colors"
+          title="Edit habit"
+        >
+          <Pencil className="w-3 h-3" />
+        </button>
+      ) : undefined}
     >
       <form onSubmit={handleSubmit} className="space-y-1">
         <div className="flex gap-4">
@@ -491,8 +533,18 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
               </tbody>
             </table>
           </div>
+        ) : viewMode === 'readonly' ? (
+          <div className="space-y-1 mb-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs font-medium text-neutral-700 w-16 shrink-0">Time</span>
+              <span className="text-sm text-neutral-900">{formatTimeOfDay(newTime, '—')}</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs font-medium text-neutral-700 w-16 shrink-0">Duration</span>
+              <span className="text-sm text-neutral-900">{newDuration} min</span>
+            </div>
+          </div>
         ) : (
-          /* Time + Duration stacked under the date — borderless, tap to edit */
           <div className="space-y-1 mb-2">
             <div className="flex items-baseline gap-2">
               <label htmlFor="time" className="text-xs font-medium text-neutral-700 w-16 shrink-0">
@@ -648,14 +700,24 @@ const HabitModal = ({ onTimeChange, onSkip }: HabitModalProps) => {
               </button>
             )}
           </div>
-          {!isWeekly && (
-            <button
-              type="submit"
-              disabled={loading || !newTime}
-              className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Saving...' : 'Save Time'}
-            </button>
+          {!isWeekly && viewMode === 'edit' && (
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={handleSaveFuture}
+                disabled={savingFuture || loading || !newTime}
+                className="px-2 py-1 bg-neutral-200 text-neutral-800 rounded text-xs hover:bg-neutral-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingFuture ? 'Saving...' : 'Save Future'}
+              </button>
+              <button
+                type="submit"
+                disabled={loading || savingFuture || !newTime}
+                className="px-2 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Saving...' : 'Save Today'}
+              </button>
+            </div>
           )}
         </div>
       </form>
