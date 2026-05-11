@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { Project, Task, Session } from '../types'
 import { useUserContext } from '../contexts/UserContext'
+import { groupTasksByParent } from '../utils/groupTasksByParent'
 
 // Single hook that consolidates all Projects page data fetching
 export function useProjectsPageData(selectedProjectId?: string) {
@@ -28,7 +29,6 @@ export function useProjectsPageData(selectedProjectId?: string) {
       setProjectsLoading(true)
       setError(null)
 
-      console.log('123 fetching')
       let query = supabase
         .from('cassian_projects')
         .select('*')
@@ -61,10 +61,6 @@ export function useProjectsPageData(selectedProjectId?: string) {
       return
     }
 
-    console.log('234 users', user.id)
-    console.log('234 userLoading', userLoading)
-    console.log('234 project', projects)
-    
     fetchProjects()
   }, [user?.id, userLoading, fetchProjects])
 
@@ -109,24 +105,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
         if (tasksResponse.error) {
           setError(tasksResponse.error.message)
         } else {
-          // Group tasks by parent/child relationship
-          const allTasks = tasksResponse.data || []
-          const taskMap = new Map(allTasks.map(task => [task.id, { ...task, subtasks: [] }]))
-          const topLevelTasks: Task[] = []
-
-          allTasks.forEach(task => {
-            if (task.parent_task_id) {
-              const parentTask = taskMap.get(task.parent_task_id)
-              if (parentTask) {
-                parentTask.subtasks = parentTask.subtasks || []
-                parentTask.subtasks.push(taskMap.get(task.id)!)
-              }
-            } else {
-              topLevelTasks.push(taskMap.get(task.id)!)
-            }
-          })
-
-          setTasks(topLevelTasks)
+          setTasks(groupTasksByParent(tasksResponse.data || []))
         }
 
         // Handle sessions
@@ -181,7 +160,12 @@ export function useProjectsPageData(selectedProjectId?: string) {
 
     if (error) throw error
 
-    setProjects(prev => prev.map(p => (p.id === id ? data : p)))
+    setProjects(prev => {
+      // Drop archived rows so the dropdown stays consistent with the
+      // initial-fetch filter (status !== 'archived').
+      if (data.status === 'archived') return prev.filter(p => p.id !== id)
+      return prev.map(p => (p.id === id ? data : p))
+    })
     return data
   }
 
@@ -333,24 +317,7 @@ export function useProjectsPageData(selectedProjectId?: string) {
       return
     }
 
-    // Process tasks
-    const allTasks = data || []
-    const taskMap = new Map(allTasks.map(task => [task.id, { ...task, subtasks: [] }]))
-    const topLevelTasks: Task[] = []
-
-    allTasks.forEach(task => {
-      if (task.parent_task_id) {
-        const parentTask = taskMap.get(task.parent_task_id)
-        if (parentTask) {
-          parentTask.subtasks = parentTask.subtasks || []
-          parentTask.subtasks.push(taskMap.get(task.id)!)
-        }
-      } else {
-        topLevelTasks.push(taskMap.get(task.id)!)
-      }
-    })
-
-    setTasks(topLevelTasks)
+    setTasks(groupTasksByParent(data || []))
   }
 
   const refetchSessions = async () => {

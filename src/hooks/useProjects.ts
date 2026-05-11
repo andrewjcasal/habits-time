@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Project, Task } from '../types'
+import { groupTasksByParent } from '../utils/groupTasksByParent'
 
 // Unified hook that handles both authenticated user projects and public projects
 export function useProjects(user?: any, projectName?: string) {
@@ -198,24 +199,7 @@ export function usePublicTasks(projectId?: string) {
         return
       }
 
-      // Group tasks by parent/child relationship
-      const allTasks = data || []
-      const taskMap = new Map(allTasks.map(task => [task.id, { ...task, subtasks: [] }]))
-      const topLevelTasks: Task[] = []
-
-      allTasks.forEach(task => {
-        if (task.parent_task_id) {
-          const parentTask = taskMap.get(task.parent_task_id)
-          if (parentTask) {
-            parentTask.subtasks = parentTask.subtasks || []
-            parentTask.subtasks.push(taskMap.get(task.id)!)
-          }
-        } else {
-          topLevelTasks.push(taskMap.get(task.id)!)
-        }
-      })
-
-      setTasks(topLevelTasks)
+      setTasks(groupTasksByParent(data || []))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -273,26 +257,7 @@ export function useTasks(projectId?: string) {
         return
       }
 
-      // Group tasks by parent/child relationship
-      const allTasks = data || []
-      const taskMap = new Map(allTasks.map(task => [task.id, { ...task, subtasks: [] }]))
-      const topLevelTasks: Task[] = []
-
-      allTasks.forEach(task => {
-        if (task.parent_task_id) {
-          // This is a subtask
-          const parentTask = taskMap.get(task.parent_task_id)
-          if (parentTask) {
-            parentTask.subtasks = parentTask.subtasks || []
-            parentTask.subtasks.push(taskMap.get(task.id)!)
-          }
-        } else {
-          // This is a top-level task
-          topLevelTasks.push(taskMap.get(task.id)!)
-        }
-      })
-
-      setTasks(topLevelTasks)
+      setTasks(groupTasksByParent(data || []))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {

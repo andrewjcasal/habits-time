@@ -2,10 +2,18 @@
 
 ## Database Migrations
 
-- Do not apply migrations automatically through Supabase CLI
-- Create SQL migration files and user will apply them manually
-- Migration files go in `sql/migrations/` folder
-- Markdown files go to .claude/migrations
+- New migration files go in `supabase/migrations/` (the directory the
+  Supabase CLI reads). Older migrations live in `sql/migrations/` for
+  historical reasons — leave those in place but don't add new files there.
+- Apply migrations with `supabase db push`. Do **not** use the Supabase
+  MCP `apply_migration` tool — the user prefers the CLI workflow so the
+  local file and remote tracking stay in sync.
+- If `supabase db push` complains about local/remote drift, run
+  `supabase migration repair --status applied <versions>` for files that
+  are already applied, and `--status reverted <versions>` for remote-only
+  entries with no local file. Repair only mutates the tracking table —
+  no SQL is re-run.
+- Markdown notes for migrations go in `.claude/migrations/`.
 
 ## Project Structure
 

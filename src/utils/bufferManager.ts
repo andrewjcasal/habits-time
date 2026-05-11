@@ -1,17 +1,7 @@
 import { format, addDays } from 'date-fns'
+import type { BufferTime } from '../types'
 
-export interface BufferTime {
-  id: string
-  title: string
-  startTime: string
-  endTime: string
-  duration: number // in minutes
-  date: Date
-  dateStr: string
-  isBuffer: true
-  isReduced: boolean
-  isActive: boolean
-}
+export type { BufferTime }
 
 export const generateDailyBuffer = (date: Date, meetings: any[] = [], projectActivity: any[] = []): BufferTime | null => {
   const dateStr = format(date, 'yyyy-MM-dd')
@@ -128,6 +118,32 @@ export const generateBuffersForDays = (dayColumns: any[], meetings: any[] = [], 
   })
 
   return buffers
+}
+
+/** Flatten daily buffers across [startDate, endDate) into ISO intervals.
+ *  Shared between the calendar render path (visible window) and the
+ *  billable-hours auto-placer (full month) so both agree on where the
+ *  end-of-day buffer sits each day. */
+export const generateBufferIntervalsForRange = (
+  startDate: Date,
+  endDate: Date,
+  meetings: any[] = [],
+  projectActivity: any[] = []
+): { start_time: string; end_time: string }[] => {
+  const intervals: { start_time: string; end_time: string }[] = []
+  for (
+    const cursor = new Date(startDate);
+    cursor.getTime() < endDate.getTime();
+    cursor.setDate(cursor.getDate() + 1)
+  ) {
+    const buffer = generateDailyBuffer(new Date(cursor), meetings, projectActivity)
+    if (!buffer || !buffer.isActive) continue
+    intervals.push({
+      start_time: new Date(`${buffer.dateStr}T${buffer.startTime}:00`).toISOString(),
+      end_time: new Date(`${buffer.dateStr}T${buffer.endTime}:00`).toISOString(),
+    })
+  }
+  return intervals
 }
 
 export const getBuffersForTimeSlot = (

@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
-import { Pencil } from 'lucide-react'
-import { useEffect, useState, useMemo } from 'react'
+import { Pencil, Play, Check } from 'lucide-react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { Meeting } from '../types'
 import { supabase } from '../lib/supabase'
 import ModalWrapper from './ModalWrapper'
@@ -72,6 +72,13 @@ const MeetingModal = ({
   const [activityProjectId, setActivityProjectId] = useState('')
   const [activityNote, setActivityNote] = useState('')
   const [savingActivity, setSavingActivity] = useState(false)
+  // Habit timer state — used by the inline "Start habits timer" panel.
+  const [showHabitTimer, setShowHabitTimer] = useState(false)
+  const [activeTimerHabitId, setActiveTimerHabitId] = useState<string | null>(null)
+  const [secondsRemaining, setSecondsRemaining] = useState(0)
+  const [totalSeconds, setTotalSeconds] = useState(0)
+  const [completedHabitIds, setCompletedHabitIds] = useState<Set<string>>(new Set())
+  const habitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [newHabitName, setNewHabitName] = useState('')
   const [newHabitDuration, setNewHabitDuration] = useState(30)
   const [newHabitStartTime, setNewHabitStartTime] = useState('09:00')
@@ -89,6 +96,27 @@ const MeetingModal = ({
     )
   }, [calendarHabits, selectedTimeSlot])
 
+  // Habits and subhabits (≤ 15 min) that haven't been completed or skipped
+  // for the dragged date. Surfaced in the inline "Start habits timer"
+  // panel — long habits don't belong in a quick-timer flow.
+  const incompleteHabits = useMemo(() => {
+    if (!selectedTimeSlot || calendarHabits.length === 0) return []
+    const dateStr = format(selectedTimeSlot.date, 'yyyy-MM-dd')
+
+    const flat: any[] = []
+    for (const h of calendarHabits) {
+      flat.push(h)
+      if (Array.isArray(h.subhabits)) flat.push(...h.subhabits)
+    }
+
+    return flat.filter(h => {
+      const duration = h.duration || 0
+      if (duration <= 0 || duration > 15) return false
+      const log = h.habits_daily_logs?.find((l: any) => l.log_date === dateStr)
+      return !log?.is_completed && !log?.is_skipped
+    })
+  }, [calendarHabits, selectedTimeSlot])
+
   // Sync local title with meeting prop when modal opens
   useEffect(() => {
     if (showMeetingModal) {
@@ -100,8 +128,22 @@ const MeetingModal = ({
       setShowFullForm(false)
       setActivityProjectId('')
       setActivityNote('')
+      setShowHabitTimer(false)
+      setActiveTimerHabitId(null)
+      setCompletedHabitIds(new Set())
+      if (habitTimerRef.current) {
+        clearInterval(habitTimerRef.current)
+        habitTimerRef.current = null
+      }
     }
   }, [showMeetingModal, meeting.title])
+
+  // Stop the habit timer when the component unmounts (modal close, route nav).
+  useEffect(() => {
+    return () => {
+      if (habitTimerRef.current) clearInterval(habitTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -191,6 +233,90 @@ const MeetingModal = ({
 
     onAddHabitBlock?.(habit.id, dateStr, startTime, durationMin)
     closeMeetingModal()
+  }
+
+  const startHabitTimer = (habit: any) => {
+    if (habitTimerRef.current) clearInterval(habitTimerRef.current)
+    const minutes = habit.duration || 5
+    const total = minutes * 60
+    setActiveTimerHabitId(habit.id)
+    setSecondsRemaining(total)
+    setTotalSeconds(total)
+    habitTimerRef.current = setInterval(() => {
+      setSecondsRemaining(prev => {
+        if (prev <= 1) {
+          if (habitTimerRef.current) clearInterval(habitTimerRef.current)
+          habitTimerRef.current = null
+          // Leave activeTimerHabitId set so the row stays in the
+          // "ready to mark complete" state until the user confirms.
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  const markHabitComplete = async (habit: any) => {
+    if (!user || !selectedTimeSlot) return
+    const dateKey = format(selectedTimeSlot.date, 'yyyy-MM-dd')
+
+    // Optimistic UI: green check immediately, stop the timer if this was
+    // the active habit.
+    setCompletedHabitIds(prev => new Set([...prev, habit.id]))
+    if (activeTimerHabitId === habit.id) {
+      if (habitTimerRef.current) clearInterval(habitTimerRef.current)
+      habitTimerRef.current = null
+      setActiveTimerHabitId(null)
+    }
+
+    try {
+      const { data: existing } = await supabase
+        .from('cassian_habits_daily_logs')
+        .select('id')
+        .eq('habit_id', habit.id)
+        .eq('user_id', user.id)
+        .eq('log_date', dateKey)
+        .limit(1)
+        .maybeSingle()
+
+      if (existing?.id) {
+        await supabase
+          .from('cassian_habits_daily_logs')
+          .update({ is_completed: true, is_skipped: false })
+          .eq('id', existing.id)
+      } else {
+        await supabase.from('cassian_habits_daily_logs').insert({
+          habit_id: habit.id,
+          user_id: user.id,
+          log_date: dateKey,
+          is_completed: true,
+        })
+      }
+    } catch (err) {
+      console.error('Error marking habit complete:', err)
+      setCompletedHabitIds(prev => {
+        const next = new Set(prev)
+        next.delete(habit.id)
+        return next
+      })
+    }
+  }
+
+  const handleHabitCircleClick = (habit: any) => {
+    if (completedHabitIds.has(habit.id)) return // already done
+    if (activeTimerHabitId === habit.id) {
+      // Active habit clicked → confirm completion.
+      markHabitComplete(habit)
+    } else {
+      // Start a fresh timer for this habit (replaces any prior active one).
+      startHabitTimer(habit)
+    }
+  }
+
+  const formatTimerDisplay = (totalSec: number) => {
+    const m = Math.floor(totalSec / 60)
+    const s = totalSec % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
   }
 
   const fetchHabitsForLinking = async () => {
@@ -547,24 +673,104 @@ const MeetingModal = ({
           </div>
 
         ) : !editingMeeting && !showFullForm && previousTitles.length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-1.5">
-                {previousTitles.slice(0, 12).map((titleData, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => {
-                      setLocalTitle(titleData.title)
-                      const updatedMeeting = { ...meeting, title: titleData.title }
-                      setNewMeeting(updatedMeeting)
-                      handleSaveMeeting(new Event('submit') as any, updatedMeeting)
-                    }}
-                    className="px-2 py-0.5 rounded-full text-xs border bg-neutral-50 border-neutral-200 text-neutral-700 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors"
-                  >
-                    {titleData.title.length > 25 ? titleData.title.slice(0, 25) + '…' : titleData.title}
-                  </button>
+            <div className="space-y-2">
+              <select
+                value=""
+                onChange={e => {
+                  const picked = previousTitles.find(t => t.title === e.target.value)
+                  if (!picked) return
+                  setLocalTitle(picked.title)
+                  const updatedMeeting = { ...meeting, title: picked.title }
+                  setNewMeeting(updatedMeeting)
+                  handleSaveMeeting(new Event('submit') as any, updatedMeeting)
+                }}
+                className="block w-[250px] px-2 py-1 border border-neutral-300 rounded-md text-xs"
+              >
+                <option value="">Recent meetings…</option>
+                {previousTitles.slice(0, 20).map((titleData, index) => (
+                  <option key={index} value={titleData.title}>
+                    {titleData.title}
+                  </option>
                 ))}
-              </div>
+              </select>
+              {incompleteHabits.length > 0 && !showHabitTimer && (
+                <button
+                  type="button"
+                  onClick={() => setShowHabitTimer(true)}
+                  className="flex items-center gap-1 w-[250px] px-2 py-1 border border-neutral-300 rounded-md text-xs text-neutral-700 hover:bg-neutral-50"
+                >
+                  <Play className="w-2.5 h-2.5" />
+                  Start habits timer
+                  <span className="ml-auto text-neutral-400">{incompleteHabits.length}</span>
+                </button>
+              )}
+              {showHabitTimer && incompleteHabits.length > 0 && (
+                <ul className="w-[250px] space-y-0.5 max-h-48 overflow-y-auto pr-1">
+                  {incompleteHabits.map(h => {
+                    const isActive = activeTimerHabitId === h.id
+                    const isDone = completedHabitIds.has(h.id)
+                    const isReady = isActive && secondsRemaining === 0
+                    const dur = h.duration || 5
+                    const r = 8
+                    const circ = 2 * Math.PI * r
+                    const offset = totalSeconds > 0
+                      ? circ * (1 - secondsRemaining / totalSeconds)
+                      : 0
+                    return (
+                      <li
+                        key={h.id}
+                        className={`flex items-center gap-2 text-xs ${
+                          isReady ? 'text-green-700 font-semibold'
+                          : isActive ? 'text-blue-700 font-semibold'
+                          : isDone ? 'text-neutral-400 line-through'
+                          : 'text-neutral-600'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleHabitCircleClick(h)}
+                          className="shrink-0 flex items-center justify-center rounded-full group"
+                          title={
+                            isDone ? 'Done'
+                            : isActive ? 'Mark as done'
+                            : 'Start timer'
+                          }
+                        >
+                          {isDone ? (
+                            <Check className="w-3.5 h-3.5 text-green-500" />
+                          ) : (
+                            <svg className="w-3.5 h-3.5 -rotate-90" viewBox="0 0 20 20">
+                              <circle
+                                cx="10" cy="10" r={r}
+                                fill={isReady ? '#bbf7d0' : 'none'}
+                                stroke={isActive ? '#dbeafe' : '#e5e7eb'}
+                                strokeWidth={isActive ? 3 : 1.5}
+                                className="group-hover:stroke-orange-400 group-hover:fill-orange-100"
+                              />
+                              {isActive && !isReady && (
+                                <circle
+                                  cx="10" cy="10" r={r}
+                                  fill="none"
+                                  stroke={secondsRemaining <= 10 ? '#ef4444' : '#2563eb'}
+                                  strokeWidth="3"
+                                  strokeLinecap="round"
+                                  strokeDasharray={circ}
+                                  strokeDashoffset={offset}
+                                  className="transition-all duration-1000 ease-linear"
+                                />
+                              )}
+                            </svg>
+                          )}
+                        </button>
+                        <span className="truncate">{h.name}</span>
+                        <span className="ml-auto text-neutral-400 shrink-0">
+                          {isActive ? formatTimerDisplay(secondsRemaining) : `${dur}m`}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
               <div className="flex gap-3">
                 <button
                   type="button"

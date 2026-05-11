@@ -287,17 +287,23 @@ export function useHabits(selectedDate?: string, options?: { includeArchived?: b
     }
   }
 
-  const unarchiveHabit = async (habitId: string) => {
+  const unarchiveHabit = async (habit: HabitWithType) => {
     if (!user) return
     try {
       const { error } = await supabase
         .from('cassian_habits')
         .update({ is_archived: false })
-        .eq('id', habitId)
+        .eq('id', habit.id)
         .eq('user_id', user.id)
       if (error) throw error
-      // Refetch so the newly-unarchived habit reappears in the main list.
-      await fetchHabits()
+      // Splice the unarchived row into local state. The caller passes
+      // the full row (typically `currentHabit` from a hook with
+      // includeArchived: true) so we don't need to refetch to get its
+      // fields.
+      setHabits(prev => {
+        const without = prev.filter(h => h.id !== habit.id)
+        return [...without, { ...habit, is_archived: false }]
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to unarchive habit')
       throw err

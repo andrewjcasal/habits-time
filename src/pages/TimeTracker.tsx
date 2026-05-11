@@ -20,6 +20,7 @@ import { supabase } from '../lib/supabase'
 import SplitLogModal from '../components/SplitLogModal'
 import AddLogModal from '../components/AddLogModal'
 import TimeLogRow from '../components/TimeLogRow'
+import { ActivityType } from '../types'
 
 interface TimeLog {
   id: string
@@ -43,12 +44,6 @@ interface CategorySummary {
   name: string
   color: string
   totalTime: number
-}
-
-interface ActivityType {
-  id: string
-  name: string
-  is_favorite?: boolean
 }
 
 interface FavoriteSummary {
@@ -357,12 +352,14 @@ const TimeTracker = () => {
 
       // Find or create activity type
       let activityTypeId: string
+      let activityTypeForLog: ActivityType
       const existingActivityType = activityTypes.find(
         at => at.name.toLowerCase() === newLogActivityType.trim().toLowerCase()
       )
 
       if (existingActivityType) {
         activityTypeId = existingActivityType.id
+        activityTypeForLog = existingActivityType
       } else {
         // Create new activity type
         const { data: newActivityType, error: createError } = await supabase
@@ -378,6 +375,9 @@ const TimeTracker = () => {
 
         if (createError) throw createError
         activityTypeId = newActivityType.id
+        activityTypeForLog = newActivityType as ActivityType
+        // Splice the new activity type into local state.
+        setActivityTypes(prev => [...prev, newActivityType as ActivityType])
       }
 
       // Create the time log
@@ -388,13 +388,40 @@ const TimeTracker = () => {
         ...(endDateTime && { end_time: endDateTime.toISOString() }),
       }
 
-      const { error: insertError } = await supabase.from('cassian_habits_time_logs').insert([logData])
+      const { data: insertedLog, error: insertError } = await supabase
+        .from('cassian_habits_time_logs')
+        .insert([logData])
+        .select()
+        .single()
 
       if (insertError) throw insertError
 
-      // Refresh data and close modal
-      await fetchTimeLogs()
-      await fetchActivityTypes()
+      // Splice the new log into local state. Categories start empty (no
+      // activity-type→category links exist yet for a brand-new log) and
+      // duration is computed from start/end times.
+      const logForState: TimeLog = {
+        ...insertedLog,
+        habits_activity_types: activityTypeForLog,
+        duration: endDateTime
+          ? endDateTime.getTime() - startDateTime.getTime()
+          : null,
+        categories: [],
+      }
+      // Only show the log if it falls within the currently selected day —
+      // mirrors fetchTimeLogs' date-range filter.
+      const startOfSelectedDay = startOfDay(selectedDate)
+      const endOfSelectedDay = endOfDay(selectedDate)
+      if (
+        startDateTime >= startOfSelectedDay &&
+        startDateTime <= endOfSelectedDay
+      ) {
+        setTimeLogs(prev =>
+          [logForState, ...prev].sort(
+            (a, b) =>
+              new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+          )
+        )
+      }
       closeAddLogModal()
     } catch (err) {
       console.error('Error creating time log:', err)
@@ -429,12 +456,14 @@ const TimeTracker = () => {
     try {
       // Find existing activity type or create new one
       let activityTypeId: string
+      let activityTypeForLog: ActivityType
       const existingActivityType = activityTypes.find(
         at => at.name.toLowerCase() === activityTypeName.toLowerCase()
       )
 
       if (existingActivityType) {
         activityTypeId = existingActivityType.id
+        activityTypeForLog = existingActivityType
       } else {
         // Create new activity type
         const { data: newActivityType, error: createError } = await supabase
@@ -450,6 +479,8 @@ const TimeTracker = () => {
 
         if (createError) throw createError
         activityTypeId = newActivityType.id
+        activityTypeForLog = newActivityType as ActivityType
+        setActivityTypes(prev => [...prev, newActivityType as ActivityType])
       }
 
       // Update the time log
@@ -461,9 +492,23 @@ const TimeTracker = () => {
 
       if (error) throw error
 
-      // Refresh data
-      await fetchTimeLogs()
-      await fetchActivityTypes()
+      // Splice the FK swap into local state. Categories are reset to []
+      // because the new activity type may have a different category mapping;
+      // if the user expects categories to follow, that needs separate
+      // handling — currently fetchTimeLogs would have shown empty too until
+      // the join populated.
+      setTimeLogs(prev =>
+        prev.map(log =>
+          log.id === logId
+            ? {
+                ...log,
+                activity_type_id: activityTypeId,
+                habits_activity_types: activityTypeForLog,
+                categories: [],
+              }
+            : log
+        )
+      )
       setOpenMenuId(null)
     } catch (err) {
       console.error('Error updating activity type:', err)
@@ -527,12 +572,41 @@ const TimeTracker = () => {
         ...(endTime && { end_time: endTime.toISOString() }),
       }
 
-      const { error: insertError } = await supabase.from('cassian_habits_time_logs').insert([newLogData])
+      const { data: insertedLog, error: insertError } = await supabase
+        .from('cassian_habits_time_logs')
+        .insert([newLogData])
+        .select()
+        .single()
 
       if (insertError) throw insertError
 
-      // Refresh the logs and close modal
-      await fetchTimeLogs()
+      // Splice both updates locally: shorten the original, add the new
+      // tail. The new log carries over the original's activity type and
+      // category list since it's the same activity continuing.
+      const splitEndIso = splitDateTime.toISOString()
+      const newLog: TimeLog = {
+        ...insertedLog,
+        habits_activity_types: splitModalLog.habits_activity_types,
+        duration: endTime ? endTime.getTime() - splitDateTime.getTime() : undefined,
+        categories: splitModalLog.categories ?? [],
+      }
+      setTimeLogs(prev =>
+        [
+          ...prev.map(log =>
+            log.id === splitModalLog.id
+              ? {
+                  ...log,
+                  end_time: splitEndIso,
+                  duration: splitDateTime.getTime() - new Date(log.start_time).getTime(),
+                }
+              : log
+          ),
+          newLog,
+        ].sort(
+          (a, b) =>
+            new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+        )
+      )
       setSplitModalLog(null)
       setSplitTime('')
     } catch (err) {

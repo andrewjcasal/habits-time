@@ -2,16 +2,23 @@
 
 ## Database Migrations
 
-- Do not apply migrations automatically through Supabase CLI
-- Create SQL migration files and user will apply them manually
-- Migration files go in `sql/migrations/` folder
-- Markdown files go to .claude/migrations
+- New migration files go in `supabase/migrations/` (the directory the
+  Supabase CLI reads). Older migrations live in `sql/migrations/` for
+  historical reasons — leave those in place but don't add new files there.
+- Apply migrations with `supabase db push`. Do **not** use the Supabase
+  MCP `apply_migration` tool — the user prefers the CLI workflow so the
+  local file and remote tracking stay in sync.
+- If `supabase db push` complains about local/remote drift, run
+  `supabase migration repair --status applied <versions>` for files that
+  are already applied, and `--status reverted <versions>` for remote-only
+  entries with no local file. Repair only mutates the tracking table —
+  no SQL is re-run.
+- Markdown notes for migrations go in `.claude/migrations/`.
 
 ## Project Structure
 
 - Main app: React TypeScript with Vite
 - Database: Supabase PostgreSQL
-- No automatic schema changes via tools
 
 ## Smart Day Boundary Logic
 
@@ -59,6 +66,7 @@
 
 - Do not use anonymous functions (IIFEs) inside JSX — extract logic into `useMemo`, named functions, or variables before the return statement
 - Prefer `useMemo` for derived data that needs computation (e.g., grouping, filtering, sorting)
+- When adding `console.log` for debugging, wrap object/array arguments in `JSON.stringify(...)` so values render inline in the console. Plain objects collapse to "Object" in the user's terminal/console paste, hiding the data we need.
 
 ## Database Table Naming
 

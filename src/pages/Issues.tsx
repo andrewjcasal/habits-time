@@ -4,12 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import LoadingSpinner from '../components/LoadingSpinner'
 import InlineEdit from '../components/InlineEdit'
-
-interface Issue {
-  id: string
-  name: string
-  is_archived: boolean
-}
+import { Issue } from '../types'
 
 interface NoteIssueRow {
   issue_id: string

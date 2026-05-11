@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-
-interface ArchivedHabit {
-  id: string
-  name: string
-  duration: number | null
-  current_start_time: string | null
-  weekly_days: string[] | null
-}
+import { ArchivedHabit } from '../types'
 
 interface ArchivedHabitsListProps {
   selectedHabitId: string | null

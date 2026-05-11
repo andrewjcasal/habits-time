@@ -36,6 +36,7 @@ interface CalendarEventSlotsProps {
   tasksDailyLogsInSlot: any[]
   categoryBuffersInSlot: any[]
   projectActivityInSlot?: any[]
+  billableHoursInSlot?: any[]
   timeSlot: string
   date: Date
   dateStr: string
@@ -46,6 +47,9 @@ interface CalendarEventSlotsProps {
   handleTaskClick: (task: any) => void
   handleEditMeeting: (meeting: any) => void
   handleProjectActivityClick?: (activity: any) => void
+  onProjectActivityResizeStart?: (activity: any, e: React.MouseEvent) => void
+  handleBillableHourClick?: (block: any) => void
+  onBillableHourResizeStart?: (block: any, e: React.MouseEvent) => void
   onMeetingResizeStart?: (meeting: any, e: React.MouseEvent) => void
   onMeetingDragStart?: (meeting: any, e: React.MouseEvent) => void
   draggingMeetingId?: string | null
@@ -69,6 +73,7 @@ function CalendarEventSlots({
   tasksDailyLogsInSlot,
   categoryBuffersInSlot,
   projectActivityInSlot = [],
+  billableHoursInSlot = [],
   timeSlot,
   date,
   dateStr,
@@ -79,6 +84,9 @@ function CalendarEventSlots({
   handleTaskClick,
   handleEditMeeting,
   handleProjectActivityClick,
+  onProjectActivityResizeStart,
+  handleBillableHourClick,
+  onBillableHourResizeStart,
   onMeetingResizeStart,
   onMeetingDragStart,
   draggingMeetingId,
@@ -305,7 +313,7 @@ function CalendarEventSlots({
             key={`project-activity-${activity.id}${isClipped ? '-clipped' : ''}`}
             type="session"
             style={{
-              ...getEventStyle(topPositionInSlot, activityHeight, 14),
+              ...getEventStyle(topPositionInSlot, activityHeight, 25),
               ...(projectColor ? { backgroundColor: projectColor, color: '#fff' } : {}),
               cursor: handleProjectActivityClick ? 'pointer' : undefined,
             }}
@@ -313,9 +321,63 @@ function CalendarEventSlots({
               e.stopPropagation()
               handleProjectActivityClick(activity)
             } : undefined}
+            onResizeStart={
+              !isClipped && onProjectActivityResizeStart
+                ? (e) => onProjectActivityResizeStart(activity, e)
+                : undefined
+            }
             eventTitle={projectName}
             subtitle={activity.note || undefined}
             duration={formatDuration(Math.round(activityDuration))}
+          />
+        )
+      })}
+
+      {/* Billable Hours — auto-placed flat-rate blocks. Render block
+          mirrors project-activity: minute-aligned start within the
+          slot, height proportional to duration, resize handle. */}
+      {billableHoursInSlot.map(block => {
+        const blockStart = new Date(block.start_time)
+        const blockEnd = new Date(block.end_time)
+        const durationMin = Math.max(0, (blockEnd.getTime() - blockStart.getTime()) / (1000 * 60))
+        const blockHeight = (durationMin / 60) * hourHeight
+        const topPositionInSlot = (blockStart.getMinutes() / 60) * 100
+
+        const subtitle =
+          block.rate && Number(block.rate) > 0
+            ? `$${Number(block.rate).toFixed(0)}/hr`
+            : undefined
+
+        // When the block is assigned to a project, tint it with a
+        // darker shade of that project's color so it visually pairs
+        // with project-activity blocks but is clearly billable.
+        const projectColor = block._projectColor as string | undefined
+        const billableStyle = projectColor
+          ? {
+              ...getEventStyle(topPositionInSlot, blockHeight, 12),
+              backgroundColor: `color-mix(in oklab, ${projectColor} 65%, black 35%)`,
+              color: '#fff',
+            }
+          : getEventStyle(topPositionInSlot, blockHeight, 12)
+        return (
+          <CalendarEvent
+            key={`billable-${block.id}`}
+            type="billable-hours"
+            style={billableStyle}
+            onClick={
+              handleBillableHourClick
+                ? e => {
+                    e.stopPropagation()
+                    handleBillableHourClick(block)
+                  }
+                : undefined
+            }
+            onResizeStart={
+              onBillableHourResizeStart ? e => onBillableHourResizeStart(block, e) : undefined
+            }
+            eventTitle={block._projectName ? `B|${block._projectName}` : 'Billable'}
+            subtitle={subtitle}
+            duration={formatDuration(Math.round(durationMin))}
           />
         )
       })}

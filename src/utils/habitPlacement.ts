@@ -38,7 +38,8 @@ export const resolveHabitPlacements = (
   habits: any[],
   meetings: any[],
   sessions: any[],
-  dayColumns: DayColumn[]
+  dayColumns: DayColumn[],
+  projectActivity: any[] = []
 ): HabitPlacement[] => {
   interface Occurrence {
     habit: any
@@ -105,18 +106,30 @@ export const resolveHabitPlacements = (
     const dateMeetings = meetings.filter(
       m => format(new Date(m.start_time), 'yyyy-MM-dd') === dateKey
     )
+    const dateProjectActivity = projectActivity.filter(
+      a => format(new Date(a.start_time), 'yyyy-MM-dd') === dateKey
+    )
     const dateSessions = sessions.filter(s => s.scheduled_date === dateKey)
 
-    const findConflictingMeetingEnd = (start: number, end: number): number | null => {
-      for (const m of dateMeetings) {
-        const ms = new Date(m.start_time)
-        const me = new Date(m.end_time)
-        const msH = ms.getHours() + ms.getMinutes() / 60
-        const meH = me.getHours() + me.getMinutes() / 60
-        if (start < meH && end > msH) return meH
+    const findConflictingBlockEnd = (
+      blocks: any[],
+      start: number,
+      end: number
+    ): number | null => {
+      for (const b of blocks) {
+        const bs = new Date(b.start_time)
+        const be = new Date(b.end_time)
+        const bsH = bs.getHours() + bs.getMinutes() / 60
+        const beH = be.getHours() + be.getMinutes() / 60
+        if (start < beH && end > bsH) return beH
       }
       return null
     }
+
+    const findConflictingMeetingEnd = (start: number, end: number): number | null =>
+      findConflictingBlockEnd(dateMeetings, start, end)
+    const findConflictingProjectActivityEnd = (start: number, end: number): number | null =>
+      findConflictingBlockEnd(dateProjectActivity, start, end)
 
     const findConflictingSessionEnd = (start: number, end: number): number | null => {
       for (const s of dateSessions) {
@@ -135,12 +148,18 @@ export const resolveHabitPlacements = (
     const shuffled: Entry[] = []
     for (const occ of occurrences) {
       const meetingEnd = findConflictingMeetingEnd(occ.origStart, occ.origEnd)
+      const projectEnd =
+        meetingEnd === null
+          ? findConflictingProjectActivityEnd(occ.origStart, occ.origEnd)
+          : null
       const sessionEnd =
-        meetingEnd === null ? findConflictingSessionEnd(occ.origStart, occ.origEnd) : null
-      if (meetingEnd === null && sessionEnd === null) {
+        meetingEnd === null && projectEnd === null
+          ? findConflictingSessionEnd(occ.origStart, occ.origEnd)
+          : null
+      if (meetingEnd === null && projectEnd === null && sessionEnd === null) {
         preserved.push({ occ })
       } else {
-        shuffled.push({ occ, shuffleStart: meetingEnd ?? sessionEnd! })
+        shuffled.push({ occ, shuffleStart: meetingEnd ?? projectEnd ?? sessionEnd! })
       }
     }
 
@@ -149,11 +168,42 @@ export const resolveHabitPlacements = (
 
     const placed: Array<{ start: number; end: number }> = []
 
+    // Fixed-block intervals (meetings + project_activity + sessions) the
+    // cascade must skip over, not just stack against. Without this the
+    // shuffle-after-conflict step can land a habit ON TOP of a different
+    // project_activity / meeting that didn't trigger its initial conflict.
+    const fixedBlocked: Array<{ start: number; end: number }> = []
+    for (const m of dateMeetings) {
+      const ms = new Date(m.start_time)
+      const me = new Date(m.end_time)
+      fixedBlocked.push({
+        start: ms.getHours() + ms.getMinutes() / 60,
+        end: me.getHours() + me.getMinutes() / 60,
+      })
+    }
+    for (const a of dateProjectActivity) {
+      const as = new Date(a.start_time)
+      const ae = new Date(a.end_time)
+      fixedBlocked.push({
+        start: as.getHours() + as.getMinutes() / 60,
+        end: ae.getHours() + ae.getMinutes() / 60,
+      })
+    }
+    for (const s of dateSessions) {
+      if (!s.actual_start_time) continue
+      const timeOnly = String(s.actual_start_time).split(/[+-]/)[0]
+      const [h, m] = timeOnly.split(':').map(Number)
+      const ss = h + m / 60
+      fixedBlocked.push({ start: ss, end: ss + (s.scheduled_hours || 1) })
+    }
+
     const placeAt = (candidateStart: number, duration: number) => {
       let start = candidateStart
       for (let guard = 0; guard < 50; guard++) {
         const end = start + duration / 60
-        const conflict = placed.find(p => start < p.end && end > p.start)
+        const habitConflict = placed.find(p => start < p.end && end > p.start)
+        const fixedConflict = fixedBlocked.find(b => start < b.end && end > b.start)
+        const conflict = habitConflict || fixedConflict
         if (!conflict) return { start, end }
         start = conflict.end
       }

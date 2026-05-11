@@ -7,13 +7,15 @@ export const computeConflictMaps = (
   sessionsData: any[],
   meetingsData: any[],
   dayColumns: any[],
-  tasksDailyLogsData: any[] = []
+  tasksDailyLogsData: any[] = [],
+  billableHoursData: any[] = []
 ) => {
   const habitConflicts = new Map()
   const sessionConflicts = new Map()
   const meetingConflicts = new Map()
   const tasksDailyLogsConflicts = new Map()
   const bufferConflicts = new Map()
+  const billableHoursConflicts = new Map()
 
   // Get valid date strings for current view to filter conflicts
   const validDateStrs = new Set(dayColumns.map(({ dateStr }) => dateStr))
@@ -105,6 +107,25 @@ export const computeConflictMaps = (
     }
   })
   
+  // Pre-compute billable hours conflicts (only for dates in current view).
+  // Mirrors the meeting block: clip to the day's date and stamp 15-minute
+  // slots so the auto-placer + scheduler treat manual blocks as immovable.
+  billableHoursData.forEach(block => {
+    const blockStart = new Date(block.start_time)
+    const blockEnd = new Date(block.end_time)
+    const dateStr = format(blockStart, 'yyyy-MM-dd')
+    if (!validDateStrs.has(dateStr)) return
+
+    const startTimeInHours = blockStart.getHours() + blockStart.getMinutes() / 60
+    const endTimeInHours = blockEnd.getHours() + blockEnd.getMinutes() / 60
+
+    for (let time = Math.round(startTimeInHours * 4) / 4; time < endTimeInHours; time += 0.25) {
+      const normalizedTime = Math.round(time * 4) / 4
+      const key = `${dateStr}-${normalizedTime}`
+      billableHoursConflicts.set(key, block)
+    }
+  })
+
   // Pre-compute buffer conflicts
   const buffers = generateBuffersForDays(dayColumns, meetingsData)
   buffers.forEach((buffer: BufferTime, dateStr: string) => {
@@ -123,5 +144,12 @@ export const computeConflictMaps = (
     }
   })
   
-  return { habitConflicts, sessionConflicts, meetingConflicts, tasksDailyLogsConflicts, bufferConflicts }
+  return {
+    habitConflicts,
+    sessionConflicts,
+    meetingConflicts,
+    tasksDailyLogsConflicts,
+    bufferConflicts,
+    billableHoursConflicts,
+  }
 }

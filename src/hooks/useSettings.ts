@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { HourRanges, getHourRanges, hourFromHHMM, DEFAULT_HOUR_RANGES } from '../utils/hourRanges'
 
 interface UserSettings {
   id?: string
   user_id: string
-  work_hours_start: string
-  work_hours_end: string
+  /** Legacy — kept for older rows. New writes go to `hour_ranges`. */
+  work_hours_start?: string
+  /** Legacy — kept for older rows. New writes go to `hour_ranges`. */
+  work_hours_end?: string
+  hour_ranges?: HourRanges
   week_ending_day: string // 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
   week_ending_time: string // HH:MM format
   week_ending_timezone: string // e.g., 'America/New_York'
   weekend_days: string[] // Array of weekday names like ['saturday', 'sunday']
   todoist_api_key?: string
   clickup_api_key?: string
-  billable_hours_enabled?: boolean
-  default_hourly_rate?: number
-  weekly_revenue_target?: number
   created_at?: string
   updated_at?: string
 }
@@ -25,6 +26,7 @@ interface UseSettingsReturn {
   error: string | null
   updateSettings: (settings: Partial<UserSettings>) => Promise<void>
   getWorkHoursRange: () => { start: number; end: number }
+  getPersonalHoursRange: () => { start: number; end: number }
 }
 
 export const useSettings = (): UseSettingsReturn => {
@@ -60,8 +62,7 @@ export const useSettings = (): UseSettingsReturn => {
         // Create default settings if none exist
         const defaultSettings = {
           user_id: user.id,
-          work_hours_start: '06:00:00',
-          work_hours_end: '23:00:00',
+          hour_ranges: DEFAULT_HOUR_RANGES,
           week_ending_day: 'sunday',
           week_ending_time: '20:30',
           week_ending_timezone: 'America/New_York',
@@ -88,8 +89,7 @@ export const useSettings = (): UseSettingsReturn => {
       if (user) {
         setSettings({
           user_id: user.id,
-          work_hours_start: '06:00:00',
-          work_hours_end: '23:00:00',
+          hour_ranges: DEFAULT_HOUR_RANGES,
           week_ending_day: 'sunday',
           week_ending_time: '20:30',
           week_ending_timezone: 'America/New_York',
@@ -130,14 +130,15 @@ export const useSettings = (): UseSettingsReturn => {
 
   // Get work hours as numbers (24-hour format)
   const getWorkHoursRange = () => {
-    if (!settings) {
-      return { start: 6, end: 23 } // Default fallback
-    }
+    const { work_hours } = getHourRanges(settings)
+    return { start: hourFromHHMM(work_hours.start), end: hourFromHHMM(work_hours.end) }
+  }
 
-    const start = parseInt(settings.work_hours_start.split(':')[0], 10)
-    const end = parseInt(settings.work_hours_end.split(':')[0], 10)
-
-    return { start, end }
+  // Get personal hours as numbers (24-hour format) — used by Todoist /
+  // off-hours scheduling.
+  const getPersonalHoursRange = () => {
+    const { personal_hours } = getHourRanges(settings)
+    return { start: hourFromHHMM(personal_hours.start), end: hourFromHHMM(personal_hours.end) }
   }
 
   useEffect(() => {
@@ -150,5 +151,6 @@ export const useSettings = (): UseSettingsReturn => {
     error,
     updateSettings,
     getWorkHoursRange,
+    getPersonalHoursRange,
   }
 }

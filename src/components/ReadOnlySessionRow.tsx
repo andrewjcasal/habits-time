@@ -1,5 +1,6 @@
 import { Copy, Check } from 'lucide-react'
 import { Session } from '../types'
+import { formatTimeOfDay } from '../utils/formatTime'
 
 interface ReadOnlySessionRowProps {
   session: Session & { assignedTasks?: any[] }
@@ -20,8 +21,11 @@ const ReadOnlySessionRow = ({
   onSessionClick,
   onCompleteSession,
 }: ReadOnlySessionRowProps) => {
+  const todayStr = new Date().toISOString().split('T')[0]
+  const isCompletableToday = session.scheduled_date === todayStr && Boolean(onCompleteSession)
+
   return (
-    <div 
+    <div
       className="py-2 px-1 border-b border-neutral-100 hover:bg-neutral-50 transition-colors group cursor-pointer"
       onClick={() => onSessionClick(session)}
     >
@@ -37,39 +41,18 @@ const ReadOnlySessionRow = ({
 
           {session.actual_start_time && session.actual_end_time && (
             <div className="flex items-center gap-1 text-xs text-neutral-500">
-              <span>
-                {(() => {
-                  const [hours, minutes] = session.actual_start_time.split(':').map(Number)
-                  const ampm = hours >= 12 ? 'PM' : 'AM'
-                  const hour12 = hours % 12 || 12
-                  return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`
-                })()}
-              </span>
-
+              <span>{formatTimeOfDay(session.actual_start_time)}</span>
               <span>-</span>
-
-              <span>
-                {(() => {
-                  const [hours, minutes] = session.actual_end_time.split(':').map(Number)
-                  const ampm = hours >= 12 ? 'PM' : 'AM'
-                  const hour12 = hours % 12 || 12
-                  return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`
-                })()}
-              </span>
+              <span>{formatTimeOfDay(session.actual_end_time)}</span>
             </div>
           )}
         </div>
         <div className="flex items-center gap-1">
-          {/* Complete session check mark - show on hover for today's sessions */}
-          {(() => {
-            const today = new Date().toISOString().split('T')[0]
-            const sessionDate = session.scheduled_date
-            return sessionDate === today && onCompleteSession
-          })() && (
+          {isCompletableToday && (
             <button
               onClick={e => {
                 e.stopPropagation()
-                onCompleteSession(session)
+                onCompleteSession!(session)
               }}
               className="p-0.5 text-neutral-400 hover:text-green-600 hover:bg-green-100 rounded transition-colors opacity-0 group-hover:opacity-100"
               title="Complete session"
@@ -77,9 +60,9 @@ const ReadOnlySessionRow = ({
               <Check className="w-3 h-3" />
             </button>
           )}
-          
+
           <span className="text-xs text-neutral-500">{session.scheduled_hours}h</span>
-          
+
           {activeSessionTab === 'upcoming' && (
             <button
               onClick={e => {

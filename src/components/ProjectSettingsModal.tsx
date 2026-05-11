@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
 import { Project } from '../types'
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
+import ModalWrapper from './ModalWrapper'
 
 interface ProjectSettingsModalProps {
   isOpen: boolean
@@ -21,14 +21,24 @@ const ProjectSettingsModal = ({
   onProjectSelect,
   projects,
 }: ProjectSettingsModalProps) => {
-  const [projectSettings, setProjectSettings] = useState({ hourly_rate: 0, has_sessions: false, is_shareable: false })
+  const [projectSettings, setProjectSettings] = useState<{
+    name: string
+    color: string
+    hourly_rate: number
+    has_sessions: boolean
+    is_shareable: boolean
+    payment_type: 'manual' | 'upwork'
+  }>({ name: '', color: '#6b7280', hourly_rate: 0, has_sessions: false, is_shareable: false, payment_type: 'manual' })
 
   useEffect(() => {
     if (selectedProject) {
-      setProjectSettings({ 
+      setProjectSettings({
+        name: selectedProject.name || '',
+        color: selectedProject.color || '#6b7280',
         hourly_rate: selectedProject.hourly_rate || 0,
         has_sessions: selectedProject.has_sessions || false,
-        is_shareable: selectedProject.is_shareable || false
+        is_shareable: selectedProject.is_shareable || false,
+        payment_type: selectedProject.payment_type || 'manual',
       })
     }
   }, [selectedProject])
@@ -38,15 +48,37 @@ const ProjectSettingsModal = ({
 
     try {
       await onUpdateProject(selectedProject.id, {
+        name: projectSettings.name.trim() || selectedProject.name,
+        color: projectSettings.color,
         hourly_rate: projectSettings.hourly_rate,
         has_sessions: projectSettings.has_sessions,
         is_shareable: projectSettings.is_shareable,
+        payment_type: projectSettings.payment_type,
       })
       onClose()
     } catch (error) {
       console.error('Error updating project settings:', error)
     }
   }
+
+  const colorOptions = [
+    { name: 'Gray', value: '#6b7280' },
+    { name: 'Slate', value: '#475569' },
+    { name: 'Red', value: '#dc2626' },
+    { name: 'Rose', value: '#e11d48' },
+    { name: 'Orange', value: '#ea580c' },
+    { name: 'Amber', value: '#d97706' },
+    { name: 'Yellow', value: '#ca8a04' },
+    { name: 'Lime', value: '#65a30d' },
+    { name: 'Green', value: '#16a34a' },
+    { name: 'Emerald', value: '#059669' },
+    { name: 'Teal', value: '#0d9488' },
+    { name: 'Cyan', value: '#0891b2' },
+    { name: 'Blue', value: '#2563eb' },
+    { name: 'Indigo', value: '#4f46e5' },
+    { name: 'Purple', value: '#9333ea' },
+    { name: 'Pink', value: '#c2185b' },
+  ]
 
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const [futureLogCount, setFutureLogCount] = useState(0)
@@ -100,22 +132,25 @@ const ProjectSettingsModal = ({
     }
   }
 
-  if (!isOpen || !selectedProject) return null
+  if (!selectedProject) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-2 w-full max-w-sm mx-4">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-sm font-semibold text-neutral-900">Project Settings</h2>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-700">
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-
-        <div className="space-y-2">
+    <ModalWrapper isOpen={isOpen} onClose={onClose} title="Project Settings" maxWidth="sm">
+      <div className="space-y-2">
           <div>
-            <h3 className="text-xs font-medium text-neutral-900 mb-0.5">{selectedProject.name}</h3>
-            <p className="text-xs text-neutral-600">{selectedProject.description}</p>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Name</label>
+            <input
+              type="text"
+              value={projectSettings.name}
+              onChange={e =>
+                setProjectSettings({ ...projectSettings, name: e.target.value })
+              }
+              className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
+              placeholder="Project name"
+            />
+            {selectedProject.description && (
+              <p className="text-xs text-neutral-600 mt-1">{selectedProject.description}</p>
+            )}
           </div>
 
           <div>
@@ -139,6 +174,45 @@ const ProjectSettingsModal = ({
             </div>
           </div>
 
+
+          <div>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Color</label>
+            <div className="flex flex-wrap gap-1">
+              {colorOptions.map(color => (
+                <button
+                  key={color.value}
+                  type="button"
+                  onClick={() =>
+                    setProjectSettings({ ...projectSettings, color: color.value })
+                  }
+                  className={`w-4 h-4 rounded-full border transition-all ${
+                    projectSettings.color === color.value
+                      ? 'border-neutral-400 scale-110'
+                      : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                  style={{ backgroundColor: color.value }}
+                  title={color.name}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Payment Type</label>
+            <select
+              value={projectSettings.payment_type}
+              onChange={e =>
+                setProjectSettings({
+                  ...projectSettings,
+                  payment_type: e.target.value as 'manual' | 'upwork',
+                })
+              }
+              className="w-full px-1 py-1 border border-neutral-300 rounded-md text-xs"
+            >
+              <option value="manual">Manual</option>
+              <option value="upwork">Upwork</option>
+            </select>
+          </div>
 
           <div>
             <label className="flex items-center gap-1">
@@ -218,8 +292,7 @@ const ProjectSettingsModal = ({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </ModalWrapper>
   )
 }
 

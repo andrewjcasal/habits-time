@@ -1,12 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-
-export interface HabitType {
-  id: string
-  name: string
-  description: string | null
-  scheduling_rule: string
-}
+import { supabase, HabitType } from '../lib/supabase'
 
 export function useHabitTypes() {
   const [habitTypes, setHabitTypes] = useState<HabitType[]>([])

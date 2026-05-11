@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MoreHorizontal, Edit, ArrowRight, Scissors } from 'lucide-react'
+import { ActivityType } from '../types'
 
 interface TimeLog {
   id: string
@@ -18,12 +19,6 @@ interface TimeLog {
     color: string
     is_favorite?: boolean
   }>
-}
-
-interface ActivityType {
-  id: string
-  name: string
-  is_favorite?: boolean
 }
 
 interface TimeLogRowProps {

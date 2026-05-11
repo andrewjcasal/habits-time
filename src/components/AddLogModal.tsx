@@ -1,12 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { format } from 'date-fns'
-
-interface ActivityType {
-  id: string
-  name: string
-  is_favorite?: boolean
-}
+import { ActivityType } from '../types'
 
 interface AddLogModalProps {
   showAddLogModal: boolean

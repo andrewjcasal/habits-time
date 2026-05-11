@@ -23,10 +23,12 @@ import {
   isLateNightHour,
   hourToGridIndex,
   getColumnDate,
+  getEffectiveTodayStr,
 } from '../utils/calendarGrid'
+import { getHourRanges, hourFromHHMM } from '../utils/hourRanges'
 
-// Todoist tasks are scheduled in personal hours, separate from work tasks
-const TODOIST_WEEKDAY_HOURS = { start: 19, end: 23 }
+// Weekend window for Todoist scheduling. Weekday window comes from the
+// user's `hour_ranges.personal_hours` setting at runtime.
 const TODOIST_WEEKEND_HOURS = { start: 10, end: 23 }
 
 // ClickUp tasks = work tasks; weekdays only (skip Sat/Sun entirely).
@@ -75,12 +77,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   // getWorkHoursRange function using our local settings state
   const getWorkHoursRange = () => {
-    if (!settings) {
-      return { start: 10, end: 22 }
-    }
-    const start = parseInt(settings.work_hours_start.split(':')[0], 10)
-    const end = parseInt(settings.work_hours_end.split(':')[0], 10)
-    return { start, end }
+    const { work_hours } = getHourRanges(settings)
+    return { start: hourFromHHMM(work_hours.start), end: hourFromHHMM(work_hours.end) }
   }
   const { saveTaskChunks } = useTaskDailyLogs()
 
@@ -147,10 +145,8 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
         // Phase 2: Task scheduling + buffers in parallel (background)
         const getWorkHoursRangeFromSettings = () => {
-          if (!fetchedSettings) return { start: 10, end: 22 }
-          const start = parseInt(fetchedSettings.work_hours_start.split(':')[0], 10)
-          const end = parseInt(fetchedSettings.work_hours_end.split(':')[0], 10)
-          return { start, end }
+          const { work_hours } = getHourRanges(fetchedSettings)
+          return { start: hourFromHHMM(work_hours.start), end: hourFromHHMM(work_hours.end) }
         }
 
         const [filteredTasks, calculatedBufferBlocks] = await Promise.all([
@@ -179,10 +175,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               saveTaskChunks,
               user.id,
               filteredTasksDailyLogs,
-              fetchedSettings?.weekend_days || ['saturday', 'sunday'],
-              fetchedSettings,
-              fetchedTasks,
-              new Map()
+              fetchedSettings?.weekend_days || ['saturday', 'sunday']
             )
             if (cancelled) return
             setScheduledTasksCache(scheduledResult)
@@ -224,10 +217,14 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
 
   // Memoize day columns calculation to avoid repeated date operations
   const dayColumns = useMemo(() => {
-    const today = new Date()
-    const todayStr = format(today, 'yyyy-MM-dd')
-    const tomorrowStr = format(addDays(today, 1), 'yyyy-MM-dd')
-    const yesterdayStr = format(addDays(today, -1), 'yyyy-MM-dd')
+    // "Effective today" treats post-midnight hours (0:00–5:00 AM) as still
+    // belonging to the previous calendar day, matching the grid's
+    // late-night column rule. Without this, opening the calendar at 12:30
+    // AM labels the day you've been awake on as "Yesterday".
+    const todayStr = getEffectiveTodayStr()
+    const todayDate = new Date(`${todayStr}T12:00:00`)
+    const tomorrowStr = format(addDays(todayDate, 1), 'yyyy-MM-dd')
+    const yesterdayStr = format(addDays(todayDate, -1), 'yyyy-MM-dd')
 
     const columnCount = windowWidth > 600 ? dayColumnCount : 1
 
@@ -390,10 +387,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
               saveTaskChunks,
               user.id,
               filteredTasksDailyLogs,
-              settings?.weekend_days || ['saturday', 'sunday'],
-              settings,
-              allTasks, // allTasks
-              scheduledTasksCache // Pass existing scheduledTasksCache for regeneration
+              settings?.weekend_days || ['saturday', 'sunday']
             )
             setScheduledTasksCache(scheduledTasksResult)
             
@@ -541,13 +535,25 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     setProjectActivity(prev => prev.filter(a => a.id !== id))
   }
 
+  const updateProjectActivity = async (id: string, patch: { start_time?: string; end_time?: string; note?: string | null; project_id?: string }) => {
+    const { data, error } = await supabase
+      .from('cassian_project_activity')
+      .update(patch)
+      .eq('id', id)
+      .select('*, projects:cassian_projects(*)')
+      .single()
+    if (error) throw error
+    setProjectActivity(prev => prev.map(a => (a.id === id ? data : a)))
+    return data
+  }
+
   // Resolve every habit occurrence's effective time window once, using the
   // shared placement algorithm. The render path indexes the results
   // per-hour-slot; the task-scheduler conflict map reads the same list so
   // both sides agree on where habits actually live on the calendar.
   const habitPlacements = useMemo(
-    () => resolveHabitPlacements(habits, meetings, sessions, dayColumns),
-    [habits, meetings, sessions, dayColumns]
+    () => resolveHabitPlacements(habits, meetings, sessions, dayColumns, projectActivity),
+    [habits, meetings, sessions, dayColumns, projectActivity]
   )
 
   const habitsIndex = useMemo(() => {
@@ -722,6 +728,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
     deleteMeeting,
     addProjectActivity,
     deleteProjectActivity,
+    updateProjectActivity,
     getProjectActivityForTimeSlot,
     dayColumns,
     hourSlots,
@@ -825,15 +832,34 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
       // state yet. Saves a round-trip when the caller already knows the
       // updated row locally.
       const meetingsForConflicts = options?.meetingsOverride ?? meetings
-      const todoistConflictMaps = computeConflictMaps(habits, sessions, meetingsForConflicts, futureDayColumns, nonTodoistDailyLogs)
+      // Fetch billable-hour blocks fresh so the scheduler knows about
+      // auto-placed blocks added since the last calendar fetch and
+      // doesn't park todoist tasks on top of them.
+      const { data: freshBillable } = await supabase
+        .from('cassian_billable_hours')
+        .select('*')
+        .eq('user_id', user.id)
+      const todoistConflictMaps = computeConflictMaps(
+        habits,
+        sessions,
+        meetingsForConflicts,
+        futureDayColumns,
+        nonTodoistDailyLogs,
+        freshBillable || []
+      )
       const weekendDayNames = settings?.weekend_days || ['saturday', 'sunday']
+      const personalHours = getHourRanges(settings).personal_hours
+      const todoistWeekdayHours = {
+        start: hourFromHHMM(personalHours.start),
+        end: hourFromHHMM(personalHours.end),
+      }
 
       const getTodoistHoursForDate = (date?: Date) => {
         if (date) {
           const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
           if (weekendDayNames.includes(dayName)) return TODOIST_WEEKEND_HOURS
         }
-        return TODOIST_WEEKDAY_HOURS
+        return todoistWeekdayHours
       }
 
       // Schedule per-day with correct priority ordering within each day:
@@ -873,7 +899,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const dayResult = await scheduleAllTasks(
           dayTasks, todoistConflictMaps, [dayCol], getTodoistHoursForDate,
           scheduleTaskInAvailableSlots, saveTaskChunks,
-          user.id, nonTodoistDailyLogs, [], null, dayTasks, new Map()
+          user.id, nonTodoistDailyLogs, []
         )
 
         dayResult.forEach((tasks, dateKey) => {
@@ -971,8 +997,17 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         (log: any) => !clickupDbIds.includes(log.task_id)
       )
       const meetingsForConflicts = options?.meetingsOverride ?? meetings
+      const { data: freshBillable } = await supabase
+        .from('cassian_billable_hours')
+        .select('*')
+        .eq('user_id', user.id)
       const clickupConflictMaps = computeConflictMaps(
-        habits, sessions, meetingsForConflicts, futureWorkdayColumns, nonAutoDailyLogs
+        habits,
+        sessions,
+        meetingsForConflicts,
+        futureWorkdayColumns,
+        nonAutoDailyLogs,
+        freshBillable || []
       )
 
       const getClickUpHours = () => CLICKUP_WORK_HOURS
@@ -1002,7 +1037,7 @@ export const useCalendarData = (windowWidth: number, baseDate: Date = new Date()
         const dayResult = await scheduleAllTasks(
           dayTasks, clickupConflictMaps, [dayCol], getClickUpHours,
           scheduleTaskInAvailableSlots, saveTaskChunks,
-          user.id, nonAutoDailyLogs, [], null, dayTasks, new Map()
+          user.id, nonAutoDailyLogs, []
         )
 
         dayResult.forEach((tasks, dateKey) => {

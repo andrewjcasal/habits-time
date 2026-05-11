@@ -4,22 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { format, addDays, startOfDay, isSameDay } from 'date-fns'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { DailyOverride } from '../types'
 
 interface Essential {
   id: string
   activity_type_id: string
   activity_type_name: string
   daily_minutes: number
-}
-
-interface DailyOverride {
-  id: string
-  user_id: string
-  essential_id: string
-  date: string
-  minutes: number
-  created_at: string
-  updated_at: string
 }
 
 interface DayData {

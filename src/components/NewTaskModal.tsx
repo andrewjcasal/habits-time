@@ -15,7 +15,6 @@ const NewTaskModal = ({ isOpen, onClose, selectedProject, onCreateTask }: NewTas
     description: '',
     priority: 'medium' as const,
     estimated_hours: 1,
-    is_billable: true,
   })
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -29,7 +28,6 @@ const NewTaskModal = ({ isOpen, onClose, selectedProject, onCreateTask }: NewTas
         description: newTask.description,
         priority: newTask.priority,
         estimated_hours: newTask.estimated_hours,
-        is_billable: newTask.is_billable,
         status: 'todo',
       })
       setNewTask({
@@ -37,7 +35,6 @@ const NewTaskModal = ({ isOpen, onClose, selectedProject, onCreateTask }: NewTas
         description: '',
         priority: 'medium',
         estimated_hours: 1,
-        is_billable: true,
       })
       onClose()
     } catch (error) {
@@ -51,7 +48,6 @@ const NewTaskModal = ({ isOpen, onClose, selectedProject, onCreateTask }: NewTas
       description: '',
       priority: 'medium',
       estimated_hours: 1,
-      is_billable: true,
     })
     onClose()
   }
@@ -113,18 +109,6 @@ const NewTaskModal = ({ isOpen, onClose, selectedProject, onCreateTask }: NewTas
               className="w-full px-3 py-2 border border-neutral-300 rounded-md text-sm"
             />
             <span className="text-sm text-neutral-500">hours</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="is_billable"
-              checked={newTask.is_billable}
-              onChange={e => setNewTask({ ...newTask, is_billable: e.target.checked })}
-              className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-            />
-            <label htmlFor="is_billable" className="text-sm text-neutral-700">
-              Billable
-            </label>
           </div>
           <div className="flex gap-2 justify-end">
             <button

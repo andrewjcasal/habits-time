@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Plus } from 'lucide-react'
 
 // Helper function to get quarter-hour from mouse position within a time slot
@@ -105,6 +105,37 @@ export default function CalendarGrid({
   const timeColWidth = gridCols.split(' ')[0]
   const dayGridCols = gridCols.split(' ').slice(1).join(' ')
   const quarterHeight = hourHeight / 4
+
+  const dragOverlayStyle = useMemo(() => {
+    if (!isDragging || !dragStart || !dragEnd) return null
+
+    const startTotalQuarters = dragStart.hourIndex * 4 + dragStart.quarter
+    const endTotalQuarters = dragEnd.hourIndex * 4 + dragEnd.quarter
+    const minQuarters = Math.min(startTotalQuarters, endTotalQuarters)
+    const maxQuarters = Math.max(startTotalQuarters, endTotalQuarters)
+
+    const startHourIndex = Math.floor(minQuarters / 4)
+    const startQuarter = minQuarters % 4
+    const endHourIndex = Math.floor(maxQuarters / 4)
+    const endQuarter = maxQuarters % 4
+
+    const topPosition = startHourIndex * hourHeight + startQuarter * quarterHeight
+    const endPosition = endHourIndex * hourHeight + (endQuarter + 1) * quarterHeight
+    const height = endPosition - topPosition
+
+    const timeColumnWidth = `calc((100% - ${gridCols.split(' ')[0]}) / ${dayColumns.length})`
+    const leftPosition = `calc(${gridCols.split(' ')[0]} + ${dragStart.columnIndex} * ${timeColumnWidth})`
+
+    return {
+      top: `${topPosition}px`,
+      left: leftPosition,
+      width: timeColumnWidth,
+      height: `${height}px`,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      animation: 'pulse 1s infinite',
+      borderRadius: '2px',
+    } as React.CSSProperties
+  }, [isDragging, dragStart, dragEnd, hourHeight, quarterHeight, gridCols, dayColumns.length])
 
   return (
     <div
@@ -220,47 +251,9 @@ export default function CalendarGrid({
       })}
 
       {/* Unified Drag Selection Overlay */}
-      {isDragging && dragStart && dragEnd && (
+      {dragOverlayStyle && (
         <div className="absolute inset-0 pointer-events-none z-10">
-          {(() => {
-            const startTotalQuarters = dragStart.hourIndex * 4 + dragStart.quarter
-            const endTotalQuarters = dragEnd.hourIndex * 4 + dragEnd.quarter
-            const minQuarters = Math.min(startTotalQuarters, endTotalQuarters)
-            const maxQuarters = Math.max(startTotalQuarters, endTotalQuarters)
-
-            // Calculate pixel positions
-            const startHourIndex = Math.floor(minQuarters / 4)
-            const startQuarter = minQuarters % 4
-            const endHourIndex = Math.floor(maxQuarters / 4)
-            const endQuarter = maxQuarters % 4
-
-            const topPosition = startHourIndex * hourHeight + startQuarter * quarterHeight
-            const endPosition = endHourIndex * hourHeight + (endQuarter + 1) * quarterHeight
-            const height = endPosition - topPosition
-
-            // Calculate column position
-            const timeColumnWidth = `calc((100% - ${gridCols.split(' ')[0]}) / ${
-              dayColumns.length
-            })`
-            const leftPosition = `calc(${gridCols.split(' ')[0]} + ${
-              dragStart.columnIndex
-            } * ${timeColumnWidth})`
-
-            return (
-              <div
-                className="absolute"
-                style={{
-                  top: `${topPosition}px`,
-                  left: leftPosition,
-                  width: timeColumnWidth,
-                  height: `${height}px`,
-                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                  animation: 'pulse 1s infinite',
-                  borderRadius: '2px',
-                }}
-              />
-            )
-          })()}
+          <div className="absolute" style={dragOverlayStyle} />
         </div>
       )}
 

@@ -15,6 +15,17 @@ import {
 
 type CustomCategory = 'convenience' | 'social' | 'trip' | 'coworking' | 'date' | null
 
+const formatTransactionDate = (rawDate: string | null | undefined): string => {
+  try {
+    if (!rawDate) return '—'
+    const date = new Date(rawDate)
+    if (isNaN(date.getTime())) return '—'
+    return format(date, 'M/d')
+  } catch {
+    return '—'
+  }
+}
+
 const Transactions = () => {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState<YnabTransaction[]>([])
@@ -503,16 +514,7 @@ const Transactions = () => {
                     <TableRow key={transaction.id}>
                       <TableCell className="py-0">
                         <div className="text-xs text-neutral-600">
-                          {(() => {
-                            try {
-                              if (!transaction.date) return '—'
-                              const date = new Date(transaction.date)
-                              if (isNaN(date.getTime())) return '—'
-                              return format(date, 'M/d')
-                            } catch {
-                              return '—'
-                            }
-                          })()}
+                          {formatTransactionDate(transaction.date)}
                         </div>
                       </TableCell>
                       <TableCell className="py-0">

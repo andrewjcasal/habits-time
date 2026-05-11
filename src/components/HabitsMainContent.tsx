@@ -4,6 +4,7 @@ import HabitsList from './HabitsList'
 import HabitDetailTabs from './HabitDetailTabs'
 import CreateHabitModal from './CreateHabitModal'
 import ArchivedHabitsList from './ArchivedHabitsList'
+import type { HabitWithType } from '../lib/supabase'
 
 interface HabitsMainContentProps {
   habits: any[]
@@ -19,7 +20,14 @@ interface HabitsMainContentProps {
   onNavigateDate: (direction: 'prev' | 'next') => void
   onShowCreateModal: (show: boolean) => void
   onCreateHabit: (habitData: any) => void
-  onUnarchiveHabit: (habitId: string) => Promise<void>
+  /** Mutators threaded down from the parent's `useHabits()` instance so
+   *  the detail-panel actions update the SAME local state that feeds
+   *  the left-side list. Without this, the parent's hook is independent
+   *  of the child's and the list goes stale after archive/unarchive/
+   *  delete (see BUG: 86b9va2fg). */
+  onArchiveHabit?: (habitId: string) => Promise<void>
+  onUnarchiveHabit: (habit: HabitWithType) => Promise<void>
+  onDeleteHabit?: (habitId: string) => Promise<void>
   formatDateDisplay: (date: string) => string
   getHabitScheduleDisplay: (habit: any, dailyLog: any) => { label: string; time: string }
   formatTime: (time: string) => string
@@ -39,7 +47,9 @@ const HabitsMainContent = ({
   onNavigateDate,
   onShowCreateModal,
   onCreateHabit,
+  onArchiveHabit,
   onUnarchiveHabit,
+  onDeleteHabit,
   formatDateDisplay,
   getHabitScheduleDisplay,
   formatTime,
@@ -136,6 +146,10 @@ const HabitsMainContent = ({
                 consequences: selectedHabit?.consequences || '',
               }}
               onHabitDeleted={() => onHabitSelect(null)}
+              archiveHabitOverride={onArchiveHabit}
+              unarchiveHabitOverride={onUnarchiveHabit}
+              deleteHabitOverride={onDeleteHabit}
+              currentHabitOverride={selectedHabit ?? null}
             />
           )}
         </div>

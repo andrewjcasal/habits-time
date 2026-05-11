@@ -11,19 +11,23 @@ import { Meeting } from '../types'
 import { deltaYToMinutes, computeMovedTimes } from '../utils/calendarDragUtils'
 import { hourToGridIndex } from '../utils/calendarGrid'
 import { getEffectiveHabitStartTime } from '../utils/habitScheduling'
-import TaskScheduleModal from '../components/TaskScheduleModal'
 import {
   handleHabitTimeChange,
   handleHabitSkip,
   handleCompleteTask,
   handleDeleteTask,
 } from '../utils/calendarDatabaseOperations'
-import { calculateWorkHours } from '../utils/workHoursCalculation'
+import { useBillableHours, BillableHoursConflictError } from '../hooks/useBillableHours'
+import { ensureBillableQuotaForRange } from '../utils/billableHoursAutoPlacement'
+import { generateBufferIntervalsForRange } from '../utils/bufferManager'
+import { getHourRanges } from '../utils/hourRanges'
 import { useModal, CalendarModalHandlers } from '../contexts/useModal'
 import { useUserContext } from '../contexts/UserContext'
 import CalendarEventSlots from '../components/CalendarEventSlots'
+import { useEventRegistry, RegistryEventType } from '../hooks/useEventRegistry'
 import CalendarTopBar from '../components/CalendarTopBar'
 import CalendarGrid, { getQuarterFromMousePosition, quarterToTimeString } from '../components/CalendarGrid'
+import BillableStatsBadge from '../components/BillableStatsBadge'
 
 const CalendarContent = () => {
   const handlersRef = useRef<Record<string, Function>>({})
@@ -41,10 +45,10 @@ const CalendarContent = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const stickyHeaderRef = useRef<HTMLDivElement>(null)
   const [mobileHeaderHeight, setMobileHeaderHeight] = useState(0)
-  const [showActualHoursTooltip, setShowActualHoursTooltip] = useState(false)
-  const [showPlannedHoursTooltip, setShowPlannedHoursTooltip] = useState(false)
   const [showWorkHoursTooltip, setShowWorkHoursTooltip] = useState(false)
-  const [showTaskScheduleModal, setShowTaskScheduleModal] = useState(false)
+  // Inline conflict toast for rejected manual billable-hour drops.
+  // Auto-dismisses after 3s; cleared by the next conflict or unmount.
+  const [conflictToast, setConflictToast] = useState<string | null>(null)
 
   // Note view modal state
   const [viewingNote, setViewingNote] = useState<any>(null)
@@ -135,8 +139,9 @@ const CalendarContent = () => {
 
   // Calendar notes come from useCalendarData (merged into single fetch)
 
-  // Meeting resize state
-  const [resizingMeeting, setResizingMeeting] = useState<any>(null)
+  // Event resize state — applies to any event type registered in
+  // useEventRegistry (currently meeting + project-activity).
+  const [resizingEvent, setResizingEvent] = useState<{ type: RegistryEventType; event: any } | null>(null)
   const [resizeNewEndTime, setResizeNewEndTime] = useState<Date | null>(null)
   const resizeStartYRef = useRef<number>(0)
   const resizeStartEndTimeRef = useRef<Date | null>(null)
@@ -220,6 +225,8 @@ const CalendarContent = () => {
     getTasksDailyLogsForTimeSlot,
     getBuffersForCalendarTimeSlot,
     getCategoryBuffersForTimeSlot,
+    buffers,
+    categoryBufferBlocks,
     settings,
     tasksScheduled,
     scheduledTasksCache,
@@ -228,6 +235,7 @@ const CalendarContent = () => {
     deleteMeeting,
     addProjectActivity,
     deleteProjectActivity,
+    updateProjectActivity,
     getProjectActivityForTimeSlot,
     projects,
     projectActivity,
@@ -254,6 +262,251 @@ const CalendarContent = () => {
     syncTodoist,
     syncClickUp,
   } = useCalendarData(windowWidth, baseDate, hourHeight, dayColumnCount)
+
+  // Registry of per-event-type operations (resize, future: extend, move,
+  // delete). The mousemove/mouseup loop dispatches through this instead of
+  // branching on type.
+  // Past project_activity rows fold into the "Billed 7d" stat alongside
+  // past billable_hours. Pass them through to the hook so it can sum
+  // both sources without re-fetching project_activity itself.
+  const pastProjectActivity = useMemo(
+    () =>
+      (projectActivity || []).map((a: any) => ({
+        start_time: a.start_time,
+        end_time: a.end_time,
+      })),
+    [projectActivity]
+  )
+
+  // Conflict sources for manual billable-hour create/edit/resize. The
+  // auto-placer doesn't go through this guard (it inverts intervals up
+  // front and inserts only into free windows). When the user manually
+  // drags or resizes a block into an overlap, useBillableHours throws
+  // a BillableHoursConflictError and the caller surfaces a toast.
+  // TODO: also include habit blocks once manual create UI lands —
+  // habits don't carry ISO start/end on the row, they need to be
+  // expanded from scheduled_start_time + duration per visible day.
+  const billableConflictSources = useMemo(() => {
+    const meetingEntries = (meetings || []).map((m: any) => ({
+      start_time: m.start_time,
+      end_time: m.end_time,
+      title: m.title || 'a meeting',
+    }))
+    const activityEntries = (projectActivity || []).map((a: any) => ({
+      start_time: a.start_time,
+      end_time: a.end_time,
+      title: a.projects?.name || 'a project activity block',
+    }))
+    return [...meetingEntries, ...activityEntries]
+  }, [meetings, projectActivity])
+
+  const {
+    billableHours,
+    addBillableHour: _addBillableHour,
+    updateBillableHour,
+    deleteBillableHour: _deleteBillableHour,
+    removeBillableHours,
+    appendBillableHours,
+  } = useBillableHours({
+    pastBilledExtras: pastProjectActivity,
+    conflictSources: billableConflictSources,
+  })
+
+  // Aggregate billable-hours sums for the day-header badge tooltip:
+  // today (local), upcoming 7-day rolling window, and the remainder of
+  // the current calendar month from now. Mirrors the windowing logic
+  // inside useBillableHours but exposes a different cut for hover.
+  const billableStats = useMemo(() => {
+    const now = new Date()
+    const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+
+    const sumHours = (rangeStart: Date, rangeEnd: Date): number =>
+      billableHours.reduce((sum, b) => {
+        const start = new Date(b.start_time).getTime()
+        const end = new Date(b.end_time).getTime()
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return sum
+        if (start >= rangeStart.getTime() && start < rangeEnd.getTime()) {
+          return sum + (end - start) / (1000 * 60 * 60)
+        }
+        return sum
+      }, 0)
+
+    const hoursForDay = (dateStr: string): number => {
+      const dayStart = new Date(`${dateStr}T00:00:00`)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayEnd.getDate() + 1)
+      return sumHours(dayStart, dayEnd)
+    }
+
+    return {
+      hoursForDay,
+      next7DaysHours: sumHours(now, sevenDaysOut),
+      restOfMonthHours: sumHours(now, endOfMonth),
+    }
+  }, [billableHours])
+
+  const eventRegistry = useEventRegistry({ updateMeeting, updateProjectActivity, updateBillableHour })
+
+  // Page-load rollover: convert past billable-hour blocks that had a
+  // project commitment into matching project_activity rows (>= 15 min
+  // only) before deleting them. Unassigned or sub-15-min past rows are
+  // simply deleted. Runs once per session.
+  const billableRolloverRanRef = useRef(false)
+  useEffect(() => {
+    if (billableRolloverRanRef.current) return
+    if (isDataLoading || !user) return
+    if (!billableHours.length && !projects?.length) return
+    billableRolloverRanRef.current = true
+    const run = async () => {
+      const nowMs = Date.now()
+      const pastBlocks = billableHours
+        .filter(b => new Date(b.start_time).getTime() < nowMs)
+        .sort(
+          (a, b) =>
+            new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+        )
+      if (pastBlocks.length === 0) return
+
+      // Compute project assignment for past blocks using the same
+      // greedy commitment logic the upcoming placer uses.
+      interface Slot {
+        id: string
+        remainingTotal: number
+      }
+      const slots: Slot[] = []
+      for (const p of (projects || []) as any[]) {
+        if (p.status === 'archived') continue
+        const total =
+          p.commitment_total_hours != null
+            ? Number(p.commitment_total_hours)
+            : null
+        if (total == null || total <= 0) continue
+        const worked = (projectActivity || [])
+          .filter((a: any) => a.project_id === p.id)
+          .reduce((sum: number, a: any) => {
+            const s = new Date(a.start_time).getTime()
+            const e = new Date(a.end_time).getTime()
+            return e > s ? sum + (e - s) / (1000 * 60 * 60) : sum
+          }, 0)
+        const remaining = Math.max(0, total - worked)
+        if (remaining > 0) slots.push({ id: p.id, remainingTotal: remaining })
+      }
+
+      const assignments: Array<{ block: any; projectId: string }> = []
+      const idsToDelete: string[] = []
+      const MIN_HOURS = 0.25
+      for (const block of pastBlocks) {
+        const dur =
+          (new Date(block.end_time).getTime() -
+            new Date(block.start_time).getTime()) /
+          (1000 * 60 * 60)
+        if (dur >= MIN_HOURS) {
+          const slot = slots.find(s => s.remainingTotal > 0)
+          if (slot) {
+            assignments.push({ block, projectId: slot.id })
+            slot.remainingTotal -= dur
+            idsToDelete.push(block.id)
+            continue
+          }
+        }
+        idsToDelete.push(block.id)
+      }
+
+      try {
+        for (const a of assignments) {
+          await addProjectActivity({
+            project_id: a.projectId,
+            start_time: a.block.start_time,
+            end_time: a.block.end_time,
+          })
+        }
+        if (idsToDelete.length > 0) {
+          await supabase
+            .from('cassian_billable_hours')
+            .delete()
+            .in('id', idsToDelete)
+          removeBillableHours(idsToDelete)
+        }
+      } catch (err) {
+        console.error('Billable rollover failed:', err)
+      }
+    }
+    run()
+  }, [
+    isDataLoading,
+    user,
+    billableHours,
+    projects,
+    projectActivity,
+    removeBillableHours,
+    addProjectActivity,
+  ])
+
+  // Idempotently top up billable-hour blocks for the next 7-day window
+  // whenever the relevant event sets shift. Debounced so a flurry of
+  // mutations (e.g. drag-creating a meeting) doesn't fire the placer
+  // multiple times. The placer respects existing rows; it only ADDS.
+  useEffect(() => {
+    if (isDataLoading) return
+    if (!user) return
+    const handle = window.setTimeout(async () => {
+      try {
+        const now = new Date()
+        const start = new Date(now)
+        start.setHours(0, 0, 0, 0)
+        // Fill through the end of the current calendar month so the
+        // "Remaining Month" stat reflects an actual horizon, not just
+        // the 7-day rolling window. First-of-next-month is exclusive.
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+
+        // Daily end-of-day buffers across the full placer range (today
+        // through end of month) so navigating forward doesn't reveal
+        // days the placer filled without buffer awareness.
+        const bufferIntervals = generateBufferIntervalsForRange(
+          start,
+          end,
+          meetings,
+          projectActivity
+        )
+        categoryBufferBlocks.forEach((block: any) => {
+          const day = new Date(block.date)
+          const startMs = new Date(day).setHours(0, 0, 0, 0) + block.start_time * 60 * 60 * 1000
+          const endMs = startMs + block.duration * 60 * 60 * 1000
+          bufferIntervals.push({
+            start_time: new Date(startMs).toISOString(),
+            end_time: new Date(endMs).toISOString(),
+          })
+        })
+
+        const inserts = await ensureBillableQuotaForRange({
+          userId: user.id,
+          startDate: start,
+          endDate: end,
+          hourRanges: getHourRanges(settings),
+          habits,
+          meetings,
+          projectActivity,
+          buffers: bufferIntervals,
+          existingBillableHours: billableHours,
+        })
+        if (inserts.length > 0) appendBillableHours(inserts)
+      } catch (err) {
+        console.error('Billable-hours placer failed:', err)
+      }
+    }, 500)
+    return () => window.clearTimeout(handle)
+  }, [
+    isDataLoading,
+    user,
+    settings,
+    habits,
+    meetings,
+    projectActivity,
+    categoryBufferBlocks,
+    billableHours,
+    appendBillableHours,
+  ])
 
   // Calendar data already includes habits - no need for separate useHabits hook
 
@@ -424,9 +677,17 @@ const CalendarContent = () => {
     openMeetingModal()
   }
 
+  const handleProjectActivityClick = useCallback((activity: any) => {
+    if (eventResizedRef.current) {
+      eventResizedRef.current = false
+      return
+    }
+    openProjectActivityModal(activity)
+  }, [openProjectActivityModal])
+
   const handleEditMeeting = useCallback((meeting: Meeting) => {
-    if (meetingResizedRef.current) {
-      meetingResizedRef.current = false
+    if (eventResizedRef.current) {
+      eventResizedRef.current = false
       return
     }
     if (meetingDragMovedRef.current) {
@@ -621,7 +882,7 @@ const CalendarContent = () => {
     columnIndex: number
   ) => {
     // Don't start drag if another drag/resize is active or clicking on a calendar event
-    if (resizingMeeting || draggingTaskLog || draggingHabit) return
+    if (resizingEvent || draggingTaskLog || draggingHabit) return
     const target = event.target as HTMLElement
     if (target.closest('[data-calendar-event]')) return
     
@@ -753,15 +1014,9 @@ const CalendarContent = () => {
     }
   }
 
-  // Close tooltips when clicking outside
+  // Close tooltip when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showActualHoursTooltip && !(event.target as Element).closest('.actual-hours-tooltip')) {
-        setShowActualHoursTooltip(false)
-      }
-      if (showPlannedHoursTooltip && !(event.target as Element).closest('.planned-hours-tooltip')) {
-        setShowPlannedHoursTooltip(false)
-      }
       if (showWorkHoursTooltip && !(event.target as Element).closest('.work-hours-tooltip')) {
         setShowWorkHoursTooltip(false)
       }
@@ -769,102 +1024,140 @@ const CalendarContent = () => {
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showActualHoursTooltip, showPlannedHoursTooltip, showWorkHoursTooltip])
+  }, [showWorkHoursTooltip])
+
+  // Auto-dismiss the conflict toast 3s after it's set. Reset on each
+  // new toast so consecutive rejections don't stack.
+  useEffect(() => {
+    if (!conflictToast) return
+    const handle = window.setTimeout(() => setConflictToast(null), 3000)
+    return () => window.clearTimeout(handle)
+  }, [conflictToast])
 
 
-  // Meeting resize handlers
-  const meetingResizedRef = useRef(false)
+  // Event resize handlers
+  const eventResizedRef = useRef(false)
   const eventDragActiveRef = useRef(false)
+  const handleEventResizeStart = useCallback(
+    (type: RegistryEventType, event: any, e: React.MouseEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+      eventResizedRef.current = true
+      eventDragActiveRef.current = true
+      setResizingEvent({ type, event })
+      resizeStartYRef.current = e.clientY
+      resizeStartEndTimeRef.current = new Date(event.end_time)
+      setResizeNewEndTime(new Date(event.end_time))
+    },
+    []
+  )
   const handleMeetingResizeStart = useCallback((meeting: any, e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    meetingResizedRef.current = true
-    eventDragActiveRef.current = true
-    setResizingMeeting(meeting)
-    resizeStartYRef.current = e.clientY
-    resizeStartEndTimeRef.current = new Date(meeting.end_time)
-    setResizeNewEndTime(new Date(meeting.end_time))
-  }, [])
+    handleEventResizeStart('meeting', meeting, e)
+  }, [handleEventResizeStart])
+  const handleProjectActivityResizeStart = useCallback((activity: any, e: React.MouseEvent) => {
+    handleEventResizeStart('project-activity', activity, e)
+  }, [handleEventResizeStart])
+  const handleBillableHourResizeStart = useCallback((block: any, e: React.MouseEvent) => {
+    handleEventResizeStart('billable-hours', block, e)
+  }, [handleEventResizeStart])
 
   useEffect(() => {
-    if (!resizingMeeting) return
+    if (!resizingEvent) return
+    const { type, event: resizingEventObj } = resizingEvent
 
     const handleMouseMove = (e: MouseEvent) => {
       const deltaY = e.clientY - resizeStartYRef.current
       const deltaMinutes = deltaYToMinutes(deltaY)
       const newEnd = new Date(resizeStartEndTimeRef.current!.getTime() + deltaMinutes * 60000)
-      const meetingStart = new Date(resizingMeeting.start_time)
+      const eventStart = new Date(resizingEventObj.start_time)
       // Minimum 15 minutes
-      if (newEnd.getTime() - meetingStart.getTime() >= 15 * 60000) {
+      if (newEnd.getTime() - eventStart.getTime() >= 15 * 60000) {
         setResizeNewEndTime(newEnd)
       }
     }
 
     const handleMouseUp = async () => {
-      if (!resizeNewEndTime || !resizingMeeting) {
-        setResizingMeeting(null)
+      if (!resizeNewEndTime) {
+        setResizingEvent(null)
         return
       }
 
-      const originalEnd = new Date(resizingMeeting.end_time)
+      const originalEnd = new Date(resizingEventObj.end_time)
       if (resizeNewEndTime.getTime() === originalEnd.getTime()) {
-        setResizingMeeting(null)
+        setResizingEvent(null)
         return
       }
 
-      // Check for overlapping tasks in the extended range
-      const meetingDate = format(new Date(resizingMeeting.start_time), 'yyyy-MM-dd')
-      const newEndHours = resizeNewEndTime.getHours() + resizeNewEndTime.getMinutes() / 60
-      const origEndHours = originalEnd.getHours() + originalEnd.getMinutes() / 60
+      // Type-specific preflight: meetings check for overlapping tasks and
+      // surface a confirmation dialog before extending. Other event types
+      // currently have no preflight.
+      if (type === 'meeting') {
+        const meetingDate = format(new Date(resizingEventObj.start_time), 'yyyy-MM-dd')
+        const newEndHours = resizeNewEndTime.getHours() + resizeNewEndTime.getMinutes() / 60
+        const origEndHours = originalEnd.getHours() + originalEnd.getMinutes() / 60
 
-      // Only check for conflicts if we're extending (not shrinking)
-      if (newEndHours > origEndHours) {
-        const conflicting = tasksDailyLogs.filter((log: any) => {
-          if (log.log_date !== meetingDate) return false
-          const startTime = log.actual_start_time || log.scheduled_start_time
-          if (!startTime) return false
-          const logStartH = parseInt(startTime.split(':')[0]) + parseInt(startTime.split(':')[1]) / 60
-          const logEndH = logStartH + (log.estimated_hours || 0.5)
-          return logStartH < newEndHours && logEndH > origEndHours
-        })
+        if (newEndHours > origEndHours) {
+          const conflicting = tasksDailyLogs.filter((log: any) => {
+            if (log.log_date !== meetingDate) return false
+            const startTime = log.actual_start_time || log.scheduled_start_time
+            if (!startTime) return false
+            const logStartH = parseInt(startTime.split(':')[0]) + parseInt(startTime.split(':')[1]) / 60
+            const logEndH = logStartH + (log.estimated_hours || 0.5)
+            return logStartH < newEndHours && logEndH > origEndHours
+          })
 
-        if (conflicting.length > 0) {
-          openResizeConflictDialog(resizingMeeting, resizeNewEndTime, conflicting)
-          setResizingMeeting(null)
-          setResizeNewEndTime(null)
-          return
+          if (conflicting.length > 0) {
+            openResizeConflictDialog(resizingEventObj, resizeNewEndTime, conflicting)
+            setResizingEvent(null)
+            setResizeNewEndTime(null)
+            return
+          }
         }
       }
 
-      // No conflicts — just update
-      const resized = resizingMeeting
+      // Dispatch the actual write through the registry. Each entry knows
+      // how to persist + patch local state for its type.
       const newEnd = resizeNewEndTime
-      const updated = await updateMeeting(resized.id, { end_time: newEnd.toISOString() })
-      setResizingMeeting(null)
+      const newEndIso = newEnd.toISOString()
+      try {
+        await eventRegistry[type].resize?.(resizingEventObj, newEndIso)
+      } catch (err) {
+        if (err instanceof BillableHoursConflictError) {
+          // Manual resize would overlap a meeting / project_activity /
+          // another billable block. The hook rejected the write; the
+          // local state is unchanged so the block snaps back.
+          setConflictToast(`Conflicts with ${err.conflictTitle}`)
+        } else {
+          console.error(`Error resizing ${type}:`, err)
+        }
+      }
+      setResizingEvent(null)
       setResizeNewEndTime(null)
 
-      // Kick off a local-only regen so Todoist/ClickUp tasks reflow around
-      // the new meeting end. No network round-trip to the external APIs
-      // since we're just rescheduling already-synced tasks. Pass the
-      // updated meeting through so the scheduler sees the fresh end_time
-      // without waiting for React state to flush.
-      const patchedMeetings = meetings.map((m: any) =>
-        m.id === resized.id ? { ...m, ...(updated ?? { end_time: newEnd.toISOString() }) } : m
-      )
-      ;(async () => {
-        try {
-          await Promise.all([
-            settings?.todoist_api_key
-              ? syncTodoist({ skipApi: true, meetingsOverride: patchedMeetings })
-              : Promise.resolve(),
-            settings?.clickup_api_key
-              ? syncClickUp({ skipApi: true, meetingsOverride: patchedMeetings })
-              : Promise.resolve(),
-          ])
-        } catch (err) {
-          console.error('Error regenerating after meeting resize:', err)
+      // Meeting-specific side effect: locally regen Todoist/ClickUp task
+      // placement so they reflow around the new meeting end. Lives outside
+      // the registry because it's coupled to upstream-sync helpers, not to
+      // the underlying data write.
+      if (type === 'meeting') {
+        const patchedMeetings = meetings.map((m: any) =>
+          m.id === resizingEventObj.id ? { ...m, end_time: newEndIso } : m
+        )
+        const regenTaskPlacementAfterResize = async () => {
+          try {
+            await Promise.all([
+              settings?.todoist_api_key
+                ? syncTodoist({ skipApi: true, meetingsOverride: patchedMeetings })
+                : Promise.resolve(),
+              settings?.clickup_api_key
+                ? syncClickUp({ skipApi: true, meetingsOverride: patchedMeetings })
+                : Promise.resolve(),
+            ])
+          } catch (err) {
+            console.error('Error regenerating after meeting resize:', err)
+          }
         }
-      })()
+        void regenTaskPlacementAfterResize()
+      }
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -873,7 +1166,7 @@ const CalendarContent = () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [resizingMeeting, resizeNewEndTime, tasksDailyLogs, updateMeeting])
+  }, [resizingEvent, resizeNewEndTime, tasksDailyLogs, eventRegistry, meetings, settings, syncTodoist, syncClickUp, openResizeConflictDialog])
 
   // Habit resize
   const handleHabitResizeStart = useCallback((habit: any, date: Date, e: React.MouseEvent) => {
@@ -1159,6 +1452,400 @@ const CalendarContent = () => {
     }
   }, [draggingMeeting, meetingDragY, updateMeeting])
 
+  // Greedy project assignment for upcoming billable-hour blocks.
+  // For each project with a non-zero commitment_total_hours, compute the
+  // remaining hours = total − sum(past project_activity for that project).
+  // Walk billable blocks in chronological order and fill the
+  // first-not-yet-satisfied project; once a project is full move to the
+  // next. Past blocks are unassigned (history doesn't need a label).
+  const billableProjectMap = useMemo(() => {
+    const result = new Map<string, { id: string; name: string; color?: string }>() // billableHourId → project
+    if (!billableHours.length || !projects?.length) return result
+    const nowMs = Date.now()
+
+    const startOfWeekMs = (d: Date): number => {
+      const out = new Date(d)
+      out.setHours(0, 0, 0, 0)
+      out.setDate(out.getDate() - out.getDay()) // Sunday-anchored
+      return out.getTime()
+    }
+
+    const candidates = (projects as any[]).filter(
+      p =>
+        p.status !== 'archived' &&
+        ((p.commitment_total_hours != null && Number(p.commitment_total_hours) > 0) ||
+          (p.commitment_weekly_hours != null && Number(p.commitment_weekly_hours) > 0))
+    )
+    if (candidates.length === 0) return result
+
+    interface Slot {
+      id: string
+      name: string
+      color?: string
+      remainingTotal: number // Infinity when no total cap
+      weeklyHours: number // Infinity when no weekly cap
+      remainingByWeek: Map<number, number> // weekStartMs → hours left
+    }
+    const slots: Slot[] = []
+    for (const p of candidates) {
+      const totalCommit =
+        p.commitment_total_hours != null ? Number(p.commitment_total_hours) : Infinity
+      const weeklyCommit =
+        p.commitment_weekly_hours != null ? Number(p.commitment_weekly_hours) : Infinity
+      let workedTotal = 0
+      let workedThisWeek = 0
+      const currentWeek = startOfWeekMs(new Date())
+      for (const a of projectActivity || []) {
+        if (a.project_id !== p.id) continue
+        const s = new Date(a.start_time).getTime()
+        const e = new Date(a.end_time).getTime()
+        if (e <= s) continue
+        const dur = (e - s) / (1000 * 60 * 60)
+        workedTotal += dur
+        if (startOfWeekMs(new Date(s)) === currentWeek) workedThisWeek += dur
+      }
+      const remainingTotal = Math.max(0, totalCommit - workedTotal)
+      if (remainingTotal <= 0) continue
+      const remainingByWeek = new Map<number, number>()
+      if (Number.isFinite(weeklyCommit)) {
+        remainingByWeek.set(currentWeek, Math.max(0, weeklyCommit - workedThisWeek))
+      }
+      slots.push({
+        id: p.id,
+        name: p.name,
+        color: p.color,
+        remainingTotal,
+        weeklyHours: weeklyCommit,
+        remainingByWeek,
+      })
+    }
+
+    // Weekly-bound projects fill first so their cadence is honored before
+    // non-weekly projects soak up the slots.
+    slots.sort((a, b) => {
+      const aW = Number.isFinite(a.weeklyHours) ? 0 : 1
+      const bW = Number.isFinite(b.weeklyHours) ? 0 : 1
+      return aW - bW
+    })
+
+    const upcoming = billableHours
+      .filter(b => new Date(b.start_time).getTime() >= nowMs)
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+
+    for (const block of upcoming) {
+      const dur =
+        (new Date(block.end_time).getTime() - new Date(block.start_time).getTime()) /
+        (1000 * 60 * 60)
+      if (dur <= 0) continue
+      const blockWeek = startOfWeekMs(new Date(block.start_time))
+      let chosen: Slot | null = null
+      for (const slot of slots) {
+        if (slot.remainingTotal <= 0) continue
+        if (Number.isFinite(slot.weeklyHours)) {
+          if (!slot.remainingByWeek.has(blockWeek)) {
+            slot.remainingByWeek.set(blockWeek, slot.weeklyHours)
+          }
+          if ((slot.remainingByWeek.get(blockWeek) ?? 0) <= 0) continue
+        }
+        chosen = slot
+        break
+      }
+      if (!chosen) continue
+      result.set(block.id, { id: chosen.id, name: chosen.name, color: chosen.color })
+      chosen.remainingTotal -= dur
+      if (Number.isFinite(chosen.weeklyHours)) {
+        chosen.remainingByWeek.set(
+          blockWeek,
+          (chosen.remainingByWeek.get(blockWeek) ?? chosen.weeklyHours) - dur
+        )
+      }
+    }
+    return result
+  }, [billableHours, projects, projectActivity])
+
+  // Income variants for the day-column tooltip. Each upcoming billable
+  // block is valued at the assigned project's hourly_rate when one is
+  // set, falling back to the block's own rate (or default $100/hr)
+  // when unassigned. Declared after billableProjectMap so it can read
+  // the assignment results directly.
+  const billableIncomeStats = useMemo(() => {
+    const now = new Date()
+    const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const rateByProject = new Map<string, number>()
+    for (const p of (projects || []) as any[]) {
+      rateByProject.set(p.id, Number(p.hourly_rate || 0))
+    }
+    const incomeOfBlock = (b: any): number => {
+      const s = new Date(b.start_time).getTime()
+      const e = new Date(b.end_time).getTime()
+      if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) return 0
+      const hours = (e - s) / (1000 * 60 * 60)
+      const assignment = billableProjectMap.get(b.id)
+      let rate = 0
+      if (assignment) rate = rateByProject.get(assignment.id) || 0
+      if (!rate) rate = Number(b.rate || 100)
+      return hours * rate
+    }
+    const sumIncome = (rangeStart: Date, rangeEnd: Date): number =>
+      billableHours.reduce((sum, b) => {
+        const start = new Date(b.start_time).getTime()
+        if (start >= rangeStart.getTime() && start < rangeEnd.getTime()) {
+          return sum + incomeOfBlock(b)
+        }
+        return sum
+      }, 0)
+    const incomeForDay = (dateStr: string): number => {
+      const dayStart = new Date(`${dateStr}T00:00:00`)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayEnd.getDate() + 1)
+      return sumIncome(dayStart, dayEnd)
+    }
+    return {
+      incomeForDay,
+      next7DaysIncome: sumIncome(now, sevenDaysOut),
+      restOfMonthIncome: sumIncome(now, endOfMonth),
+    }
+  }, [billableHours, billableProjectMap, projects])
+
+  // Forecast upcoming-payment rows for the top-bar "Remaining Month"
+  // tooltip. Two sources feed in:
+  //  - past project_activity at projects with hourly_rate, paid out
+  //    on a date driven by payment_type (manual = same day, upwork =
+  //    Friday after the next Sunday-8pm cutoff)
+  //  - upcoming billable_hours assigned to projects via
+  //    billableProjectMap (forecasted under the same payout rules)
+  // Plus a per-week "Possible Pay:" row summing UNassigned upcoming
+  // billable_hours × their default rate.
+  const upcomingPayments = useMemo(() => {
+    const startOfDayMs = (d: Date): number => {
+      const out = new Date(d)
+      out.setHours(0, 0, 0, 0)
+      return out.getTime()
+    }
+    const startOfWeekMs = (d: Date): number => {
+      const out = new Date(d)
+      out.setHours(0, 0, 0, 0)
+      out.setDate(out.getDate() - out.getDay())
+      return out.getTime()
+    }
+    // Upwork pay date: Friday after the next Sunday at 20:00 local.
+    const upworkPaymentDateMs = (t: number): number => {
+      const T = new Date(t)
+      const sun = new Date(T)
+      const daysUntilSun = (7 - sun.getDay()) % 7
+      sun.setDate(sun.getDate() + daysUntilSun)
+      sun.setHours(20, 0, 0, 0)
+      if (sun.getTime() < t) sun.setDate(sun.getDate() + 7)
+      const fri = new Date(sun)
+      fri.setDate(fri.getDate() + 5)
+      fri.setHours(0, 0, 0, 0)
+      return fri.getTime()
+    }
+
+    const projectIndex = new Map<
+      string,
+      { name: string; hourly_rate: number; payment_type: 'manual' | 'upwork' }
+    >()
+    for (const p of (projects || []) as any[]) {
+      projectIndex.set(p.id, {
+        name: p.name,
+        hourly_rate: Number(p.hourly_rate || 0),
+        payment_type: (p.payment_type as 'manual' | 'upwork') || 'manual',
+      })
+    }
+
+    const todayStart = startOfDayMs(new Date())
+    // End of current month, exclusive — anything paid on or after this
+    // date doesn't count toward the "Remaining Month" forecast.
+    const endOfMonthMs = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth() + 1,
+      1
+    ).getTime()
+    interface Row {
+      sortKey: number
+      dateLabel: string
+      label: string
+      amount: number
+    }
+    const projectBuckets = new Map<string, Row>() // key: paymentMs|projectId
+    const possibleBuckets = new Map<number, Row>() // key: weekStartMs
+
+    const addProject = (paymentMs: number, projectId: string, hours: number) => {
+      const proj = projectIndex.get(projectId)
+      if (!proj || proj.hourly_rate <= 0 || hours <= 0) return
+      if (paymentMs < todayStart || paymentMs >= endOfMonthMs) return
+      const amount = hours * proj.hourly_rate
+      const key = `${paymentMs}|${projectId}`
+      const existing = projectBuckets.get(key)
+      if (existing) {
+        existing.amount += amount
+        return
+      }
+      projectBuckets.set(key, {
+        sortKey: paymentMs,
+        dateLabel: format(new Date(paymentMs), 'EEE M/d'),
+        label: proj.name,
+        amount,
+      })
+    }
+
+    // Past project_activity awaiting payment.
+    for (const a of (projectActivity || []) as any[]) {
+      const proj = projectIndex.get(a.project_id)
+      if (!proj) continue
+      const s = new Date(a.start_time).getTime()
+      const e = new Date(a.end_time).getTime()
+      if (e <= s) continue
+      const hours = (e - s) / (1000 * 60 * 60)
+      const paymentMs =
+        proj.payment_type === 'upwork' ? upworkPaymentDateMs(s) : startOfDayMs(new Date(s))
+      addProject(paymentMs, a.project_id, hours)
+    }
+
+    // Forecast: all billable_hours. We don't pre-filter past blocks
+    // here — addProject's paymentMs guard drops past payouts and the
+    // weekEnd check below keeps a partially-past week's bucket alive.
+    const defaultRate = 100
+    for (const block of billableHours) {
+      const s = new Date(block.start_time).getTime()
+      const e = new Date(block.end_time).getTime()
+      if (e <= s) continue
+      const hours = (e - s) / (1000 * 60 * 60)
+      const assignment = billableProjectMap.get(block.id)
+      if (assignment) {
+        const proj = projectIndex.get(assignment.id)
+        if (!proj) continue
+        const paymentMs =
+          proj.payment_type === 'upwork' ? upworkPaymentDateMs(s) : startOfDayMs(new Date(s))
+        addProject(paymentMs, assignment.id, hours)
+      } else {
+        // Unassigned → Possible Pay weekly bucket at the block's rate
+        // (falls back to default flat rate when row is rate-less).
+        const rate = Number(block.rate || defaultRate)
+        const week = startOfWeekMs(new Date(s))
+        // Sat of week = Sun + 6 days, end of day. Include the bucket
+        // when Saturday hasn't passed yet so partially-past weeks
+        // (e.g., today is Mon, blocks scheduled later in the same
+        // week) still show.
+        const weekEnd = week + 7 * 24 * 60 * 60 * 1000 - 1
+        if (weekEnd < todayStart || week >= endOfMonthMs) continue
+        const existing = possibleBuckets.get(week)
+        const amount = hours * rate
+        if (existing) {
+          existing.amount += amount
+        } else {
+          const sun = new Date(week)
+          const sat = new Date(week + 6 * 24 * 60 * 60 * 1000)
+          possibleBuckets.set(week, {
+            sortKey: week,
+            dateLabel: `Possible: ${format(sun, 'M/d')}-${format(sat, 'M/d')}`,
+            label: 'Possible Pay',
+            amount,
+          })
+        }
+      }
+    }
+
+    return [
+      ...projectBuckets.values(),
+      ...possibleBuckets.values(),
+    ].sort((a, b) => a.sortKey - b.sortKey)
+  }, [billableHours, billableProjectMap, projects, projectActivity])
+
+  const remainingMonthTotal = useMemo(
+    () => upcomingPayments.reduce((sum, r) => sum + r.amount, 0),
+    [upcomingPayments]
+  )
+
+  // Past-payment retrospectives shown under the dashed line in the
+  // tooltip: amount paid in the last 7 days, and the 7-day window
+  // before that (day −14 through day −7). Each project_activity row's
+  // payment_date is computed the same way as the forecast above
+  // (manual = same day, upwork = Friday after the next Sunday-8pm
+  // cutoff).
+  const pastPayWindows = useMemo(() => {
+    const startOfDay = (d: Date): number => {
+      const out = new Date(d)
+      out.setHours(0, 0, 0, 0)
+      return out.getTime()
+    }
+    const upworkPaymentDateMs = (t: number): number => {
+      const T = new Date(t)
+      const sun = new Date(T)
+      const daysUntilSun = (7 - sun.getDay()) % 7
+      sun.setDate(sun.getDate() + daysUntilSun)
+      sun.setHours(20, 0, 0, 0)
+      if (sun.getTime() < t) sun.setDate(sun.getDate() + 7)
+      const fri = new Date(sun)
+      fri.setDate(fri.getDate() + 5)
+      fri.setHours(0, 0, 0, 0)
+      return fri.getTime()
+    }
+    const todayStart = startOfDay(new Date())
+    const sevenDaysAgo = todayStart - 7 * 24 * 60 * 60 * 1000
+    const fourteenDaysAgo = todayStart - 14 * 24 * 60 * 60 * 1000
+
+    const projectIndex = new Map<
+      string,
+      { hourly_rate: number; payment_type: 'manual' | 'upwork' }
+    >()
+    for (const p of (projects || []) as any[]) {
+      projectIndex.set(p.id, {
+        hourly_rate: Number(p.hourly_rate || 0),
+        payment_type: (p.payment_type as 'manual' | 'upwork') || 'manual',
+      })
+    }
+
+    let last7 = 0
+    let prev7 = 0
+    for (const a of (projectActivity || []) as any[]) {
+      const proj = projectIndex.get(a.project_id)
+      if (!proj || proj.hourly_rate <= 0) continue
+      const s = new Date(a.start_time).getTime()
+      const e = new Date(a.end_time).getTime()
+      if (e <= s) continue
+      const hours = (e - s) / (1000 * 60 * 60)
+      const paymentMs =
+        proj.payment_type === 'upwork'
+          ? upworkPaymentDateMs(s)
+          : startOfDay(new Date(s))
+      const amount = hours * proj.hourly_rate
+      if (paymentMs >= sevenDaysAgo && paymentMs < todayStart) last7 += amount
+      else if (paymentMs >= fourteenDaysAgo && paymentMs < sevenDaysAgo)
+        prev7 += amount
+    }
+    return { last7, prev7 }
+  }, [projects, projectActivity])
+
+  // Index billable hours by date-hour key for the per-slot render.
+  const billableHoursIndex = useMemo(() => {
+    const index = new Map<string, any[]>()
+    billableHours.forEach(block => {
+      const start = new Date(block.start_time)
+      const dateStr = format(start, 'yyyy-MM-dd')
+      const key = `${dateStr}-${start.getHours()}`
+      const arr = index.get(key) || []
+      const projectInfo = billableProjectMap.get(block.id)
+      arr.push(
+        projectInfo
+          ? { ...block, _projectName: projectInfo.name, _projectColor: projectInfo.color }
+          : block
+      )
+      index.set(key, arr)
+    })
+    return index
+  }, [billableHours, billableProjectMap])
+
+  const getBillableHoursForTimeSlot = useCallback(
+    (timeSlot: string, date: Date) => {
+      const key = `${format(date, 'yyyy-MM-dd')}-${parseInt(timeSlot.split(':')[0], 10)}`
+      return billableHoursIndex.get(key) || []
+    },
+    [billableHoursIndex]
+  )
+
   // Render all calendar events for a time slot
   const renderCalendarEvents = useCallback(
     (timeSlot: string, date: Date) => {
@@ -1176,6 +1863,7 @@ const CalendarContent = () => {
       const buffersInSlot = getBuffersForCalendarTimeSlot(timeSlot, date)
       const categoryBuffersInSlot = getCategoryBuffersForTimeSlot(timeSlot, date)
       const projectActivityInSlot = getProjectActivityForTimeSlot(timeSlot, date)
+      const billableHoursInSlot = getBillableHoursForTimeSlot(timeSlot, date)
       // Tasks render from tasks_daily_logs (single source of truth)
       const tasksInSlot: any[] = []
       const tasksDailyLogsInSlot = getTasksDailyLogsForTimeSlot(timeSlot, date)
@@ -1192,6 +1880,7 @@ const CalendarContent = () => {
           tasksDailyLogsInSlot={tasksDailyLogsInSlot}
           categoryBuffersInSlot={categoryBuffersInSlot}
           projectActivityInSlot={projectActivityInSlot}
+          billableHoursInSlot={billableHoursInSlot}
           timeSlot={timeSlot}
           date={date}
           dateStr={dateStr}
@@ -1201,7 +1890,9 @@ const CalendarContent = () => {
           handleSessionClick={handleSessionClick}
           handleTaskClick={handleTaskClick}
           handleEditMeeting={handleEditMeeting}
-          handleProjectActivityClick={openProjectActivityModal}
+          handleProjectActivityClick={handleProjectActivityClick}
+          onProjectActivityResizeStart={handleProjectActivityResizeStart}
+          onBillableHourResizeStart={handleBillableHourResizeStart}
           onMeetingResizeStart={handleMeetingResizeStart}
           onMeetingDragStart={handleMeetingDragStart}
           draggingMeetingId={draggingMeeting?.id}
@@ -1226,13 +1917,16 @@ const CalendarContent = () => {
       getBuffersForCalendarTimeSlot,
       getCategoryBuffersForTimeSlot,
       getProjectActivityForTimeSlot,
+      getBillableHoursForTimeSlot,
       isDataLoading,
       tasksScheduled,
       handleHabitClick,
       handleSessionClick,
       handleTaskClick,
       handleEditMeeting,
-      openProjectActivityModal,
+      handleProjectActivityClick,
+      handleProjectActivityResizeStart,
+      handleBillableHourResizeStart,
       handleTaskLogDragStart,
       draggingTaskLog,
       taskLogDragY,
@@ -1329,12 +2023,6 @@ const CalendarContent = () => {
     [noteBadgesIndex]
   )
 
-  const { plannedHours, actualHours, actualHoursBreakdown, plannedHoursBreakdown } = useMemo(
-    () =>
-      calculateWorkHours(scheduledTasksCache, allTasks, tasksScheduled, settings, tasksDailyLogs),
-    [scheduledTasksCache, allTasks, tasksScheduled, settings, tasksDailyLogs]
-  )
-
   // Set the handlers for the modal provider
   useEffect(() => {
     handlersRef.current = {
@@ -1408,7 +2096,7 @@ const CalendarContent = () => {
       // Slow path: close the task upstream and regenerate the source's
       // schedule in the background so the modal doesn't block on network.
       // The freed slot will fill in once the regen lands.
-      ;(async () => {
+      const closeTaskUpstreamInBackground = async () => {
         try {
           if (result.source === 'todoist' && result.todoistTaskId) {
             // Fire-and-forget the upstream close in parallel with the
@@ -1431,7 +2119,8 @@ const CalendarContent = () => {
         } catch (err) {
           console.error('Error in background task-complete chain:', err)
         }
-      })()
+      }
+      void closeTaskUpstreamInBackground()
     },
     onDeleteTask: async task => {
       const deletedId = await handleDeleteTask(task)
@@ -1459,7 +2148,7 @@ const CalendarContent = () => {
       // 3. Push the edit upstream so the next full sync doesn't overwrite
       //    it from the external API. Fire-and-forget — the modal has
       //    already shown "Saved" by now.
-      ;(async () => {
+      const pushTaskEditUpstream = async () => {
         try {
           if (task?.source === 'todoist' && task?.todoist_task_id) {
             await supabase.functions.invoke('todoist', {
@@ -1483,7 +2172,8 @@ const CalendarContent = () => {
         } catch (err) {
           console.error('Error pushing task edit upstream:', err)
         }
-      })()
+      }
+      void pushTaskEditUpstream()
     },
     onHabitTimeChange: async (habitId, date, newTime, newDuration) => {
       await handlersRef.current.habitTimeChange?.(habitId, date, newTime, newDuration)
@@ -1533,6 +2223,26 @@ const CalendarContent = () => {
     setCalendarModalData({ meetingTitles, meetingCategories, habits: calendarHabits, archivedHabits, projects, projectActivity })
   }, [meetingTitles, meetingCategories, calendarHabits, archivedHabits, projects, projectActivity, setCalendarModalData])
 
+  // Compute the habit-drag-preview shadow position from the original
+  // start time + the live drag delta. Recomputes only while a habit drag
+  // is active; otherwise stays null.
+  const habitDragPreview = useMemo(() => {
+    if (!draggingHabit || !draggingHabitDate) return null
+    const dateStr = format(draggingHabitDate, 'yyyy-MM-dd')
+    const colIdx = dayColumns.findIndex(c => c.dateStr === dateStr)
+    if (colIdx === -1) return null
+    const durationMin = draggingHabit.duration || 60
+    const heightPx = (durationMin / 60) * hourHeight
+    const [origH, origM] = habitOriginalStartRef.current.split(':').map(Number)
+    const deltaMin = deltaYToMinutes(habitDragY)
+    const totalMin = origH * 60 + origM + deltaMin
+    const newH = Math.max(0, Math.floor(totalMin / 60))
+    const hourIndex = hourToGridIndex(newH)
+    const minuteFrac = (totalMin % 60) / 60
+    const topPx = (hourIndex + minuteFrac) * hourHeight
+    return { columnIndex: colIdx, topPx, heightPx }
+  }, [draggingHabit, draggingHabitDate, habitDragY, hourHeight, dayColumns])
+
   return (
     <div className="flex flex-col bg-white md:h-screen md:overflow-hidden">
       {/* CSS for drag animation */}
@@ -1573,18 +2283,11 @@ const CalendarContent = () => {
       )}
       <CalendarTopBar
         settings={settings}
-        plannedHours={plannedHours}
-        actualHours={actualHours}
-        plannedHoursBreakdown={plannedHoursBreakdown}
-        actualHoursBreakdown={actualHoursBreakdown}
         showWorkHoursTooltip={showWorkHoursTooltip}
-        showActualHoursTooltip={showActualHoursTooltip}
-        showPlannedHoursTooltip={showPlannedHoursTooltip}
-        showTaskScheduleModal={showTaskScheduleModal}
         setShowWorkHoursTooltip={setShowWorkHoursTooltip}
-        setShowActualHoursTooltip={setShowActualHoursTooltip}
-        setShowPlannedHoursTooltip={setShowPlannedHoursTooltip}
-        setShowTaskScheduleModal={setShowTaskScheduleModal}
+        restOfMonthHours={billableStats.restOfMonthHours}
+        remainingMonthTotal={remainingMonthTotal}
+        upcomingPayments={upcomingPayments}
         navigateBackWeek={navigateBackWeek}
         navigateBackDay={navigateBackDay}
         navigateToToday={navigateToToday}
@@ -1657,11 +2360,19 @@ const CalendarContent = () => {
         {dayColumns.map((column, columnIndex) => (
           <div
             key={columnIndex}
-            className="py-1 px-1.5 sm:py-0.5 sm:px-1 bg-neutral-50 border-r border-neutral-200 last:border-r-0 min-w-0 flex items-center justify-center sm:justify-start"
+            className="py-1 px-1.5 sm:py-0.5 sm:px-1 bg-neutral-50 border-r border-neutral-200 last:border-r-0 min-w-0 flex items-center justify-between gap-1"
           >
             <h2 className="text-base sm:text-sm font-medium text-neutral-900 truncate text-center sm:text-left">
               {column.label}
             </h2>
+            <BillableStatsBadge
+              dayLabel={column.label}
+              dayIncome={billableIncomeStats.incomeForDay(column.dateStr)}
+              next7DaysIncome={billableIncomeStats.next7DaysIncome}
+              restOfMonthIncome={billableIncomeStats.restOfMonthIncome}
+              last7DaysPaid={pastPayWindows.last7}
+              prev7DaysPaid={pastPayWindows.prev7}
+            />
           </div>
         ))}
       </div>
@@ -1709,31 +2420,8 @@ const CalendarContent = () => {
         dragEnd={dragEnd}
         isInDragSelection={isInDragSelection}
         getCurrentTimeLinePosition={getCurrentTimeLinePosition}
-        habitDragPreview={draggingHabit && draggingHabitDate ? (() => {
-          const dateStr = format(draggingHabitDate, 'yyyy-MM-dd')
-          const colIdx = dayColumns.findIndex(c => c.dateStr === dateStr)
-          if (colIdx === -1) return null
-          const durationMin = draggingHabit.duration || 60
-          const heightPx = (durationMin / 60) * hourHeight
-          // Compute new start from original + drag delta
-          const [origH, origM] = habitOriginalStartRef.current.split(':').map(Number)
-          const deltaMin = deltaYToMinutes(habitDragY)
-          const totalMin = origH * 60 + origM + deltaMin
-          const newH = Math.max(0, Math.floor(totalMin / 60))
-          const hourIndex = hourToGridIndex(newH)
-          const minuteFrac = (totalMin % 60) / 60
-          const topPx = (hourIndex + minuteFrac) * hourHeight
-          return { columnIndex: colIdx, topPx, heightPx }
-        })() : null}
+        habitDragPreview={habitDragPreview}
         hourHeight={hourHeight}
-      />
-
-      <TaskScheduleModal
-        showTaskScheduleModal={showTaskScheduleModal}
-        setShowTaskScheduleModal={setShowTaskScheduleModal}
-        scheduledTasksCache={scheduledTasksCache}
-        allTasks={allTasks}
-        tasksDailyLogs={tasksDailyLogs}
       />
 
       {/* Note View Modal */}
@@ -1755,6 +2443,27 @@ const CalendarContent = () => {
           setViewingNote(null)
         }}
       />
+
+      {/* Conflict toast — shown when a manual billable-hour drop or
+          resize was rejected by the hook's overlap guard. The block
+          itself snapped back because local state was never updated. */}
+      {conflictToast && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 bg-red-600 text-white rounded-md shadow-lg text-xs flex items-center gap-1.5"
+        >
+          <span>{conflictToast}</span>
+          <button
+            type="button"
+            onClick={() => setConflictToast(null)}
+            aria-label="Dismiss"
+            className="hover:opacity-80"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }

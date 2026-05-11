@@ -1,23 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { Meeting } from '../types'
 import { handleTaskRolloverForPastMeeting } from '../utils/meetingManager'
-
-export interface Meeting {
-  id: string
-  user_id: string
-  title: string
-  description?: string
-  start_time: string
-  end_time: string
-  location?: string
-  attendees?: string[]
-  meeting_type: 'general' | 'work' | 'personal' | 'appointment'
-  priority: 'low' | 'medium' | 'high'
-  status: 'scheduled' | 'completed' | 'cancelled'
-  category_id?: string
-  created_at: string
-  updated_at: string
-}
 
 export const useMeetings = (date?: Date) => {
   const [meetings, setMeetings] = useState<Meeting[]>([])

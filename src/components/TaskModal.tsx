@@ -45,7 +45,6 @@ const TaskModal = ({
     try {
       await onUpdateTask(selectedTask.id, mainTaskChanges)
       setMainTaskChanges({})
-      await onRefetchTasks()
       handleClose()
     } catch (error) {
       console.error('Error saving main task:', error)
@@ -58,12 +57,7 @@ const TaskModal = ({
 
     try {
       await onDeleteTask(selectedSubtask.id)
-      
-      // Clear the selected subtask
       setSelectedSubtask(null)
-      
-      // Refresh tasks to get updated data
-      await onRefetchTasks()
     } catch (error) {
       console.error('Error deleting subtask:', error)
     }
@@ -91,7 +85,7 @@ const TaskModal = ({
 
       if (Object.keys(updates).length > 0) {
         await onUpdateTask(selectedSubtask.id, updates)
-        
+
         // Clear editing states
         setEditingHours(prev => {
           const updated = { ...prev }
@@ -103,9 +97,6 @@ const TaskModal = ({
           delete updated[selectedSubtask.id]
           return updated
         })
-
-        // Refresh tasks to get updated data
-        await onRefetchTasks()
       }
     } catch (error) {
       console.error('Error saving subtask:', error)
@@ -149,7 +140,11 @@ const TaskModal = ({
 
       await onAddTask(taskData)
 
-      // Refresh tasks to get updated subtasks
+      // TODO(consistency-sweep): Drop this refetch once the hook's addTask
+      // can splice subtasks under their parent's `subtasks` array based on
+      // parent_task_id. Currently the hook does setTasks(prev => [data,
+      // ...prev]) which puts the new subtask at the top level instead of
+      // nested under the parent. Until that's fixed, we need the refetch.
       await onRefetchTasks()
 
       setNewSubtask({ title: '', description: '', priority: 'medium', estimated_hours: 1 })

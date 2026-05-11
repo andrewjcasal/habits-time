@@ -5,7 +5,7 @@ import HabitContext from './HabitContext'
 import InlineEdit from './InlineEdit'
 import { useHabits } from '../hooks/useHabits'
 import { useHabitTypes } from '../hooks/useHabitTypes'
-import { supabase } from '../lib/supabase'
+import { supabase, HabitWithType } from '../lib/supabase'
 
 interface HabitDetailTabsProps {
   habitId: string
@@ -22,6 +22,21 @@ interface HabitDetailTabsProps {
   showCompletionToggle?: boolean
   onCompletionToggle?: () => void
   isCompleted?: boolean
+  /** Optional overrides that route archive/unarchive/delete through the
+   *  caller's `useHabits()` instance instead of this component's
+   *  internal one. Used by the desktop sidebar mount in
+   *  HabitsMainContent so the parent's habits-list state reflects the
+   *  mutation in-place (BUG: 86b9va2fg). When omitted (e.g. on the
+   *  mobile HabitDetail page where this component owns its own data),
+   *  the local `useHabits` mutators are used. */
+  archiveHabitOverride?: (habitId: string) => Promise<void>
+  unarchiveHabitOverride?: (habit: HabitWithType) => Promise<void>
+  deleteHabitOverride?: (habitId: string) => Promise<void>
+  /** When supplied, the panel reads `currentHabit` from the caller's
+   *  state instead of from its own internal `useHabits()` instance.
+   *  Pairs with the *Override mutators above so the panel's reads and
+   *  writes both flow through the parent's hook (BUG: 86b9va2fg). */
+  currentHabitOverride?: HabitWithType | null
 }
 
 const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
@@ -35,6 +50,10 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   showCompletionToggle = false,
   onCompletionToggle,
   isCompleted = false,
+  archiveHabitOverride,
+  unarchiveHabitOverride,
+  deleteHabitOverride,
+  currentHabitOverride,
 }) => {
   const [activeTab, setActiveTab] = useState<'subhabits' | 'settings'>(initialTab)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -62,10 +81,23 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
   const [subhabitComments, setSubhabitComments] = useState<{[key: string]: string}>({})
   const [savingComments, setSavingComments] = useState<{[key: string]: boolean}>({})
   const commentTimeoutRefs = useRef<{[key: string]: NodeJS.Timeout}>({})
-  const { habits, updateHabitType, updateHabitDuration, updateHabitName, updateHabitDefaultStartTime, updateHabitWeeklyDays, archiveHabit, unarchiveHabit, deleteHabit } = useHabits(undefined, { includeArchived: true })
+  const { habits, updateHabitType, updateHabitDuration, updateHabitName, updateHabitDefaultStartTime, updateHabitWeeklyDays, archiveHabit: archiveHabitLocal, unarchiveHabit: unarchiveHabitLocal, deleteHabit: deleteHabitLocal } = useHabits(undefined, { includeArchived: true })
+  // Prefer parent-supplied mutators when present so the parent's local
+  // habits state mutates in-place — see prop docs for BUG: 86b9va2fg.
+  const archiveHabit = archiveHabitOverride ?? archiveHabitLocal
+  const unarchiveHabit = unarchiveHabitOverride ?? unarchiveHabitLocal
+  const deleteHabit = deleteHabitOverride ?? deleteHabitLocal
   const { habitTypes } = useHabitTypes()
   
-  const currentHabit = habits.find(h => h.id === habitId)
+  // Prefer the LOCAL hook's habit when it has a row, since this
+  // component's form fields (name/duration/default_start_time/weekly_days)
+  // are mutated through `useHabits` here and the local hook patches its
+  // own state in place. The parent-supplied override exists for shared
+  // mutations like archive/unarchive/delete (BUG: 86b9va2fg) but is
+  // stale for these in-form edits. Fall back to the override only if
+  // the local lookup misses (e.g. archived → not in this hook's list).
+  const localHabit = habits.find(h => h.id === habitId)
+  const currentHabit = localHabit ?? currentHabitOverride
   const currentHabitType = currentHabit?.habits_types
   const navigate = useNavigate()
 
@@ -141,7 +173,9 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
       // Wipe existing
       await supabase.from('cassian_habit_todoist_tasks').delete().eq('habit_id', habitId)
 
-      // Insert new
+      // Insert new and use the returned rows (with generated ids) to update
+      // local state directly — sync is a full replace for this habit, so
+      // setting local state to the inserted rows mirrors the DB exactly.
       if (matchingTasks.length > 0) {
         const defaultDuration = currentHabit.todoist_task_duration || 3
         const rows = matchingTasks.map((t: any, i: number) => ({
@@ -152,10 +186,14 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
           sort_order: i + 1,
           user_id: user.id,
         }))
-        await supabase.from('cassian_habit_todoist_tasks').insert(rows)
+        const { data: insertedRows } = await supabase
+          .from('cassian_habit_todoist_tasks')
+          .insert(rows)
+          .select()
+        setTodoistTasks(insertedRows || [])
+      } else {
+        setTodoistTasks([])
       }
-
-      await fetchTodoistTasks()
     } catch (err) {
       console.error('Error syncing todoist tasks:', err)
     } finally {
@@ -510,6 +548,19 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
 
   return (
     <div className="h-full flex flex-col">
+      {showBackButton && (
+        <div className="bg-white border-b border-gray-200 flex-shrink-0 flex items-center gap-2 px-2 py-1.5">
+          <button
+            type="button"
+            onClick={onBackClick}
+            aria-label="Back to habits"
+            className="p-1 -ml-1 rounded hover:bg-gray-100 transition-colors text-gray-700"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <h1 className="text-sm font-medium text-neutral-900 truncate">{habitName}</h1>
+        </div>
+      )}
       {/* Tab Navigation */}
       <div className="bg-gray-50 border-b border-gray-200 flex-shrink-0">
         <div className="flex grid grid-cols-2">
@@ -654,7 +705,8 @@ const HabitDetailTabs: React.FC<HabitDetailTabsProps> = ({
                   {currentHabit?.is_archived ? (
                     <button
                       onClick={async () => {
-                        await unarchiveHabit(habitId)
+                        if (!currentHabit) return
+                        await unarchiveHabit(currentHabit)
                         onHabitDeleted?.()
                       }}
                       className="flex-shrink-0 px-2 py-1 bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors text-xs"

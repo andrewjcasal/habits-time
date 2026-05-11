@@ -1,5 +1,4 @@
 import React from 'react'
-import { format } from 'date-fns'
 import {
   AlertCircle,
   ChevronLeft,
@@ -7,7 +6,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Info,
-  ListTodo,
   Plus,
   Sun,
   Settings,
@@ -20,18 +18,8 @@ import { useModal } from '../contexts/useModal'
 
 interface CalendarTopBarProps {
   settings: any
-  plannedHours: number
-  actualHours: number
-  plannedHoursBreakdown: any[]
-  actualHoursBreakdown: any[]
   showWorkHoursTooltip: boolean
-  showActualHoursTooltip: boolean
-  showPlannedHoursTooltip: boolean
-  showTaskScheduleModal: boolean
   setShowWorkHoursTooltip: (show: boolean) => void
-  setShowActualHoursTooltip: (show: boolean) => void
-  setShowPlannedHoursTooltip: (show: boolean) => void
-  setShowTaskScheduleModal: (show: boolean) => void
   navigateBackWeek: () => void
   navigateBackDay: () => void
   navigateToToday: () => void
@@ -50,22 +38,25 @@ interface CalendarTopBarProps {
   dayColumnCount?: number
   setDayColumnCount?: (count: number) => void
   archivedHabits?: { id: string; name: string }[]
+  /** Default rate per upcoming billable hour, used to render the
+   *  dollar amount alongside the Remaining Month hours stat. */
+  upcomingBillableRate?: number
+  /** Hours of upcoming billable_hours through end of current month. */
+  restOfMonthHours?: number
+  /** Sum of upcoming-payment rows that arrive within the current
+   *  month, computed at each project's real rate. Headlined alongside
+   *  the hours figure so the headline matches the tooltip Total. */
+  remainingMonthTotal?: number
+  /** Forecast payment rows shown in the Remaining Month tooltip.
+   *  Each row is one (date × project) or (week × "Possible Pay")
+   *  bucket, sorted ascending by date. */
+  upcomingPayments?: Array<{ dateLabel: string; label: string; amount: number }>
 }
 
 export default function CalendarTopBar({
   settings,
-  plannedHours,
-  actualHours,
-  plannedHoursBreakdown,
-  actualHoursBreakdown,
   showWorkHoursTooltip,
-  showActualHoursTooltip,
-  showPlannedHoursTooltip,
-  showTaskScheduleModal,
   setShowWorkHoursTooltip,
-  setShowActualHoursTooltip,
-  setShowPlannedHoursTooltip,
-  setShowTaskScheduleModal,
   navigateBackWeek,
   navigateBackDay,
   navigateToToday,
@@ -84,9 +75,14 @@ export default function CalendarTopBar({
   dayColumnCount = 7,
   setDayColumnCount,
   archivedHabits = [],
+  upcomingBillableRate: _upcomingBillableRate = 100,
+  restOfMonthHours = 0,
+  remainingMonthTotal = 0,
+  upcomingPayments = [],
 }: CalendarTopBarProps) {
   const { openNeedHelpModal } = useModal()
   const showBar = settings ? (settings.metadata?.showWorkHoursBar ?? true) : false
+  const [showRemainingTooltip, setShowRemainingTooltip] = React.useState(false)
 
   return (
     // Top Bar with Navigation and Work Hours
@@ -107,7 +103,7 @@ export default function CalendarTopBar({
         <button
           onClick={navigateBackWeek}
           className="hidden sm:block hover:bg-neutral-200 rounded transition-colors"
-          title="Go back 5 days"
+          title="Go back 7 days"
         >
           <ChevronsLeft className="w-3 h-3 text-neutral-600" />
         </button>
@@ -144,7 +140,7 @@ export default function CalendarTopBar({
         <button
           onClick={navigateForwardWeek}
           className="hidden sm:block hover:bg-neutral-200 rounded transition-colors"
-          title="Go forward 5 days"
+          title="Go forward 7 days"
         >
           <ChevronsRight className="w-3 h-3 text-neutral-600" />
         </button>
@@ -162,235 +158,96 @@ export default function CalendarTopBar({
           </button>
         )}
 
-        {/* Work Hours Label - desktop only, togglable */}
-        {showBar && <div className="hidden sm:block text-sm text-neutral-700 ml-2 work-hours-tooltip relative">
-          {settings ? (
-            <div className="flex items-center">
-              <span>Work Hours</span>
-              <button
-                onClick={() => setShowWorkHoursTooltip(!showWorkHoursTooltip)}
-                className="ml-0 hover:bg-neutral-200 rounded p-0.5 transition-colors"
-                title="Work hours details"
-              >
-                <Info className="w-2 h-2 text-neutral-500" />
-              </button>
-              <button
-                onClick={() => setShowTaskScheduleModal(!showTaskScheduleModal)}
-                className="ml-0.5 hover:bg-neutral-200 rounded p-0.5 transition-colors"
-                title="View upcoming tasks"
-              >
-                <ListTodo className="w-2 h-2 text-neutral-500" />
-              </button>
-              {showWorkHoursTooltip && (
-                <div className="absolute top-full left-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg p-3 text-xs whitespace-nowrap z-50">
-                  <div className="font-medium mb-1">Work Schedule:</div>
-                  <div>
-                    Daily: {settings.work_hours_start} - {settings.work_hours_end}
+        {/* Work-schedule info icon — kept (the label "Work Hours" was
+            removed alongside the planned/actual stats). Toggles a
+            tooltip with the user's daily window + week-ending day. */}
+        {showBar && (
+          <div className="hidden sm:block text-sm text-neutral-700 ml-2 work-hours-tooltip relative">
+            {settings ? (
+              <div className="flex items-center">
+                <button
+                  onClick={() => setShowWorkHoursTooltip(!showWorkHoursTooltip)}
+                  className="hover:bg-neutral-200 rounded p-0.5 transition-colors"
+                  title="Work hours details"
+                  aria-label="Work hours details"
+                >
+                  <Info className="w-2 h-2 text-neutral-500" />
+                </button>
+                {showWorkHoursTooltip && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg p-3 text-xs whitespace-nowrap z-50">
+                    <div className="font-medium mb-1">Work Schedule:</div>
+                    <div>
+                      Daily: {settings.work_hours_start} - {settings.work_hours_end}
+                    </div>
+                    <div>
+                      Week ends:{' '}
+                      {settings.week_ending_day?.charAt(0).toUpperCase() +
+                        settings.week_ending_day?.slice(1)}{' '}
+                      {new Date(
+                        `1970-01-01T${settings.week_ending_time || '20:30'}`
+                      ).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                      })}
+                    </div>
+                    <div>
+                      Timezone: {settings.week_ending_timezone?.split('/')[1]?.replace('_', ' ')}
+                    </div>
                   </div>
-                  <div>
-                    Week ends:{' '}
-                    {settings.week_ending_day?.charAt(0).toUpperCase() +
-                      settings.week_ending_day?.slice(1)}{' '}
-                    {new Date(
-                      `1970-01-01T${settings.week_ending_time || '20:30'}`
-                    ).toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                    })}
-                  </div>
-                  <div>
-                    Timezone: {settings.week_ending_timezone?.split('/')[1]?.replace('_', ' ')}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <span className="text-neutral-400">Loading work hours...</span>
-          )}
-        </div>}
+                )}
+              </div>
+            ) : (
+              <span className="text-neutral-400">Loading…</span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Right side: Planned and Actual hours */}
-      {showBar && <div className="flex items-center gap-2">
-        <div className="text-sm relative planned-hours-tooltip">
-          <span className="text-neutral-600">Planned:</span>
-          <span
-            className="font-medium text-neutral-900 ml-1 cursor-pointer hover:underline"
-            onClick={() => setShowPlannedHoursTooltip(!showPlannedHoursTooltip)}
+      {/* Right side: billable-hours summary stats. "Bill 7d" is the
+          sum of upcoming cassian_billable_hours durations × the flat
+          rate; "Billed 7d" is duration only (past project_activity
+          rows fold in via the hook but don't carry rates). */}
+      {showBar && (
+        <div className="hidden sm:flex items-center gap-3 text-sm">
+          <div
+            className="relative"
+            onMouseEnter={() => setShowRemainingTooltip(true)}
+            onMouseLeave={() => setShowRemainingTooltip(false)}
           >
-            {plannedHours.toFixed(1)}h ($
-            {plannedHoursBreakdown
-              .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
-              .reduce((sum, item) => sum + item.hours * Number(item.hourlyRate), 0)
-              .toFixed(0)}
-            )
-          </span>
-          {showPlannedHoursTooltip && (
-            <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-neutral-200 shadow-lg rounded-md p-2 z-50">
-              <div className="text-sm font-medium text-neutral-900">
-                Planned Hours Breakdown
-              </div>
-              {plannedHoursBreakdown.filter(
-                item => item.hourlyRate && Number(item.hourlyRate) > 0
-              ).length > 0 ? (
-                <div className="space-y-2">
-                  {(() => {
-                    // Group by project
-                    const groupedByProject = plannedHoursBreakdown
-                      .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
-                      .reduce((acc, item) => {
-                        const existingProject = acc.find(
-                          group => group.projectName === item.projectName
-                        )
-                        if (existingProject) {
-                          existingProject.sessions.push(item)
-                          existingProject.totalHours += item.hours
-                          existingProject.totalValue += item.hours * Number(item.hourlyRate)
-                        } else {
-                          acc.push({
-                            projectName: item.projectName,
-                            hourlyRate: item.hourlyRate,
-                            totalHours: item.hours,
-                            totalValue: item.hours * Number(item.hourlyRate),
-                            sessions: [item],
-                          })
-                        }
-                        return acc
-                      }, [])
-
-                    return groupedByProject.map((project, projectIndex) => (
-                      <div
-                        key={projectIndex}
-                        className="border-b border-neutral-100 last:border-b-0 pb-2 last:pb-0"
-                      >
-                        <div className="flex justify-between items-center mb-1">
-                          <div className="flex items-center gap-2">
-                            <div className="font-medium text-neutral-900">
-                              {project.projectName}
-                            </div>
-                            <div className="text-neutral-500 text-xs">
-                              ${Number(project.hourlyRate)}/hr
-                            </div>
-                          </div>
-                          <div className="text-neutral-900 font-medium">
-                            {project.totalHours.toFixed(1)}h
-                            <div className="text-blue-600 text-xs">
-                              ${project.totalValue.toFixed(0)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-0.5 ml-2">
-                          {project.sessions.map((session, sessionIndex) => (
-                            <div
-                              key={sessionIndex}
-                              className="flex justify-between items-center text-xs"
-                            >
-                              <div className="flex-1">
-                                <div className="text-neutral-600 truncate flex items-center">
-                                  {session.sessionName}
-                                  {session.isCompleted && (
-                                    <span className="ml-2 text-green-600">✓</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-neutral-600">
-                                {session.hours.toFixed(1)}h
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  })()}
-                  <div className="border-t border-neutral-200 pt-1 mt-2">
-                    <div className="flex justify-between items-center text-sm font-medium">
-                      <span>Total</span>
-                      <span>
-                        {plannedHoursBreakdown
-                          .filter(item => item.hourlyRate && Number(item.hourlyRate) > 0)
-                          .reduce((sum, item) => sum + item.hours, 0)
-                          .toFixed(1)}
-                        h
-                      </span>
-                    </div>
-                    {plannedHoursBreakdown.some(
-                      item => item.hourlyRate && Number(item.hourlyRate) > 0
-                    ) && (
-                      <div className="flex justify-between items-center text-sm text-blue-600">
-                        <span>Est. Value</span>
-                        <span>
-                          $
-                          {plannedHoursBreakdown
-                            .reduce(
-                              (sum, item) =>
-                                sum +
-                                item.hours *
-                                  (Number(item.hourlyRate) > 0 ? Number(item.hourlyRate) : 0),
-                              0
-                            )
-                            .toFixed(0)}
+            <span className="text-neutral-600">Remaining Month:</span>
+            <span className="font-medium text-neutral-900 ml-1">
+              {restOfMonthHours.toFixed(2)}h (${remainingMonthTotal.toFixed(0)})
+            </span>
+            {showRemainingTooltip && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg p-2 text-xs whitespace-nowrap z-50 min-w-[180px]">
+                {upcomingPayments.length === 0 ? (
+                  <div className="text-neutral-500">No upcoming payments</div>
+                ) : (
+                  <>
+                    {upcomingPayments.map((row, i) => (
+                      <div key={i} className="flex justify-between gap-3">
+                        <span className="text-neutral-600">
+                          {row.dateLabel}{row.label !== 'Possible Pay' ? ` (${row.label})` : ''}:
+                        </span>
+                        <span className="font-medium text-neutral-900">
+                          ${row.amount.toFixed(0)}
                         </span>
                       </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-neutral-500">No planned work found</div>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="hidden sm:block text-sm relative actual-hours-tooltip">
-          <span className="text-neutral-600">Actual:</span>
-          <span
-            className="font-medium text-neutral-900 ml-1 cursor-pointer hover:underline"
-            onClick={() => setShowActualHoursTooltip(!showActualHoursTooltip)}
-          >
-            {actualHours.toFixed(1)}h
-          </span>
-          {showActualHoursTooltip && (
-            <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-neutral-200 shadow-lg rounded-md p-3 z-50">
-              <div className="text-sm font-medium text-neutral-900 mb-2">
-                Actual Hours Breakdown
+                    ))}
+                    <div className="flex justify-between gap-3 mt-1 pt-1 border-t border-neutral-200">
+                      <span className="text-neutral-700 font-medium">Total:</span>
+                      <span className="font-semibold text-neutral-900">
+                        ${upcomingPayments.reduce((sum, r) => sum + r.amount, 0).toFixed(0)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
-              {actualHoursBreakdown.length > 0 ? (
-                <div className="space-y-1">
-                  {actualHoursBreakdown.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center text-xs">
-                      <div className="flex-1">
-                        <div className="font-medium text-neutral-900">{item.projectName}</div>
-                        <div className="text-neutral-600">
-                          {format(new Date(item.date), 'MMM d')}
-                        </div>
-                        {item.hourlyRate && Number(item.hourlyRate) > 0 && (
-                          <div className="text-neutral-500">${Number(item.hourlyRate)}/hr</div>
-                        )}
-                      </div>
-                      <div className="text-neutral-900 font-medium">
-                        {item.hours.toFixed(1)}h
-                        {item.hourlyRate && item.hourlyRate > 0 && (
-                          <div className="text-green-600 text-xs">
-                            ${(item.hours * item.hourlyRate).toFixed(0)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <div className="border-t border-neutral-200 pt-1 mt-2">
-                    <div className="flex justify-between items-center text-sm font-medium">
-                      <span>Total</span>
-                      <span>{actualHours.toFixed(1)}h</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-neutral-500">No completed sessions yet</div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>}
+      )}
 
       {/* Calendar Settings Gear + Mobile Hamburger */}
       <div className="relative ml-2 flex items-center gap-1">

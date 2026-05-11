@@ -13,6 +13,7 @@ import TaskModal from '../components/TaskModal'
 import DayViewModal from '../components/DayViewModal'
 import SessionsList from '../components/SessionsList'
 import TasksList from '../components/TasksList'
+import CommitmentsPanel from '../components/CommitmentsPanel'
 
 const Projects = () => {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -41,7 +42,6 @@ const Projects = () => {
     createSessionsWithContract,
     refetchTasks,
     refetchSessions,
-    fetchProjects,
   } = useProjectsPageData(selectedProjectId)
 
   // Public project hooks (only for non-authenticated users)
@@ -106,13 +106,8 @@ const Projects = () => {
   const handleUpdateProject = useCallback(
     async (projectId: string, data: any) => {
       await updateProject(projectId, data)
-
-      // If a project was archived, refresh the projects list to remove it from the dropdown
-      if (data.status === 'archived') {
-        await fetchProjects()
-      }
     },
-    [updateProject, fetchProjects]
+    [updateProject]
   )
 
   const handleToggleTaskStatus = async (task: Task) => {
@@ -167,8 +162,9 @@ const Projects = () => {
         status: 'completed',
       })
 
-      // Refresh tasks and sessions to show updated status
-      await refetchTasks()
+      // Sessions need a refetch because the cassian_session_tasks join above
+      // was a raw upsert; the join data isn't easily spliced locally. Tasks
+      // were already updated in-place by updateTask.
       await refetchSessions()
     } catch (error) {
       console.error('Error completing session tasks:', error)
@@ -602,6 +598,13 @@ const Projects = () => {
                 onCopyToClipboard={handleCopyToClipboard}
                 onUpdateSession={user ? updateSession : undefined}
                 onCompleteSessionTasks={user ? handleCompleteSessionTasks : undefined}
+              />
+            )}
+
+            {user && (
+              <CommitmentsPanel
+                selectedProject={currentProject}
+                onUpdateProject={handleUpdateProject}
               />
             )}
 

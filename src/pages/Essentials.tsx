@@ -3,11 +3,7 @@ import { Plus, Edit, Trash2, Save, X, Star } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-
-interface ActivityType {
-  id: string
-  name: string
-}
+import { ActivityType } from '../types'
 
 interface Essential {
   id: string

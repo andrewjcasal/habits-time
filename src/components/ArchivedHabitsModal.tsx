@@ -2,14 +2,7 @@ import { useEffect, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import ModalWrapper from './ModalWrapper'
-
-interface ArchivedHabit {
-  id: string
-  name: string
-  duration: number | null
-  current_start_time: string | null
-  weekly_days: string[] | null
-}
+import { ArchivedHabit } from '../types'
 
 interface ArchivedHabitsModalProps {
   isOpen: boolean

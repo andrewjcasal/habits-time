@@ -4,22 +4,7 @@ import { ArrowLeft, Target, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import LoadingSpinner from '../components/LoadingSpinner'
-
-interface Aspect {
-  id: string
-  title: string
-  created_at: string
-  updated_at: string
-  subhabits?: Subhabit[]
-}
-
-interface Subhabit {
-  id: string
-  title: string
-  aspect_id: string
-  created_at: string
-  updated_at: string
-}
+import { Aspect, Subhabit } from '../types'
 
 const AspectDetail = () => {
   const { aspectId } = useParams<{ aspectId: string }>()

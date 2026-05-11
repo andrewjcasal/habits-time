@@ -55,3 +55,16 @@ export const getColumnDate = (dateStr: string, hour: number): string => {
   d.setDate(d.getDate() - 1)
   return format(d, 'yyyy-MM-dd')
 }
+
+/**
+ * "Effective today" — between 00:00 and GRID_START_HOUR (5 AM), the user is
+ * still conceptually in the previous day (the grid already places those
+ * hours in yesterday's column). Returns the yyyy-MM-dd string for whichever
+ * day owns the current moment in the calendar's mental model.
+ */
+export const getEffectiveTodayStr = (now: Date = new Date()): string => {
+  const hour = now.getHours()
+  const d = new Date(now)
+  if (isLateNightHour(hour)) d.setDate(d.getDate() - 1)
+  return format(d, 'yyyy-MM-dd')
+}

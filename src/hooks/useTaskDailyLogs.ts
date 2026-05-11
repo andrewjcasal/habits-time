@@ -1,23 +1,11 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
+import type { TaskDailyLog } from '../types'
 
-export interface TaskDailyLog {
-  id?: string
-  task_id: string
-  user_id: string
-  log_date: string
-  scheduled_start_time: string
-  scheduled_end_time: string
-  estimated_hours: number
-  actual_start_time?: string
-  actual_end_time?: string
-  completed_at?: string
-  time_spent_hours?: number
-  notes?: string
-  created_at?: string
-  updated_at?: string
-}
+// Re-export so existing `import { TaskDailyLog } from '../hooks/useTaskDailyLogs'`
+// call sites keep working.
+export type { TaskDailyLog }
 
 export function useTaskDailyLogs() {
   const [loading, setLoading] = useState(false)
